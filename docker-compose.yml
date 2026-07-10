@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gestrest-db
+    environment:
+      POSTGRES_USER: gestrest
+      POSTGRES_PASSWORD: gestrest
+      POSTGRES_DB: gestrest
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gestrest']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: gestrest-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://gestrest:gestrest@db:5432/gestrest?schema=public
+      JWT_ACCESS_SECRET: change-me-in-prod-access
+      JWT_REFRESH_SECRET: change-me-in-prod-refresh
+      CORS_ORIGIN: http://localhost:8080
+    ports:
+      - '4000:4000'
+
+  frontend:
+    build: ./frontend
+    container_name: gestrest-frontend
+    depends_on:
+      - backend
+    ports:
+      - '8080:80'
+
+volumes:
+  pgdata:

@@ -1,0 +1,312 @@
+// GestRest - Sistema de Gestão de Restaurante
+// Modelo de dados normalizado (PostgreSQL + Prisma)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MANAGER
+  WAITER
+  JUICER // Suqueiro
+  COOK // Cozinheiro
+  CASHIER // Caixa
+}
+
+// Estação de produção: para onde o item é roteado
+enum Station {
+  KITCHEN // Cozinha (comidas)
+  JUICE_BAR // Suqueiros (bebidas)
+  NONE // Itens que não passam por produção
+}
+
+enum TableStatus {
+  FREE // Livre
+  OCCUPIED // Ocupada
+  IN_PRODUCTION // Em Produção
+  READY_FOR_PAYMENT // Pronta para Pagamento
+  CLOSED // Fechada
+}
+
+enum OrderStatus {
+  OPEN // Aberto (comanda ativa)
+  IN_PRODUCTION // Em produção
+  READY_FOR_PAYMENT // Todos os itens concluídos
+  PAID // Pago / fechado
+  CANCELLED // Cancelado
+}
+
+enum ProductionStatus {
+  WAITING // Aguardando
+  PREPARING // Preparando
+  DONE // Concluído
+  CANCELLED // Cancelado
+}
+
+enum PaymentMethod {
+  PIX
+  CASH // Dinheiro
+  CREDIT // Cartão Crédito
+  DEBIT // Cartão Débito
+  MEAL_VOUCHER // Vale Alimentação
+}
+
+enum AuditAction {
+  ORDER_CREATED
+  ORDER_UPDATED
+  ORDER_CANCELLED
+  ITEM_ADDED
+  ITEM_UPDATED
+  ITEM_REMOVED
+  STATUS_CHANGED
+  PAYMENT_RECEIVED
+  TABLE_OPENED
+  TABLE_CLOSED
+  LOGIN
+  USER_CREATED
+}
+
+// ─────────────────────────────────────────────────────────────
+// USUÁRIOS & PERMISSÕES
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(WAITER)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+  ordersAsWaiter Order[]        @relation("WaiterOrders")
+  auditLogs     AuditLog[]
+  payments      Payment[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CLIENTES & MESAS
+// ─────────────────────────────────────────────────────────────
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String?
+  createdAt DateTime @default(now())
+
+  orders Order[]
+
+  @@map("customers")
+}
+
+model RestaurantTable {
+  id        String      @id @default(uuid())
+  number    Int         @unique
+  status    TableStatus @default(FREE)
+  seats     Int         @default(4)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  orders Order[]
+
+  @@index([status])
+  @@map("tables")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CATÁLOGO: CATEGORIAS, PRODUTOS, ADICIONAIS
+// ─────────────────────────────────────────────────────────────
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  station   Station  @default(KITCHEN) // roteamento automático
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  products    Product[]
+  additionals Additional[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  price         Decimal  @db.Decimal(10, 2)
+  imageUrl      String?
+  avgPrepMin    Int      @default(10) // tempo médio de preparo (min)
+  available     Boolean  @default(true)
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@index([available])
+  @@map("products")
+}
+
+model Additional {
+  id         String   @id @default(uuid())
+  name       String
+  price      Decimal  @db.Decimal(10, 2) @default(0)
+  active     Boolean  @default(true)
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  createdAt  DateTime @default(now())
+
+  orderItemAdditionals OrderItemAdditional[]
+
+  @@map("additionals")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PEDIDOS (COMANDAS)
+// ─────────────────────────────────────────────────────────────
+
+model Order {
+  id           String      @id @default(uuid())
+  number       Int         @default(autoincrement()) // número sequencial da comanda
+  tableId      String
+  table        RestaurantTable @relation(fields: [tableId], references: [id])
+  customerId   String?
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+  waiterId     String
+  waiter       User        @relation("WaiterOrders", fields: [waiterId], references: [id])
+  status       OrderStatus @default(OPEN)
+  peopleCount  Int         @default(1)
+  notes        String?
+  serviceRate  Decimal     @db.Decimal(5, 2) @default(10) // % taxa de serviço
+  discount     Decimal     @db.Decimal(10, 2) @default(0)
+  version      Int         @default(0) // controle de concorrência otimista
+  openedAt     DateTime    @default(now())
+  closedAt     DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  items    OrderItem[]
+  payments Payment[]
+
+  @@index([status])
+  @@index([tableId])
+  @@index([waiterId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String           @id @default(uuid())
+  orderId     String
+  order       Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product          @relation(fields: [productId], references: [id])
+  quantity    Int              @default(1)
+  unitPrice   Decimal          @db.Decimal(10, 2) // snapshot do preço no momento do pedido
+  notes       String?
+  station     Station          @default(KITCHEN) // snapshot da estação (roteamento)
+  status      ProductionStatus @default(WAITING)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  additionals OrderItemAdditional[]
+
+  @@index([orderId])
+  @@index([station, status])
+  @@map("order_items")
+}
+
+model OrderItemAdditional {
+  id           String     @id @default(uuid())
+  orderItemId  String
+  orderItem    OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  additionalId String
+  additional   Additional @relation(fields: [additionalId], references: [id])
+  name         String // snapshot
+  price        Decimal    @db.Decimal(10, 2) // snapshot
+
+  @@map("order_item_additionals")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PAGAMENTOS
+// ─────────────────────────────────────────────────────────────
+
+model Payment {
+  id          String        @id @default(uuid())
+  orderId     String
+  order       Order         @relation(fields: [orderId], references: [id])
+  method      PaymentMethod
+  amount      Decimal       @db.Decimal(10, 2)
+  change      Decimal       @db.Decimal(10, 2) @default(0) // troco (dinheiro)
+  cashierId   String
+  cashier     User          @relation(fields: [cashierId], references: [id])
+  createdAt   DateTime      @default(now())
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUDITORIA / LOGS
+// ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  action    AuditAction
+  userId    String?
+  user      User?       @relation(fields: [userId], references: [id])
+  entity    String? // ex: "Order", "OrderItem"
+  entityId  String?
+  ip        String?
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CONFIGURAÇÕES
+// ─────────────────────────────────────────────────────────────
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
