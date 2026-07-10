@@ -34,7 +34,8 @@ export default function Users() {
         action={<button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Novo Usuário</button>}
       />
       <Card className="!p-0">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
             <tr>
               <th className="p-3">Nome</th>
@@ -54,6 +55,7 @@ export default function Users() {
             ))}
           </tbody>
         </table>
+        </div>
       </Card>
       {creating && (
         <UserForm

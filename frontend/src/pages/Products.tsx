@@ -41,7 +41,8 @@ export default function Products() {
       <input className="input mb-4 max-w-xs" placeholder="Pesquisar..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
       <Card className="!p-0">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
             <tr>
               <th className="p-3">Nome</th>
@@ -71,6 +72,7 @@ export default function Products() {
             ))}
           </tbody>
         </table>
+        </div>
       </Card>
 
       {(creating || editing) && (

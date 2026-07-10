@@ -40,7 +40,8 @@ export default function Audit() {
     <div>
       <PageHeader title="Auditoria" subtitle="Registro de todas as ações do sistema" />
       <Card className="!p-0">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
             <tr>
               <th className="p-3">Data/Hora</th>
@@ -62,6 +63,7 @@ export default function Audit() {
             ))}
           </tbody>
         </table>
+        </div>
       </Card>
     </div>
   );
