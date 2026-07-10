@@ -21,3 +21,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// Registra o service worker para instalação como app (PWA).
+// Só roda em contexto seguro (HTTPS ou localhost); em HTTP puro é ignorado.
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* falha silenciosa — o app funciona normalmente sem o SW */
+    });
+  });
+}
