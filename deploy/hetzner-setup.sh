@@ -31,9 +31,11 @@ if grep -q "TROQUE" .env || grep -q "SEU_IP_AQUI" .env; then
   exit 1
 fi
 
-echo "==> 3/5  Abrindo a porta 80 no firewall (se o ufw estiver ativo)..."
+HTTP_PORT=$(grep -E '^HTTP_PORT=' .env | cut -d= -f2- || true)
+HTTP_PORT=${HTTP_PORT:-80}
+echo "==> 3/5  Abrindo a porta ${HTTP_PORT} no firewall (se o ufw estiver ativo)..."
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
-  ufw allow 80/tcp || true
+  ufw allow "${HTTP_PORT}/tcp" || true
 fi
 
 echo "==> 4/5  Build e subida dos containers..."

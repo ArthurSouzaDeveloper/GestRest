@@ -36,7 +36,8 @@ Preencha:
 | `POSTGRES_PASSWORD` | Uma senha forte para o banco (invente uma) |
 | `JWT_ACCESS_SECRET` | Rode `openssl rand -hex 32` e cole o resultado |
 | `JWT_REFRESH_SECRET` | Rode `openssl rand -hex 32` de novo (valor diferente) |
-| `PUBLIC_URL` | `http://SEU_IP` (o IP do servidor, sem barra no final) |
+| `HTTP_PORT` | `80` (padrão). Use outra porta, ex. `8081`, se o servidor já tiver outro sistema na 80 |
+| `PUBLIC_URL` | `http://SEU_IP` — **inclua a porta se não for 80**, ex.: `http://SEU_IP:8081` |
 
 Gere os segredos facilmente:
 
@@ -55,12 +56,12 @@ bash deploy/hetzner-setup.sh
 
 O script instala o Docker (se faltar), libera a porta 80, sobe o banco + backend + frontend, aplica as migrações e popula os dados iniciais. Ao final mostra o endereço de acesso.
 
-## 5. Liberar a porta 80 no firewall do Hetzner
+## 5. Liberar a porta no firewall do Hetzner
 
 Se você criou um **Firewall** no painel do Hetzner Cloud, adicione uma regra de entrada:
 
 - Painel Hetzner → seu servidor → *Firewalls* → *Rules* → **Inbound**
-- Adicione: `TCP` porta `80` de origem `Any IPv4 / Any IPv6`
+- Adicione: `TCP` porta `80` (ou a que você definiu em `HTTP_PORT`) de origem `Any IPv4 / Any IPv6`
 
 (Sem firewall do Hetzner, o script já cuida do `ufw` interno.)
 
@@ -105,6 +106,26 @@ docker compose -f docker-compose.prod.yml exec db \
 ```
 
 ---
+
+## Rodar junto com outros sistemas no mesmo servidor
+
+Um servidor aguenta vários sistemas — o limite prático é a memória (veja com `free -h`
+e `docker stats`). O único cuidado é a **porta**: só um sistema usa a porta 80.
+
+Para o GestRest conviver com outro sistema, defina no `.env` uma porta livre e
+inclua-a na URL pública:
+
+```env
+HTTP_PORT=8081
+PUBLIC_URL=http://SEU_IP:8081
+```
+
+Depois recrie: `docker compose -f docker-compose.prod.yml --env-file .env up -d`.
+O sistema passa a responder em `http://SEU_IP:8081`, deixando a porta 80 livre para
+outro app. Cada sistema fica isolado na sua própria pasta, rede e banco.
+
+> Dica: com um domínio, um reverse proxy (Caddy) na porta 80/443 roteia vários
+> sistemas por subdomínio, sem portas na URL. Posso montar isso quando você quiser.
 
 ## Adicionar um domínio + HTTPS depois (opcional)
 

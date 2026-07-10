@@ -43,7 +43,9 @@ services:
     depends_on:
       - backend
     ports:
-      - '80:80'
+      # Porta pública no servidor. Troque HTTP_PORT no .env para conviver com
+      # outros sistemas no mesmo host (ex.: 8081). Dentro do container é sempre 80.
+      - '${HTTP_PORT:-80}:80'
 
 volumes:
   pgdata:
