@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
@@ -22,7 +23,10 @@ export function signAccessToken(payload: AccessTokenPayload): string {
 }
 
 export function signRefreshToken(userId: string): string {
-  return jwt.sign({ sub: userId }, env.jwt.refreshSecret, {
+  // `jti` (a random token id) guarantees every refresh token is unique, even
+  // when two are minted within the same second — otherwise identical `iat`
+  // claims would produce identical tokens and collide on the unique index.
+  return jwt.sign({ sub: userId, jti: randomUUID() }, env.jwt.refreshSecret, {
     expiresIn: env.jwt.refreshExpires,
   } as jwt.SignOptions);
 }
