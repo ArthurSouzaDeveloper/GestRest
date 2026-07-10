@@ -52,8 +52,13 @@ done
 
 echo "==> 5/5  Populando dados iniciais (apenas na primeira vez)..."
 if [ ! -f .seeded ]; then
-  $COMPOSE exec -T backend npx prisma db seed && touch .seeded
-  echo "    Seed concluído. Usuários demo (senha 123456): admin@ / gerente@ / garcom@ / suqueiro@ / cozinha@ / caixa@ gestrest.com"
+  if $COMPOSE exec -T backend npx prisma db seed; then
+    touch .seeded
+    echo "    Seed concluído. Usuários demo (senha 123456): admin@ / gerente@ / garcom@ / suqueiro@ / cozinha@ / caixa@ gestrest.com"
+  else
+    echo "    !! O SEED FALHOU. O banco pode estar sem usuários. Veja o erro acima e rode de novo:"
+    echo "       $COMPOSE exec backend npx prisma db seed"
+  fi
 else
   echo "    Já foi populado antes (arquivo .seeded existe). Pulando."
 fi
