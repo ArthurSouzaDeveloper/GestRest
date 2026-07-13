@@ -145,6 +145,32 @@ docker compose -f docker-compose.prod.yml exec db \
 
 ---
 
+## Onboarding de um restaurante com cardápio real (ex.: O Rei do Suco)
+
+Para restaurantes com cardápio grande e complexo (ex.: dezenas de sabores de
+suco em várias bases), a forma mais rápida é: **1)** criar o restaurante +
+admin pelo painel `/super`, **2)** rodar o script de importação do cardápio.
+
+```bash
+# 1. No painel /super, clique "Novo Restaurante" e cadastre nome, slug e o
+#    admin (e-mail/senha) daquele restaurante. Anote o slug (ex.: rei-do-suco).
+
+# 2. Importe o cardápio completo para esse restaurante:
+docker compose -f docker-compose.prod.yml --env-file .env exec backend \
+  node dist/scripts/import-menu-rei-do-suco.js --slug=rei-do-suco
+```
+
+O script é **idempotente** — rodar de novo não duplica itens (produtos e
+adicionais já existentes são ignorados). Ele cria as categorias, todos os
+produtos com os preços reais do cardápio, e os grupos de adicionais.
+
+Para o **suco montado na hora** (fruta + base + adicionais), o sistema conta
+com um montador guiado na tela do garçom: ele escolhe a fruta, depois a base
+(Água, Laranja, Leite, Frapê, Vinho — cada uma com seu preço correto) e por
+fim os adicionais, sem precisar rolar uma lista enorme de combinações prontas.
+Pastéis e mini pizzas "monte o seu" usam o campo de observações + adicionais
+já existentes no pedido.
+
 ## Rodar junto com outros sistemas no mesmo servidor
 
 Um servidor aguenta vários sistemas — o limite prático é a memória (veja com `free -h`
