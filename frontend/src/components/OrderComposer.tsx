@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, Minus, X } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
+import { JuiceBuilder } from './JuiceBuilder';
 import type { Additional, Category, Product } from '../types';
 
 export interface DraftItem {
@@ -48,6 +49,14 @@ export function OrderComposer({
     }
   };
 
+  const addFromBuilder = (item: DraftItem) => setDraft([...draft, item]);
+
+  // Categorias com produtos nomeados "Fruta (Base)" usam o montador guiado
+  // (fruta -> base -> adicionais) em vez da grade — evita listar dezenas de
+  // combinações como botões separados.
+  const activeCategory = categories.find((c) => c.id === activeCat);
+  const useBuilder = activeCategory?.name.toLowerCase() === 'sucos';
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {/* Catalog */}
@@ -69,18 +78,29 @@ export function OrderComposer({
             </button>
           ))}
         </div>
-        <div className="grid max-h-[50vh] grid-cols-2 gap-2 overflow-y-auto pr-1">
-          {filtered.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => addSimple(p)}
-              className="card flex flex-col items-start p-3 text-left transition hover:border-brand hover:shadow"
-            >
-              <span className="text-sm font-medium leading-tight">{p.name}</span>
-              <span className="mt-1 text-xs text-gray-500">{brl(p.price)}</span>
-            </button>
-          ))}
-        </div>
+        {useBuilder ? (
+          <div className="max-h-[55vh] overflow-y-auto pr-1">
+            <JuiceBuilder products={filtered} categoryId={activeCat} onAdd={addFromBuilder} />
+          </div>
+        ) : (
+          <div className="grid max-h-[50vh] grid-cols-2 gap-2 overflow-y-auto pr-1">
+            {filtered.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => addSimple(p)}
+                className="card flex flex-col items-start p-3 text-left transition hover:border-brand hover:shadow"
+              >
+                <span className="text-sm font-medium leading-tight">{p.name}</span>
+                {p.description && (
+                  <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-gray-400">
+                    {p.description}
+                  </span>
+                )}
+                <span className="mt-1 text-xs text-gray-500">{brl(p.price)}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Draft cart */}
