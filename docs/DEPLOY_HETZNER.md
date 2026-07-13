@@ -79,6 +79,29 @@ Entre com um usuário demo (senha `123456`): `admin@gestrest.com`.
 
 ---
 
+## Atualizar um servidor já rodando para a versão multi-restaurante
+
+A versão multi-restaurante muda a estrutura do banco. Como o banco em produção
+ainda só tinha dados de demonstração, o caminho seguro é **recriar o banco** e
+popular de novo (isso apaga os dados de teste):
+
+```bash
+cd ~/GestRest
+git pull origin main
+docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+
+# Recria o schema (apaga dados de demonstração) e popula com superadmin + restaurante demo
+docker compose -f docker-compose.prod.yml --env-file .env exec backend npx prisma migrate reset --force --skip-seed
+docker compose -f docker-compose.prod.yml --env-file .env exec -T db \
+  psql -U gestrest -d gestrest < backend/prisma/seed.sql
+```
+
+Depois acesse:
+- **Painel da plataforma:** `http://SEU_IP:8081/super` → `super@gestrest.com` / `123456`
+- **Restaurante demo:** `http://SEU_IP:8081/r/demo` → `admin@gestrest.com` / `123456`
+
+> ⚠️ Troque as senhas padrão e crie os restaurantes reais pelo painel `/super`.
+
 ## Operação do dia a dia
 
 Todos os comandos rodam dentro da pasta `GestRest`:

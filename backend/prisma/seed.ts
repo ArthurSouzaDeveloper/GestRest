@@ -2,14 +2,33 @@ import { PrismaClient, Role, Station } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+const hash = (p: string) => bcrypt.hashSync(p, 10);
 
 async function main() {
-  console.log('🌱 Seeding GestRest...');
+  console.log('🌱 Seeding GestRest (multi-tenant)...');
 
-  const hash = (p: string) => bcrypt.hashSync(p, 10);
+  // ── SUPERADMIN (dono da plataforma, sem restaurante) ──
+  await prisma.user.upsert({
+    where: { email: 'super@gestrest.com' },
+    update: {},
+    create: {
+      name: 'Super Admin',
+      email: 'super@gestrest.com',
+      passwordHash: hash('123456'),
+      role: Role.SUPERADMIN,
+    },
+  });
 
-  // ── Users (one per role) ──
-  const users: { name: string; email: string; role: Role }[] = [
+  // ── Restaurante de demonstração ──
+  const restaurant = await prisma.restaurant.upsert({
+    where: { slug: 'demo' },
+    update: {},
+    create: { name: 'Restaurante Demo', slug: 'demo' },
+  });
+  const rid = restaurant.id;
+
+  // Equipe do restaurante
+  const staff: { name: string; email: string; role: Role }[] = [
     { name: 'Administrador', email: 'admin@gestrest.com', role: Role.ADMIN },
     { name: 'Gerente', email: 'gerente@gestrest.com', role: Role.MANAGER },
     { name: 'Garçom João', email: 'garcom@gestrest.com', role: Role.WAITER },
@@ -17,15 +36,15 @@ async function main() {
     { name: 'Cozinheiro Pedro', email: 'cozinha@gestrest.com', role: Role.COOK },
     { name: 'Caixa Maria', email: 'caixa@gestrest.com', role: Role.CASHIER },
   ];
-  for (const u of users) {
+  for (const u of staff) {
     await prisma.user.upsert({
       where: { email: u.email },
       update: {},
-      create: { ...u, passwordHash: hash('123456') },
+      create: { ...u, passwordHash: hash('123456'), restaurantId: rid },
     });
   }
 
-  // ── Categories with station routing ──
+  // Categorias
   const categories: { name: string; station: Station; sortOrder: number }[] = [
     { name: 'Sucos', station: Station.JUICE_BAR, sortOrder: 1 },
     { name: 'Refrigerantes', station: Station.JUICE_BAR, sortOrder: 2 },
@@ -38,32 +57,30 @@ async function main() {
   const catMap: Record<string, string> = {};
   for (const c of categories) {
     const cat = await prisma.category.upsert({
-      where: { name: c.name },
+      where: { restaurantId_name: { restaurantId: rid, name: c.name } },
       update: { station: c.station, sortOrder: c.sortOrder },
-      create: c,
+      create: { ...c, restaurantId: rid },
     });
     catMap[c.name] = cat.id;
   }
 
-  // ── Products ──
+  // Produtos
   const products = [
     { name: 'Suco de Laranja', category: 'Sucos', price: 9.9, avgPrepMin: 5 },
     { name: 'Suco de Morango', category: 'Sucos', price: 11.9, avgPrepMin: 5 },
     { name: 'Suco de Maracujá', category: 'Sucos', price: 10.9, avgPrepMin: 5 },
-    { name: 'Vitamina de Banana', category: 'Sucos', price: 12.9, avgPrepMin: 7 },
     { name: 'Coca-Cola Lata', category: 'Refrigerantes', price: 6.0, avgPrepMin: 1 },
-    { name: 'Guaraná Lata', category: 'Refrigerantes', price: 6.0, avgPrepMin: 1 },
     { name: 'Água Mineral 500ml', category: 'Água', price: 4.0, avgPrepMin: 1 },
     { name: 'Pastel de Carne', category: 'Pastéis', price: 8.5, avgPrepMin: 12 },
     { name: 'Pastel de Queijo', category: 'Pastéis', price: 8.5, avgPrepMin: 12 },
-    { name: 'Pastel de Frango c/ Catupiry', category: 'Pastéis', price: 9.5, avgPrepMin: 14 },
     { name: 'Mini Pizza Calabresa', category: 'Mini Pizzas', price: 15.9, avgPrepMin: 15 },
     { name: 'Mini Pizza Mussarela', category: 'Mini Pizzas', price: 14.9, avgPrepMin: 15 },
-    { name: 'Mini Pizza Portuguesa', category: 'Mini Pizzas', price: 16.9, avgPrepMin: 16 },
     { name: 'Petit Gateau', category: 'Sobremesas', price: 13.9, avgPrepMin: 10 },
   ];
   for (const p of products) {
-    const existing = await prisma.product.findFirst({ where: { name: p.name } });
+    const existing = await prisma.product.findFirst({
+      where: { name: p.name, restaurantId: rid },
+    });
     if (!existing) {
       await prisma.product.create({
         data: {
@@ -71,48 +88,43 @@ async function main() {
           price: p.price,
           avgPrepMin: p.avgPrepMin,
           categoryId: catMap[p.category],
+          restaurantId: rid,
         },
       });
     }
   }
 
-  // ── Additionals ──
+  // Adicionais
   const additionals = [
     { name: 'Leite condensado', price: 2.5, category: 'Sucos' },
     { name: 'Whey / Proteína', price: 6.0, category: 'Sucos' },
-    { name: 'Mel', price: 2.0, category: 'Sucos' },
-    { name: 'Polpa extra', price: 3.0, category: 'Sucos' },
     { name: 'Queijo extra', price: 3.0, category: 'Pastéis' },
-    { name: 'Cheddar', price: 3.5, category: 'Pastéis' },
-    { name: 'Catupiry', price: 3.5, category: 'Pastéis' },
     { name: 'Bacon', price: 4.0, category: 'Pastéis' },
-    { name: 'Ovo', price: 2.0, category: 'Pastéis' },
     { name: 'Borda recheada', price: 5.0, category: 'Mini Pizzas' },
-    { name: 'Queijo extra', price: 4.0, category: 'Mini Pizzas' },
-    { name: 'Calabresa extra', price: 4.5, category: 'Mini Pizzas' },
   ];
   for (const a of additionals) {
     const existing = await prisma.additional.findFirst({
-      where: { name: a.name, categoryId: catMap[a.category] },
+      where: { name: a.name, restaurantId: rid, categoryId: catMap[a.category] },
     });
     if (!existing) {
       await prisma.additional.create({
-        data: { name: a.name, price: a.price, categoryId: catMap[a.category] },
+        data: { name: a.name, price: a.price, categoryId: catMap[a.category], restaurantId: rid },
       });
     }
   }
 
-  // ── Tables ──
+  // Mesas
   for (let n = 1; n <= 20; n++) {
     await prisma.restaurantTable.upsert({
-      where: { number: n },
+      where: { restaurantId_number: { restaurantId: rid, number: n } },
       update: {},
-      create: { number: n, seats: n % 4 === 0 ? 6 : 4 },
+      create: { number: n, seats: n % 4 === 0 ? 6 : 4, restaurantId: rid },
     });
   }
 
-  console.log('✅ Seed complete.');
-  console.log('   Users (senha: 123456): admin@, gerente@, garcom@, suqueiro@, cozinha@, caixa@ gestrest.com');
+  console.log('✅ Seed completo.');
+  console.log('   SUPERADMIN: super@gestrest.com (senha 123456)');
+  console.log('   Restaurante demo (slug "demo"): admin@ / gerente@ / garcom@ / suqueiro@ / cozinha@ / caixa@ gestrest.com (senha 123456)');
 }
 
 main()

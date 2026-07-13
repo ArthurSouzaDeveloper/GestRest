@@ -12,16 +12,16 @@ function daysAgo(n: number): Date {
   return x;
 }
 
-async function revenueSince(since: Date): Promise<number> {
+async function revenueSince(tenantId: string, since: Date): Promise<number> {
   const rows = await prisma.payment.aggregate({
     _sum: { amount: true },
-    where: { createdAt: { gte: since } },
+    where: { restaurantId: tenantId, createdAt: { gte: since } },
   });
   return Number(rows._sum.amount ?? 0);
 }
 
 export const dashboardService = {
-  async summary() {
+  async summary(tenantId: string) {
     const [
       tables,
       waitingItems,
@@ -35,32 +35,57 @@ export const dashboardService = {
       topWaiters,
       finishedTimes,
     ] = await Promise.all([
-      prisma.restaurantTable.groupBy({ by: ['status'], _count: true }),
-      prisma.orderItem.count({ where: { status: ProductionStatus.WAITING } }),
-      prisma.orderItem.count({ where: { status: ProductionStatus.PREPARING } }),
-      prisma.order.count({ where: { status: OrderStatus.PAID, closedAt: { gte: startOfDay() } } }),
-      prisma.order.count({
-        where: { status: OrderStatus.CANCELLED, updatedAt: { gte: startOfDay() } },
+      prisma.restaurantTable.groupBy({
+        by: ['status'],
+        _count: true,
+        where: { restaurantId: tenantId },
       }),
-      revenueSince(startOfDay()),
-      revenueSince(daysAgo(7)),
-      revenueSince(daysAgo(30)),
+      prisma.orderItem.count({
+        where: { status: ProductionStatus.WAITING, order: { restaurantId: tenantId } },
+      }),
+      prisma.orderItem.count({
+        where: { status: ProductionStatus.PREPARING, order: { restaurantId: tenantId } },
+      }),
+      prisma.order.count({
+        where: {
+          restaurantId: tenantId,
+          status: OrderStatus.PAID,
+          closedAt: { gte: startOfDay() },
+        },
+      }),
+      prisma.order.count({
+        where: {
+          restaurantId: tenantId,
+          status: OrderStatus.CANCELLED,
+          updatedAt: { gte: startOfDay() },
+        },
+      }),
+      revenueSince(tenantId, startOfDay()),
+      revenueSince(tenantId, daysAgo(7)),
+      revenueSince(tenantId, daysAgo(30)),
       prisma.orderItem.groupBy({
         by: ['productId'],
         _sum: { quantity: true },
-        where: { status: { not: ProductionStatus.CANCELLED } },
+        where: {
+          status: { not: ProductionStatus.CANCELLED },
+          order: { restaurantId: tenantId },
+        },
         orderBy: { _sum: { quantity: 'desc' } },
         take: 5,
       }),
       prisma.order.groupBy({
         by: ['waiterId'],
         _count: true,
-        where: { status: OrderStatus.PAID },
+        where: { restaurantId: tenantId, status: OrderStatus.PAID },
         orderBy: { _count: { waiterId: 'desc' } },
         take: 5,
       }),
       prisma.orderItem.findMany({
-        where: { startedAt: { not: null }, finishedAt: { not: null } },
+        where: {
+          startedAt: { not: null },
+          finishedAt: { not: null },
+          order: { restaurantId: tenantId },
+        },
         select: { startedAt: true, finishedAt: true },
         take: 200,
         orderBy: { finishedAt: 'desc' },
@@ -72,7 +97,6 @@ export const dashboardService = {
       number
     >;
 
-    // Enrich top products & waiters with names
     const products = await prisma.product.findMany({
       where: { id: { in: topProducts.map((p) => p.productId) } },
       select: { id: true, name: true },
@@ -103,11 +127,7 @@ export const dashboardService = {
         finishedToday: paidToday,
         cancelledToday,
       },
-      revenue: {
-        daily: dailyRevenue,
-        weekly: weeklyRevenue,
-        monthly: monthlyRevenue,
-      },
+      revenue: { daily: dailyRevenue, weekly: weeklyRevenue, monthly: monthlyRevenue },
       avgPrepMin: Math.round(avgPrepMin * 10) / 10,
       topProducts: topProducts.map((p) => ({
         name: products.find((x) => x.id === p.productId)?.name ?? '—',

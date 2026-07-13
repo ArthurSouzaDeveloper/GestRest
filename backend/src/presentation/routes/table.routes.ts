@@ -5,24 +5,27 @@ import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validateBody } from '../middlewares/validate.middleware';
 import { tableService } from '../../application/services/table.service';
 import { tableSchema } from '../validators/schemas';
+import { ctx } from './context';
 
 const router = Router();
 router.use(authenticate);
 
-router.get('/', asyncHandler(async (_req, res) => res.json(await tableService.list())));
+router.get('/', asyncHandler(async (req, res) => res.json(await tableService.list(ctx(req).tenantId))));
 
 router.post(
   '/',
   authorize(Role.ADMIN, Role.MANAGER),
   validateBody(tableSchema),
-  asyncHandler(async (req, res) => res.status(201).json(await tableService.create(req.body))),
+  asyncHandler(async (req, res) =>
+    res.status(201).json(await tableService.create(ctx(req).tenantId, req.body)),
+  ),
 );
 
 router.delete(
   '/:id',
   authorize(Role.ADMIN, Role.MANAGER),
   asyncHandler(async (req, res) => {
-    await tableService.remove(req.params.id);
+    await tableService.remove(ctx(req).tenantId, req.params.id);
     res.status(204).end();
   }),
 );

@@ -6,6 +6,15 @@ export const loginSchema = z.object({
   password: z.string().min(4),
 });
 
+export const createRestaurantSchema = z.object({
+  name: z.string().min(2),
+  slug: z.string().min(2).optional(),
+  adminName: z.string().min(2),
+  adminEmail: z.string().email(),
+  adminPassword: z.string().min(6),
+  tablesCount: z.number().int().positive().max(100).optional(),
+});
+
 export const createUserSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),

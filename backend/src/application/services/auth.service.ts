@@ -17,25 +17,49 @@ function refreshExpiryDate(): Date {
 
 export const authService = {
   async login(email: string, password: string, ip?: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { restaurant: true },
+    });
     if (!user || !user.active) throw new UnauthorizedError('Credenciais inválidas');
+    if (user.restaurant && !user.restaurant.active) {
+      throw new UnauthorizedError('Restaurante inativo. Contate o administrador.');
+    }
 
     const ok = await comparePassword(password, user.passwordHash);
     if (!ok) throw new UnauthorizedError('Credenciais inválidas');
 
-    const accessToken = signAccessToken({ sub: user.id, role: user.role, name: user.name });
+    const accessToken = signAccessToken({
+      sub: user.id,
+      role: user.role,
+      name: user.name,
+      restaurantId: user.restaurantId,
+    });
     const refreshToken = signRefreshToken(user.id);
 
     await prisma.refreshToken.create({
       data: { token: refreshToken, userId: user.id, expiresAt: refreshExpiryDate() },
     });
 
-    await auditService.record({ action: AuditAction.LOGIN, userId: user.id, ip });
+    await auditService.record({
+      action: AuditAction.LOGIN,
+      userId: user.id,
+      restaurantId: user.restaurantId,
+      ip,
+    });
 
     return {
       accessToken,
       refreshToken,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        restaurant: user.restaurant
+          ? { id: user.restaurant.id, slug: user.restaurant.slug, name: user.restaurant.name }
+          : null,
+      },
     };
   },
 
@@ -64,7 +88,12 @@ export const authService = {
       data: { token: newRefresh, userId: user.id, expiresAt: refreshExpiryDate() },
     });
 
-    const accessToken = signAccessToken({ sub: user.id, role: user.role, name: user.name });
+    const accessToken = signAccessToken({
+      sub: user.id,
+      role: user.role,
+      name: user.name,
+      restaurantId: user.restaurantId,
+    });
     return { accessToken, refreshToken: newRefresh };
   },
 
@@ -76,7 +105,14 @@ export const authService = {
   async me(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true, role: true, active: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        active: true,
+        restaurant: { select: { id: true, slug: true, name: true } },
+      },
     });
     if (!user) throw new UnauthorizedError();
     return user;

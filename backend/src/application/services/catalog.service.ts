@@ -3,30 +3,40 @@ import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
 
 export const categoryService = {
-  list() {
-    return prisma.category.findMany({ orderBy: { sortOrder: 'asc' } });
+  list(tenantId: string) {
+    return prisma.category.findMany({
+      where: { restaurantId: tenantId },
+      orderBy: { sortOrder: 'asc' },
+    });
   },
-  create(data: { name: string; station: Station; sortOrder?: number }) {
-    return prisma.category.create({ data });
+  create(tenantId: string, data: { name: string; station: Station; sortOrder?: number }) {
+    return prisma.category.create({ data: { ...data, restaurantId: tenantId } });
   },
-  async update(id: string, data: Partial<{ name: string; station: Station; sortOrder: number }>) {
-    await categoryService.ensure(id);
+  async update(
+    tenantId: string,
+    id: string,
+    data: Partial<{ name: string; station: Station; sortOrder: number }>,
+  ) {
+    await categoryService.ensure(tenantId, id);
     return prisma.category.update({ where: { id }, data });
   },
-  async remove(id: string) {
-    await categoryService.ensure(id);
+  async remove(tenantId: string, id: string) {
+    await categoryService.ensure(tenantId, id);
     return prisma.category.delete({ where: { id } });
   },
-  async ensure(id: string) {
-    const c = await prisma.category.findUnique({ where: { id } });
+  async ensure(tenantId: string, id: string) {
+    const c = await prisma.category.findFirst({ where: { id, restaurantId: tenantId } });
     if (!c) throw new NotFoundError('Categoria');
     return c;
   },
 };
 
 export const productService = {
-  list(params: { search?: string; categoryId?: string; onlyAvailable?: boolean } = {}) {
-    const where: Prisma.ProductWhereInput = {};
+  list(
+    tenantId: string,
+    params: { search?: string; categoryId?: string; onlyAvailable?: boolean } = {},
+  ) {
+    const where: Prisma.ProductWhereInput = { restaurantId: tenantId };
     if (params.search) where.name = { contains: params.search, mode: 'insensitive' };
     if (params.categoryId) where.categoryId = params.categoryId;
     if (params.onlyAvailable) where.available = true;
@@ -36,49 +46,60 @@ export const productService = {
       orderBy: { name: 'asc' },
     });
   },
-  async get(id: string) {
-    const p = await prisma.product.findUnique({ where: { id }, include: { category: true } });
+  async get(tenantId: string, id: string) {
+    const p = await prisma.product.findFirst({
+      where: { id, restaurantId: tenantId },
+      include: { category: true },
+    });
     if (!p) throw new NotFoundError('Produto');
     return p;
   },
-  create(data: {
-    name: string;
-    description?: string;
-    price: number;
-    categoryId: string;
-    avgPrepMin?: number;
-    imageUrl?: string;
-    available?: boolean;
-  }) {
-    return prisma.product.create({ data });
+  async create(
+    tenantId: string,
+    data: {
+      name: string;
+      description?: string;
+      price: number;
+      categoryId: string;
+      avgPrepMin?: number;
+      imageUrl?: string;
+      available?: boolean;
+    },
+  ) {
+    // Garante que a categoria pertence ao mesmo restaurante.
+    await categoryService.ensure(tenantId, data.categoryId);
+    return prisma.product.create({ data: { ...data, restaurantId: tenantId } });
   },
-  async update(id: string, data: Prisma.ProductUpdateInput) {
-    await productService.get(id);
+  async update(tenantId: string, id: string, data: Prisma.ProductUpdateInput) {
+    await productService.get(tenantId, id);
     return prisma.product.update({ where: { id }, data });
   },
-  async remove(id: string) {
-    await productService.get(id);
+  async remove(tenantId: string, id: string) {
+    await productService.get(tenantId, id);
     return prisma.product.delete({ where: { id } });
   },
 };
 
 export const additionalService = {
-  list(params: { categoryId?: string; onlyActive?: boolean } = {}) {
-    const where: Prisma.AdditionalWhereInput = {};
+  list(tenantId: string, params: { categoryId?: string; onlyActive?: boolean } = {}) {
+    const where: Prisma.AdditionalWhereInput = { restaurantId: tenantId };
     if (params.categoryId) where.categoryId = params.categoryId;
     if (params.onlyActive) where.active = true;
     return prisma.additional.findMany({ where, orderBy: { name: 'asc' } });
   },
-  create(data: { name: string; price: number; categoryId?: string; active?: boolean }) {
-    return prisma.additional.create({ data });
+  create(
+    tenantId: string,
+    data: { name: string; price: number; categoryId?: string; active?: boolean },
+  ) {
+    return prisma.additional.create({ data: { ...data, restaurantId: tenantId } });
   },
-  async update(id: string, data: Prisma.AdditionalUpdateInput) {
-    const a = await prisma.additional.findUnique({ where: { id } });
+  async update(tenantId: string, id: string, data: Prisma.AdditionalUpdateInput) {
+    const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });
     if (!a) throw new NotFoundError('Adicional');
     return prisma.additional.update({ where: { id }, data });
   },
-  async remove(id: string) {
-    const a = await prisma.additional.findUnique({ where: { id } });
+  async remove(tenantId: string, id: string) {
+    const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });
     if (!a) throw new NotFoundError('Adicional');
     return prisma.additional.delete({ where: { id } });
   },
