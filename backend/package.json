@@ -12,6 +12,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:seed": "ts-node --transpile-only prisma/seed.ts",
+    "superadmin:create": "node dist/scripts/create-superadmin.js",
     "db:push": "prisma db push",
     "test": "vitest run",
     "test:watch": "vitest",
