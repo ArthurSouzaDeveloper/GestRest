@@ -98,11 +98,13 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T db \
 
 ### Criar o SEU super admin (e-mail e senha próprios)
 
-Em vez de usar o `super@gestrest.com` padrão, crie o superadmin com o seu e-mail:
+Em vez de usar o `super@gestrest.com` padrão, crie o superadmin com o seu e-mail.
+Os parâmetros são **nomeados** e podem vir em qualquer ordem (não há como confundir
+qual valor é o quê):
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env exec backend \
-  node dist/scripts/create-superadmin.js SEU_EMAIL SUA_SENHA "Seu Nome"
+  node dist/scripts/create-superadmin.js --email=seu@email.com --senha=SuaSenha123 --nome="Seu Nome"
 ```
 
 Rode o mesmo comando de novo a qualquer momento para **redefinir a senha** do superadmin.
