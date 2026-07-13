@@ -79,18 +79,27 @@ npm install
 npm run dev                   # http://localhost:5173
 ```
 
+## 🏢 Multi-restaurante (multi-tenant / SaaS)
+
+O GestRest opera como plataforma: cada restaurante é um **tenant** isolado, com seu próprio **link, equipe e cardápio**. Os dados nunca se misturam entre restaurantes (todo acesso é filtrado por `restaurantId`).
+
+- **Super administrador** (`/super`): cria e gerencia os restaurantes e o admin inicial de cada um.
+- **Link próprio por restaurante** (`/r/<slug>`): tela de login com o nome do restaurante; ex.: `/r/pizzaria-do-ze`.
+- Cada restaurante monta o **próprio cardápio** (categorias, produtos, adicionais) e a **própria equipe**.
+
 ## 👥 Usuários de demonstração
 
 Senha para todos: **`123456`**
 
-| Perfil | E-mail |
-|--------|--------|
-| Administrador | admin@gestrest.com |
-| Gerente | gerente@gestrest.com |
-| Garçom | garcom@gestrest.com |
-| Suqueiro | suqueiro@gestrest.com |
-| Cozinheiro | cozinha@gestrest.com |
-| Caixa | caixa@gestrest.com |
+| Acesso | E-mail | Onde entrar |
+|--------|--------|-------------|
+| **Super Admin** (plataforma) | super@gestrest.com | `/super` |
+| Administrador (restaurante demo) | admin@gestrest.com | `/r/demo` |
+| Gerente | gerente@gestrest.com | `/r/demo` |
+| Garçom | garcom@gestrest.com | `/r/demo` |
+| Suqueiro | suqueiro@gestrest.com | `/r/demo` |
+| Cozinheiro | cozinha@gestrest.com | `/r/demo` |
+| Caixa | caixa@gestrest.com | `/r/demo` |
 
 ---
 

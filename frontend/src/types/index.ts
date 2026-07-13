@@ -1,4 +1,10 @@
-export type Role = 'ADMIN' | 'MANAGER' | 'WAITER' | 'JUICER' | 'COOK' | 'CASHIER';
+export type Role = 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'WAITER' | 'JUICER' | 'COOK' | 'CASHIER';
+
+export interface RestaurantRef {
+  id: string;
+  slug: string;
+  name: string;
+}
 export type Station = 'KITCHEN' | 'JUICE_BAR' | 'NONE';
 export type TableStatus =
   | 'FREE'
@@ -21,6 +27,16 @@ export interface User {
   email: string;
   role: Role;
   active?: boolean;
+  restaurant?: RestaurantRef | null;
+}
+
+export interface RestaurantSummary {
+  id: string;
+  name: string;
+  slug: string;
+  active: boolean;
+  createdAt: string;
+  counts: { users: number; orders: number; products: number };
 }
 
 export interface Category {

@@ -6,12 +6,12 @@ import { prisma } from '../../config/prisma';
  * done or cancelled, oldest first, with the context each screen needs.
  */
 export const productionService = {
-  async queue(station: Station) {
+  async queue(tenantId: string, station: Station) {
     const items = await prisma.orderItem.findMany({
       where: {
         station,
         status: { in: [ProductionStatus.WAITING, ProductionStatus.PREPARING] },
-        order: { status: { notIn: ['PAID', 'CANCELLED'] } },
+        order: { restaurantId: tenantId, status: { notIn: ['PAID', 'CANCELLED'] } },
       },
       include: {
         product: { include: { category: true } },

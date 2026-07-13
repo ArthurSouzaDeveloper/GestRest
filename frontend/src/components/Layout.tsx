@@ -92,8 +92,13 @@ export function Layout({ children }: { children: ReactNode }) {
           <button className="btn-secondary lg:hidden" onClick={() => setOpen((v) => !v)}>
             <Menu size={18} />
           </button>
-          <div className="hidden text-sm text-gray-500 lg:block">
-            {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+          <div className="hidden lg:block">
+            {user?.restaurant && (
+              <div className="text-sm font-medium">{user.restaurant.name}</div>
+            )}
+            <div className="text-xs text-gray-500">
+              {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">

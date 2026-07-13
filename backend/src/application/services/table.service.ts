@@ -4,8 +4,9 @@ import { NotFoundError } from '../../utils/errors';
 import { emitTo, ROOMS } from '../../socket';
 
 export const tableService = {
-  list() {
+  list(tenantId: string) {
     return prisma.restaurantTable.findMany({
+      where: { restaurantId: tenantId },
       orderBy: { number: 'asc' },
       include: {
         orders: {
@@ -16,24 +17,25 @@ export const tableService = {
     });
   },
 
-  async get(id: string) {
-    const t = await prisma.restaurantTable.findUnique({ where: { id } });
+  async get(tenantId: string, id: string) {
+    const t = await prisma.restaurantTable.findFirst({ where: { id, restaurantId: tenantId } });
     if (!t) throw new NotFoundError('Mesa');
     return t;
   },
 
-  create(data: { number: number; seats?: number }) {
-    return prisma.restaurantTable.create({ data });
+  create(tenantId: string, data: { number: number; seats?: number }) {
+    return prisma.restaurantTable.create({ data: { ...data, restaurantId: tenantId } });
   },
 
-  async setStatus(id: string, status: TableStatus) {
+  async setStatus(tenantId: string, id: string, status: TableStatus) {
+    await tableService.get(tenantId, id);
     const table = await prisma.restaurantTable.update({ where: { id }, data: { status } });
     emitTo([ROOMS.FLOOR, ROOMS.DASHBOARD], 'table:updated', table);
     return table;
   },
 
-  async remove(id: string) {
-    await tableService.get(id);
+  async remove(tenantId: string, id: string) {
+    await tableService.get(tenantId, id);
     return prisma.restaurantTable.delete({ where: { id } });
   },
 };

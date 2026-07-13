@@ -8,13 +8,14 @@ import {
 } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { AppError, ConflictError, NotFoundError } from '../../utils/errors';
-import { emitTo, ROOMS } from '../../socket';
+import { emitTenant, ROOMS } from '../../socket';
 import { auditService } from './audit.service';
 import { orderInclude, serializeOrder } from './order.helpers';
 
 interface Ctx {
   userId: string;
   ip?: string;
+  tenantId: string;
 }
 
 interface NewItemInput {
@@ -43,12 +44,7 @@ async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = p
   let status: OrderStatus = OrderStatus.OPEN;
   if (active.length > 0) {
     const allDone = active.every((i) => i.status === ProductionStatus.DONE);
-    const anyInProduction = active.some(
-      (i) => i.status === ProductionStatus.PREPARING || i.status === ProductionStatus.DONE,
-    );
-    if (allDone) status = OrderStatus.READY_FOR_PAYMENT;
-    else if (anyInProduction) status = OrderStatus.IN_PRODUCTION;
-    else status = OrderStatus.IN_PRODUCTION; // has items waiting → in production pipeline
+    status = allDone ? OrderStatus.READY_FOR_PAYMENT : OrderStatus.IN_PRODUCTION;
   }
 
   const tableStatus: TableStatus =
@@ -62,17 +58,24 @@ async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = p
   await tx.restaurantTable.update({ where: { id: order.tableId }, data: { status: tableStatus } });
 }
 
-async function loadAndBroadcast(orderId: string, event: string) {
+async function loadAndBroadcast(tenantId: string, orderId: string, event: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: orderInclude });
   if (!order) return null;
   const payload = serializeOrder(order);
-  emitTo([ROOMS.FLOOR, ROOMS.CASHIER, ROOMS.DASHBOARD], event, payload);
+  emitTenant(tenantId, [ROOMS.FLOOR, ROOMS.CASHIER, ROOMS.DASHBOARD], event, payload);
   return payload;
 }
 
+/** Loads an order scoped to the tenant, or throws. */
+async function requireOrder(tenantId: string, id: string) {
+  const order = await prisma.order.findFirst({ where: { id, restaurantId: tenantId } });
+  if (!order) throw new NotFoundError('Pedido');
+  return order;
+}
+
 export const orderService = {
-  async list(params: { status?: OrderStatus; tableId?: string } = {}) {
-    const where: Prisma.OrderWhereInput = {};
+  async list(tenantId: string, params: { status?: OrderStatus; tableId?: string } = {}) {
+    const where: Prisma.OrderWhereInput = { restaurantId: tenantId };
     if (params.status) where.status = params.status;
     if (params.tableId) where.tableId = params.tableId;
     const orders = await prisma.order.findMany({
@@ -83,31 +86,36 @@ export const orderService = {
     return orders.map(serializeOrder);
   },
 
-  async get(id: string) {
-    const order = await prisma.order.findUnique({ where: { id }, include: orderInclude });
+  async get(tenantId: string, id: string) {
+    const order = await prisma.order.findFirst({
+      where: { id, restaurantId: tenantId },
+      include: orderInclude,
+    });
     if (!order) throw new NotFoundError('Pedido');
     return serializeOrder(order);
   },
 
-  /** Opens a table: creates an OPEN order. */
   async open(
     input: { tableId: string; customerName?: string; peopleCount?: number; notes?: string },
     ctx: Ctx,
   ) {
-    const table = await prisma.restaurantTable.findUnique({ where: { id: input.tableId } });
+    const table = await prisma.restaurantTable.findFirst({
+      where: { id: input.tableId, restaurantId: ctx.tenantId },
+    });
     if (!table) throw new NotFoundError('Mesa');
-    if (table.status !== TableStatus.FREE) {
-      throw new ConflictError('Mesa não está livre');
-    }
+    if (table.status !== TableStatus.FREE) throw new ConflictError('Mesa não está livre');
 
     const order = await prisma.$transaction(async (tx) => {
       let customerId: string | undefined;
       if (input.customerName?.trim()) {
-        const customer = await tx.customer.create({ data: { name: input.customerName.trim() } });
+        const customer = await tx.customer.create({
+          data: { name: input.customerName.trim(), restaurantId: ctx.tenantId },
+        });
         customerId = customer.id;
       }
       const created = await tx.order.create({
         data: {
+          restaurantId: ctx.tenantId,
           tableId: input.tableId,
           customerId,
           waiterId: ctx.userId,
@@ -125,21 +133,20 @@ export const orderService = {
     await auditService.record({
       action: AuditAction.TABLE_OPENED,
       userId: ctx.userId,
+      restaurantId: ctx.tenantId,
       entity: 'Order',
       entityId: order.id,
       ip: ctx.ip,
       metadata: { tableId: input.tableId },
     });
 
-    emitTo([ROOMS.FLOOR, ROOMS.DASHBOARD], 'table:updated', { id: input.tableId });
-    return loadAndBroadcast(order.id, 'order:created');
+    emitTenant(ctx.tenantId, [ROOMS.FLOOR, ROOMS.DASHBOARD], 'table:updated', { id: input.tableId });
+    return loadAndBroadcast(ctx.tenantId, order.id, 'order:created');
   },
 
-  /** Adds items to an open order and routes them to the correct station. */
   async addItems(orderId: string, items: NewItemInput[], ctx: Ctx) {
     if (items.length === 0) throw new AppError('Nenhum item informado');
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) throw new NotFoundError('Pedido');
+    const order = await requireOrder(ctx.tenantId, orderId);
     if (order.status === OrderStatus.PAID || order.status === OrderStatus.CANCELLED) {
       throw new ConflictError('Pedido já finalizado');
     }
@@ -148,8 +155,8 @@ export const orderService = {
 
     await prisma.$transaction(async (tx) => {
       for (const item of items) {
-        const product = await tx.product.findUnique({
-          where: { id: item.productId },
+        const product = await tx.product.findFirst({
+          where: { id: item.productId, restaurantId: ctx.tenantId },
           include: { category: true },
         });
         if (!product) throw new NotFoundError('Produto');
@@ -159,7 +166,9 @@ export const orderService = {
         touchedStations.add(station);
 
         const additionals = item.additionalIds?.length
-          ? await tx.additional.findMany({ where: { id: { in: item.additionalIds } } })
+          ? await tx.additional.findMany({
+              where: { id: { in: item.additionalIds }, restaurantId: ctx.tenantId },
+            })
           : [];
 
         await tx.orderItem.create({
@@ -187,24 +196,25 @@ export const orderService = {
     await auditService.record({
       action: AuditAction.ITEM_ADDED,
       userId: ctx.userId,
+      restaurantId: ctx.tenantId,
       entity: 'Order',
       entityId: orderId,
       ip: ctx.ip,
       metadata: { count: items.length },
     });
 
-    // Notify production stations of new tickets.
     const rooms = [...touchedStations]
       .map((s) => stationRoom[s])
       .filter((r): r is string => Boolean(r));
-    if (rooms.length) emitTo(rooms, 'production:updated', { orderId });
+    if (rooms.length) emitTenant(ctx.tenantId, rooms, 'production:updated', { orderId });
 
-    return loadAndBroadcast(orderId, 'order:updated');
+    return loadAndBroadcast(ctx.tenantId, orderId, 'order:updated');
   },
 
-  /** Updates a production item's status (kitchen / juice bar). */
   async setItemStatus(itemId: string, status: ProductionStatus, ctx: Ctx) {
-    const item = await prisma.orderItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.orderItem.findFirst({
+      where: { id: itemId, order: { restaurantId: ctx.tenantId } },
+    });
     if (!item) throw new NotFoundError('Item');
 
     const data: Prisma.OrderItemUpdateInput = { status };
@@ -219,6 +229,7 @@ export const orderService = {
     await auditService.record({
       action: AuditAction.STATUS_CHANGED,
       userId: ctx.userId,
+      restaurantId: ctx.tenantId,
       entity: 'OrderItem',
       entityId: itemId,
       ip: ctx.ip,
@@ -226,17 +237,14 @@ export const orderService = {
     });
 
     const room = stationRoom[item.station];
-    if (room) emitTo(room, 'production:updated', { orderId: item.orderId });
-    return loadAndBroadcast(item.orderId, 'order:updated');
+    if (room) emitTenant(ctx.tenantId, [room], 'production:updated', { orderId: item.orderId });
+    return loadAndBroadcast(ctx.tenantId, item.orderId, 'order:updated');
   },
 
-  /** Editing helpers used by cashier / waiter with optimistic concurrency. */
-  async updateItem(
-    itemId: string,
-    data: { quantity?: number; notes?: string },
-    ctx: Ctx,
-  ) {
-    const item = await prisma.orderItem.findUnique({ where: { id: itemId } });
+  async updateItem(itemId: string, data: { quantity?: number; notes?: string }, ctx: Ctx) {
+    const item = await prisma.orderItem.findFirst({
+      where: { id: itemId, order: { restaurantId: ctx.tenantId } },
+    });
     if (!item) throw new NotFoundError('Item');
     await prisma.orderItem.update({
       where: { id: itemId },
@@ -248,15 +256,18 @@ export const orderService = {
     await auditService.record({
       action: AuditAction.ITEM_UPDATED,
       userId: ctx.userId,
+      restaurantId: ctx.tenantId,
       entity: 'OrderItem',
       entityId: itemId,
       ip: ctx.ip,
     });
-    return loadAndBroadcast(item.orderId, 'order:updated');
+    return loadAndBroadcast(ctx.tenantId, item.orderId, 'order:updated');
   },
 
   async cancelItem(itemId: string, ctx: Ctx) {
-    const item = await prisma.orderItem.findUnique({ where: { id: itemId } });
+    const item = await prisma.orderItem.findFirst({
+      where: { id: itemId, order: { restaurantId: ctx.tenantId } },
+    });
     if (!item) throw new NotFoundError('Item');
     await prisma.$transaction(async (tx) => {
       await tx.orderItem.update({
@@ -268,23 +279,22 @@ export const orderService = {
     await auditService.record({
       action: AuditAction.ITEM_REMOVED,
       userId: ctx.userId,
+      restaurantId: ctx.tenantId,
       entity: 'OrderItem',
       entityId: itemId,
       ip: ctx.ip,
     });
     const room = stationRoom[item.station];
-    if (room) emitTo(room, 'production:updated', { orderId: item.orderId });
-    return loadAndBroadcast(item.orderId, 'order:updated');
+    if (room) emitTenant(ctx.tenantId, [room], 'production:updated', { orderId: item.orderId });
+    return loadAndBroadcast(ctx.tenantId, item.orderId, 'order:updated');
   },
 
-  /** Optimistic-concurrency update of order-level fields (discount, service rate, notes). */
   async updateOrder(
     id: string,
     data: { discount?: number; serviceRate?: number; notes?: string; version?: number },
     ctx: Ctx,
   ) {
-    const order = await prisma.order.findUnique({ where: { id } });
-    if (!order) throw new NotFoundError('Pedido');
+    const order = await requireOrder(ctx.tenantId, id);
     if (data.version !== undefined && data.version !== order.version) {
       throw new ConflictError('O pedido foi alterado por outro usuário. Recarregue e tente novamente.');
     }
@@ -300,16 +310,16 @@ export const orderService = {
     await auditService.record({
       action: AuditAction.ORDER_UPDATED,
       userId: ctx.userId,
+      restaurantId: ctx.tenantId,
       entity: 'Order',
       entityId: id,
       ip: ctx.ip,
     });
-    return loadAndBroadcast(id, 'order:updated');
+    return loadAndBroadcast(ctx.tenantId, id, 'order:updated');
   },
 
   async cancel(id: string, ctx: Ctx) {
-    const order = await prisma.order.findUnique({ where: { id } });
-    if (!order) throw new NotFoundError('Pedido');
+    const order = await requireOrder(ctx.tenantId, id);
     if (order.status === OrderStatus.PAID) throw new ConflictError('Pedido já pago');
 
     await prisma.$transaction(async (tx) => {
@@ -330,12 +340,13 @@ export const orderService = {
     await auditService.record({
       action: AuditAction.ORDER_CANCELLED,
       userId: ctx.userId,
+      restaurantId: ctx.tenantId,
       entity: 'Order',
       entityId: id,
       ip: ctx.ip,
     });
-    emitTo([ROOMS.KITCHEN, ROOMS.JUICE_BAR], 'production:updated', { orderId: id });
-    return loadAndBroadcast(id, 'order:updated');
+    emitTenant(ctx.tenantId, [ROOMS.KITCHEN, ROOMS.JUICE_BAR], 'production:updated', { orderId: id });
+    return loadAndBroadcast(ctx.tenantId, id, 'order:updated');
   },
 };
 

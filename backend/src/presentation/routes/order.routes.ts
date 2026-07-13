@@ -25,7 +25,7 @@ router.get(
   '/',
   asyncHandler(async (req, res) =>
     res.json(
-      await orderService.list({
+      await orderService.list(ctx(req).tenantId, {
         status: req.query.status as OrderStatus | undefined,
         tableId: req.query.tableId as string | undefined,
       }),
@@ -33,7 +33,10 @@ router.get(
   ),
 );
 
-router.get('/:id', asyncHandler(async (req, res) => res.json(await orderService.get(req.params.id))));
+router.get(
+  '/:id',
+  asyncHandler(async (req, res) => res.json(await orderService.get(ctx(req).tenantId, req.params.id))),
+);
 
 router.post(
   '/',

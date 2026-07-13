@@ -8,6 +8,7 @@ export interface AccessTokenPayload {
   sub: string;
   role: Role;
   name: string;
+  restaurantId: string | null;
 }
 
 export function hashPassword(plain: string): Promise<string> {

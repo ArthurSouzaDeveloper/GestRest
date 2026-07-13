@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { Spinner } from './components/ui';
 import type { Role } from './types';
 import Login from './pages/Login';
+import SuperAdmin from './pages/SuperAdmin';
 import Dashboard from './pages/Dashboard';
 import Tables from './pages/Tables';
 import Kitchen from './pages/Kitchen';
@@ -23,14 +24,18 @@ function Protected({ children, roles }: { children: JSX.Element; roles?: Role[] 
       </div>
     );
   if (!user) return <Navigate to="/login" replace />;
+  // Superadmin não opera dentro de um restaurante — vai para o painel da plataforma.
+  if (user.role === 'SUPERADMIN') return <Navigate to="/super" replace />;
   if (roles && !hasRole(...roles)) return <Navigate to="/mesas" replace />;
   return <Layout>{children}</Layout>;
 }
 
-/** Sends each role to the screen they actually use. */
+/** Envia cada perfil para a tela que ele realmente usa. */
 function Home() {
   const { user } = useAuth();
   switch (user?.role) {
+    case 'SUPERADMIN':
+      return <Navigate to="/super" replace />;
     case 'COOK':
       return <Navigate to="/cozinha" replace />;
     case 'JUICER':
@@ -48,6 +53,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/r/:slug" element={<Login />} />
+      <Route path="/super" element={<SuperAdmin />} />
       <Route path="/" element={<Protected><Home /></Protected>} />
       <Route path="/mesas" element={<Protected roles={['ADMIN', 'MANAGER', 'WAITER']}><Tables /></Protected>} />
       <Route path="/cozinha" element={<Protected roles={['ADMIN', 'MANAGER', 'COOK']}><Kitchen /></Protected>} />

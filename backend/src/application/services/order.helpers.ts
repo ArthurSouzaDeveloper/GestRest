@@ -15,6 +15,11 @@ export const orderInclude = {
   payments: true,
 } satisfies Prisma.OrderInclude;
 
+/** Scopes an order lookup by id to a single tenant. */
+export function tenantOrderWhere(tenantId: string, id?: string): Prisma.OrderWhereInput {
+  return id ? { id, restaurantId: tenantId } : { restaurantId: tenantId };
+}
+
 export type OrderWithRelations = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
 export interface OrderTotals {

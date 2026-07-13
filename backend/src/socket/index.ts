@@ -43,9 +43,11 @@ export function initSocket(httpServer: HttpServer): SocketServer {
   io.on('connection', (socket) => {
     logger.debug(`Socket connected: ${socket.id}`);
 
-    // Clients join the rooms relevant to their screen.
+    // Clients join tenant-scoped rooms relevant to their screen,
+    // e.g. "kitchen:<restaurantId>". The base must be a known room.
     socket.on('join', (room: string) => {
-      if (Object.values(ROOMS).includes(room as never)) {
+      const base = room.split(':')[0];
+      if (Object.values(ROOMS).includes(base as never)) {
         socket.join(room);
       }
     });
@@ -68,4 +70,22 @@ export function emitTo(rooms: string | string[], event: string, payload: unknown
   if (!io) return;
   const list = Array.isArray(rooms) ? rooms : [rooms];
   list.forEach((room) => io!.to(room).emit(event, payload));
+}
+
+/**
+ * Namespaces base rooms by tenant so real-time events stay isolated per
+ * restaurant (e.g. "kitchen" → "kitchen:<restaurantId>").
+ */
+export function tenantRooms(tenantId: string, rooms: string[]): string[] {
+  return rooms.map((r) => `${r}:${tenantId}`);
+}
+
+/** Emit an event to tenant-scoped rooms. */
+export function emitTenant(
+  tenantId: string,
+  rooms: string[],
+  event: string,
+  payload: unknown,
+): void {
+  emitTo(tenantRooms(tenantId, rooms), event, payload);
 }

@@ -7,6 +7,7 @@ import type { Role, User } from '../types';
 
 const ROLES: Role[] = ['ADMIN', 'MANAGER', 'WAITER', 'JUICER', 'COOK', 'CASHIER'];
 const ROLE_LABELS: Record<Role, string> = {
+  SUPERADMIN: 'Super Admin',
   ADMIN: 'Administrador',
   MANAGER: 'Gerente',
   WAITER: 'Garçom',
