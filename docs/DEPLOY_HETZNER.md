@@ -96,11 +96,24 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T db \
   psql -U gestrest -d gestrest < backend/prisma/seed.sql
 ```
 
-Depois acesse:
-- **Painel da plataforma:** `http://SEU_IP:8081/super` → `super@gestrest.com` / `123456`
-- **Restaurante demo:** `http://SEU_IP:8081/r/demo` → `admin@gestrest.com` / `123456`
+### Criar o SEU super admin (e-mail e senha próprios)
 
-> ⚠️ Troque as senhas padrão e crie os restaurantes reais pelo painel `/super`.
+Em vez de usar o `super@gestrest.com` padrão, crie o superadmin com o seu e-mail:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env exec backend \
+  node dist/scripts/create-superadmin.js SEU_EMAIL SUA_SENHA "Seu Nome"
+```
+
+Rode o mesmo comando de novo a qualquer momento para **redefinir a senha** do superadmin.
+
+Depois acesse:
+- **Painel da plataforma:** `http://SEU_IP:8081/super` → seu e-mail / sua senha
+- **Restaurante demo (opcional):** `http://SEU_IP:8081/r/demo` → `admin@gestrest.com` / `123456`
+
+No painel `/super`, clique em **Novo Restaurante** e cadastre cada casa com o **e-mail próprio do admin dela** — esse admin entra pelo link `/r/<slug>` e monta o cardápio.
+
+> ⚠️ Troque/remova as credenciais de demonstração em produção.
 
 ## Operação do dia a dia
 
