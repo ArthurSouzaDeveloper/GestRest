@@ -29,7 +29,18 @@ async function bootstrap(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
+// Last line of defense: an error here means the process can no longer guarantee
+// correct behavior, so it logs at `fatal` and exits rather than limping along.
+process.on('uncaughtException', (err) => {
+  logger.fatal('uncaught_exception', { error: err });
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.fatal('unhandled_rejection', { error: reason });
+  process.exit(1);
+});
+
 bootstrap().catch((err) => {
-  logger.error('Fatal bootstrap error', err);
+  logger.fatal('bootstrap_failed', { error: err });
   process.exit(1);
 });

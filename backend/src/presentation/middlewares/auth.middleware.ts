@@ -2,6 +2,8 @@ import { NextFunction, Request, Response } from 'express';
 import { Role } from '@prisma/client';
 import { verifyAccessToken, AccessTokenPayload } from '../../utils/auth';
 import { ForbiddenError, UnauthorizedError } from '../../utils/errors';
+import { logger } from '../../config/logger';
+import { setContextActor } from '../../config/requestContext';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -17,8 +19,10 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
   if (!header?.startsWith('Bearer ')) throw new UnauthorizedError('Token ausente');
   try {
     req.user = verifyAccessToken(header.slice(7));
+    setContextActor(req.user.sub, req.user.restaurantId ?? undefined);
     next();
-  } catch {
+  } catch (err) {
+    logger.warn('auth_token_rejected', { reason: err instanceof Error ? err.message : String(err) });
     throw new UnauthorizedError('Token inválido ou expirado');
   }
 }
