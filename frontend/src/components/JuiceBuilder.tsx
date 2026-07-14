@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronLeft } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
+import { DRINK_NOTE_PRESETS, toggleNotePreset } from '../lib/notePresets';
 import type { Additional, Product } from '../types';
 import type { DraftItem } from './OrderComposer';
 
@@ -121,6 +122,21 @@ export function JuiceBuilder({
 
         <div>
           <label className="label">Observações</label>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {DRINK_NOTE_PRESETS.map((preset) => {
+              const on = notes.toLowerCase().split(',').map((p) => p.trim()).includes(preset.toLowerCase());
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setNotes(toggleNotePreset(notes, preset))}
+                  className={`rounded-full border px-2.5 py-1 text-xs ${on ? 'border-brand bg-brand text-white' : 'border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300'}`}
+                >
+                  {preset}
+                </button>
+              );
+            })}
+          </div>
           <textarea
             className="input"
             rows={2}

@@ -4,6 +4,7 @@ import { Plus, Minus, X, Search } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { JuiceBuilder } from './JuiceBuilder';
+import { DRINK_NOTE_PRESETS, FOOD_NOTE_PRESETS, toggleNotePreset } from '../lib/notePresets';
 import type { Additional, Category, Product } from '../types';
 
 export interface DraftItem {
@@ -256,6 +257,21 @@ function ItemConfigModal({
         )}
         <div className="mb-4">
           <label className="label">Observações</label>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {(product.category?.station === 'JUICE_BAR' ? DRINK_NOTE_PRESETS : FOOD_NOTE_PRESETS).map((preset) => {
+              const on = notes.toLowerCase().split(',').map((p) => p.trim()).includes(preset.toLowerCase());
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setNotes(toggleNotePreset(notes, preset))}
+                  className={`rounded-full border px-2.5 py-1 text-xs ${on ? 'border-brand bg-brand text-white' : 'border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300'}`}
+                >
+                  {preset}
+                </button>
+              );
+            })}
+          </div>
           <textarea
             className="input"
             rows={2}
