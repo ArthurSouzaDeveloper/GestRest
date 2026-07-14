@@ -101,6 +101,13 @@ export const superadminService = {
     return { id: restaurant.id, name: restaurant.name, slug: restaurant.slug };
   },
 
+  /** Apaga o restaurante e todos os seus dados (cardápio, pedidos, equipe, etc). */
+  async removeRestaurant(id: string) {
+    const r = await prisma.restaurant.findUnique({ where: { id } });
+    if (!r) throw new NotFoundError('Restaurante');
+    await prisma.restaurant.delete({ where: { id } });
+  },
+
   async setActive(id: string, active: boolean) {
     const r = await prisma.restaurant.findUnique({ where: { id } });
     if (!r) throw new NotFoundError('Restaurante');

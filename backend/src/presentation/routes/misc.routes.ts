@@ -41,6 +41,12 @@ userRouter.patch(
     res.json(await userService.update(ctx(req).tenantId, req.params.id, req.body)),
   ),
 );
+userRouter.delete(
+  '/:id',
+  asyncHandler(async (req, res) =>
+    res.json(await userService.remove(ctx(req).tenantId, req.params.id, req.user!.sub)),
+  ),
+);
 
 // ── Audit ──
 export const auditRouter = Router();
@@ -79,6 +85,13 @@ superadminRouter.patch(
   asyncHandler(async (req, res) =>
     res.json(await superadminService.setActive(req.params.id, Boolean(req.body.active))),
   ),
+);
+superadminRouter.delete(
+  '/restaurants/:id',
+  asyncHandler(async (req, res) => {
+    await superadminService.removeRestaurant(req.params.id);
+    res.status(204).end();
+  }),
 );
 
 // ── Público: resolve restaurante por slug (tela de login com marca) ──
