@@ -209,7 +209,7 @@ model Product {
   avgPrepMin   Int        @default(10)
   available    Boolean    @default(true)
   categoryId   String
-  category     Category   @relation(fields: [categoryId], references: [id])
+  category     Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
@@ -228,7 +228,7 @@ model Additional {
   price        Decimal    @db.Decimal(10, 2) @default(0)
   active       Boolean    @default(true)
   categoryId   String?
-  category     Category?  @relation(fields: [categoryId], references: [id])
+  category     Category?  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
@@ -247,11 +247,11 @@ model Order {
   id           String          @id @default(uuid())
   number       Int             @default(autoincrement())
   tableId      String
-  table        RestaurantTable @relation(fields: [tableId], references: [id])
+  table        RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
   customerId   String?
-  customer     Customer?       @relation(fields: [customerId], references: [id])
+  customer     Customer?       @relation(fields: [customerId], references: [id], onDelete: Cascade)
   waiterId     String
-  waiter       User            @relation("WaiterOrders", fields: [waiterId], references: [id])
+  waiter       User            @relation("WaiterOrders", fields: [waiterId], references: [id], onDelete: Cascade)
   restaurantId String
   restaurant   Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   status       OrderStatus     @default(OPEN)
@@ -279,7 +279,7 @@ model OrderItem {
   orderId    String
   order      Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId  String
-  product    Product          @relation(fields: [productId], references: [id])
+  product    Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   quantity   Int              @default(1)
   unitPrice  Decimal          @db.Decimal(10, 2)
   notes      String?
@@ -302,7 +302,7 @@ model OrderItemAdditional {
   orderItemId  String
   orderItem    OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   additionalId String
-  additional   Additional @relation(fields: [additionalId], references: [id])
+  additional   Additional @relation(fields: [additionalId], references: [id], onDelete: Cascade)
   name         String
   price        Decimal    @db.Decimal(10, 2)
 
@@ -316,12 +316,12 @@ model OrderItemAdditional {
 model Payment {
   id           String        @id @default(uuid())
   orderId      String
-  order        Order         @relation(fields: [orderId], references: [id])
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   method       PaymentMethod
   amount       Decimal       @db.Decimal(10, 2)
   change       Decimal       @db.Decimal(10, 2) @default(0)
   cashierId    String
-  cashier      User          @relation(fields: [cashierId], references: [id])
+  cashier      User          @relation(fields: [cashierId], references: [id], onDelete: Cascade)
   restaurantId String
   restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt    DateTime      @default(now())
@@ -339,7 +339,7 @@ model AuditLog {
   id           String      @id @default(uuid())
   action       AuditAction
   userId       String?
-  user         User?       @relation(fields: [userId], references: [id])
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   restaurantId String?
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   entity       String?

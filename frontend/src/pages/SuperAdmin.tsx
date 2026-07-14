@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, ExternalLink, LogOut } from 'lucide-react';
+import { Plus, ExternalLink, LogOut, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { apiError } from '../lib/api';
 import { Card, Modal, Spinner } from '../components/ui';
@@ -85,6 +85,17 @@ function Console({ onLogout, name }: { onLogout: () => void; name: string }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['restaurants'] }),
   });
 
+  const remove = useMutation({
+    mutationFn: async (id: string) => api.delete(`/superadmin/restaurants/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['restaurants'] }),
+    onError: (e) => alert(apiError(e)),
+  });
+
+  const handleRemove = (r: RestaurantSummary) => {
+    const confirmMsg = `Excluir "${r.name}" definitivamente? Isso apaga o cardápio, ${r.counts.users} usuário(s), ${r.counts.orders} pedido(s) e todo o histórico. Essa ação não pode ser desfeita.`;
+    if (window.confirm(confirmMsg)) remove.mutate(r.id);
+  };
+
   const origin = window.location.origin;
 
   return (
@@ -138,12 +149,21 @@ function Console({ onLogout, name }: { onLogout: () => void; name: string }) {
                   <span>{r.counts.products} produtos</span>
                   <span>{r.counts.orders} pedidos</span>
                 </div>
-                <button
-                  className="btn-secondary mt-3 w-full !py-1.5 text-xs"
-                  onClick={() => toggle.mutate({ id: r.id, active: !r.active })}
-                >
-                  {r.active ? 'Desativar' : 'Ativar'}
-                </button>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    className="btn-secondary flex-1 !py-1.5 text-xs"
+                    onClick={() => toggle.mutate({ id: r.id, active: !r.active })}
+                  >
+                    {r.active ? 'Desativar' : 'Ativar'}
+                  </button>
+                  <button
+                    className="btn-secondary !py-1.5 !px-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    title="Excluir restaurante"
+                    onClick={() => handleRemove(r)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </Card>
             ))}
           </div>
