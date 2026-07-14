@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Minus, X } from 'lucide-react';
+import { Plus, Minus, X, Search } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { JuiceBuilder } from './JuiceBuilder';
@@ -22,6 +22,7 @@ export function OrderComposer({
   setDraft: (items: DraftItem[]) => void;
 }) {
   const [activeCat, setActiveCat] = useState<string>('all');
+  const [search, setSearch] = useState('');
   const [configuring, setConfiguring] = useState<Product | null>(null);
 
   const { data: categories = [] } = useQuery({
@@ -33,10 +34,21 @@ export function OrderComposer({
     queryFn: async () => (await api.get<Product[]>('/catalog/products', { params: { available: true } })).data,
   });
 
-  const filtered = useMemo(
-    () => products.filter((p) => activeCat === 'all' || p.categoryId === activeCat),
-    [products, activeCat],
-  );
+  const term = search.trim().toLowerCase();
+  const searching = term.length > 0;
+
+  // Buscando: procura em TODAS as categorias por nome ou descrição.
+  // Sem busca: filtra pela categoria (aba) selecionada.
+  const filtered = useMemo(() => {
+    if (searching) {
+      return products.filter(
+        (p) =>
+          p.name.toLowerCase().includes(term) ||
+          (p.description ?? '').toLowerCase().includes(term),
+      );
+    }
+    return products.filter((p) => activeCat === 'all' || p.categoryId === activeCat);
+  }, [products, activeCat, term, searching]);
 
   const addSimple = (product: Product) => {
     const idx = draft.findIndex((d) => d.product.id === product.id && d.additionalIds.length === 0 && !d.notes);
@@ -55,33 +67,60 @@ export function OrderComposer({
   // (fruta -> base -> adicionais) em vez da grade — evita listar dezenas de
   // combinações como botões separados.
   const activeCategory = categories.find((c) => c.id === activeCat);
-  const useBuilder = activeCategory?.name.toLowerCase() === 'sucos';
+  const useBuilder = activeCategory?.name.toLowerCase() === 'sucos' && !searching;
+  const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? '';
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {/* Catalog */}
       <div>
-        <div className="mb-3 flex flex-wrap gap-2">
-          <button
-            className={`rounded-full px-3 py-1 text-xs font-medium ${activeCat === 'all' ? 'bg-brand text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
-            onClick={() => setActiveCat('all')}
-          >
-            Todos
-          </button>
-          {categories.map((c) => (
+        {/* Busca instantânea por nome/descrição do produto */}
+        <div className="relative mb-3">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="input !pl-9"
+            placeholder="Pesquisar produto..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
             <button
-              key={c.id}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${activeCat === c.id ? 'bg-brand text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
-              onClick={() => setActiveCat(c.id)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-600"
+              onClick={() => setSearch('')}
+              title="Limpar"
             >
-              {c.name}
+              <X size={14} />
             </button>
-          ))}
+          )}
         </div>
+
+        {!searching && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              className={`rounded-full px-3 py-1 text-xs font-medium ${activeCat === 'all' ? 'bg-brand text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
+              onClick={() => setActiveCat('all')}
+            >
+              Todos
+            </button>
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${activeCat === c.id ? 'bg-brand text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
+                onClick={() => setActiveCat(c.id)}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        )}
         {useBuilder ? (
           <div className="max-h-[55vh] overflow-y-auto pr-1">
             <JuiceBuilder products={filtered} categoryId={activeCat} onAdd={addFromBuilder} />
           </div>
+        ) : filtered.length === 0 ? (
+          <p className="py-8 text-center text-sm text-gray-400">
+            {searching ? `Nenhum produto encontrado para "${search}".` : 'Nenhum produto nesta categoria.'}
+          </p>
         ) : (
           <div className="grid max-h-[50vh] grid-cols-2 gap-2 overflow-y-auto pr-1">
             {filtered.map((p) => (
@@ -90,6 +129,11 @@ export function OrderComposer({
                 onClick={() => addSimple(p)}
                 className="card flex flex-col items-start p-3 text-left transition hover:border-brand hover:shadow"
               >
+                {searching && (
+                  <span className="mb-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800">
+                    {categoryName(p.categoryId)}
+                  </span>
+                )}
                 <span className="text-sm font-medium leading-tight">{p.name}</span>
                 {p.description && (
                   <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-gray-400">
