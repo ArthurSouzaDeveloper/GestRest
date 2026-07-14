@@ -33,15 +33,19 @@ export function initSocket(httpServer: HttpServer): SocketServer {
     if (token) {
       try {
         socket.data.user = verifyAccessToken(token);
-      } catch {
-        // allow anonymous read-only connection for TV modes
+      } catch (err) {
+        // Falls back to an anonymous read-only connection (e.g. TV/kitchen display modes).
+        logger.debug('socket_auth_failed', {
+          socketId: socket.id,
+          reason: err instanceof Error ? err.message : String(err),
+        });
       }
     }
     next();
   });
 
   io.on('connection', (socket) => {
-    logger.debug(`Socket connected: ${socket.id}`);
+    logger.debug('socket_connected', { socketId: socket.id, userId: socket.data.user?.sub });
 
     // Clients join tenant-scoped rooms relevant to their screen,
     // e.g. "kitchen:<restaurantId>". The base must be a known room.
@@ -54,7 +58,7 @@ export function initSocket(httpServer: HttpServer): SocketServer {
 
     socket.on('leave', (room: string) => socket.leave(room));
 
-    socket.on('disconnect', () => logger.debug(`Socket disconnected: ${socket.id}`));
+    socket.on('disconnect', () => logger.debug('socket_disconnected', { socketId: socket.id }));
   });
 
   return io;

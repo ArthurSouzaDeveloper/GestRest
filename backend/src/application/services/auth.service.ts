@@ -9,6 +9,8 @@ import {
 import { UnauthorizedError } from '../../utils/errors';
 import { env } from '../../config/env';
 import { auditService } from './audit.service';
+import { logger } from '../../config/logger';
+import { maskEmail } from '../../utils/sanitize';
 
 function refreshExpiryDate(): Date {
   // 7 days default; keep in sync with JWT_REFRESH_EXPIRES
@@ -21,13 +23,23 @@ export const authService = {
       where: { email },
       include: { restaurant: true },
     });
-    if (!user || !user.active) throw new UnauthorizedError('Credenciais inválidas');
+    if (!user || !user.active) {
+      logger.warn('login_failed', {
+        email: maskEmail(email),
+        reason: user ? 'inactive_user' : 'user_not_found',
+      });
+      throw new UnauthorizedError('Credenciais inválidas');
+    }
     if (user.restaurant && !user.restaurant.active) {
+      logger.warn('login_failed', { email: maskEmail(email), reason: 'inactive_restaurant', userId: user.id });
       throw new UnauthorizedError('Restaurante inativo. Contate o administrador.');
     }
 
     const ok = await comparePassword(password, user.passwordHash);
-    if (!ok) throw new UnauthorizedError('Credenciais inválidas');
+    if (!ok) {
+      logger.warn('login_failed', { email: maskEmail(email), reason: 'bad_password', userId: user.id });
+      throw new UnauthorizedError('Credenciais inválidas');
+    }
 
     const accessToken = signAccessToken({
       sub: user.id,
@@ -69,7 +81,8 @@ export const authService = {
     let payload: { sub: string };
     try {
       payload = verifyRefreshToken(token);
-    } catch {
+    } catch (err) {
+      logger.warn('refresh_token_rejected', { reason: err instanceof Error ? err.message : String(err) });
       throw new UnauthorizedError('Refresh token inválido');
     }
 

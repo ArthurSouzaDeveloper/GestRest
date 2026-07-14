@@ -23,6 +23,7 @@ export const env = {
   },
   uploadDir: process.env.UPLOAD_DIR ?? 'uploads',
   isProd: (process.env.NODE_ENV ?? 'development') === 'production',
+  logLevel: process.env.LOG_LEVEL ?? ((process.env.NODE_ENV ?? 'development') === 'production' ? 'info' : 'debug'),
   // Only mark the refresh cookie `Secure` when explicitly enabled. Behind plain
   // HTTP (e.g. IP-only deploys) a Secure cookie is never sent, breaking sessions.
   // Defaults to the value of NODE_ENV=production unless COOKIE_SECURE overrides it.

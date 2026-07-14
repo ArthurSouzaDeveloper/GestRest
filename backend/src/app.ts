@@ -8,12 +8,15 @@ import { env } from './config/env';
 import api from './presentation/routes';
 import { errorHandler, notFoundHandler } from './presentation/middlewares/error.middleware';
 import { apiLimiter } from './presentation/middlewares/rateLimit.middleware';
+import { requestContextMiddleware } from './presentation/middlewares/requestContext.middleware';
 import { openApiDocument } from './config/swagger';
 
 export function createApp(): Application {
   const app = express();
 
   app.set('trust proxy', 1);
+  // First middleware: opens the requestId/ip context so every log line from here on is correlated.
+  app.use(requestContextMiddleware);
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
