@@ -26,6 +26,12 @@ export default function Products() {
     qc.invalidateQueries({ queryKey: ['products', 'admin'] });
   };
 
+  const toggleAvailable = useMutation({
+    mutationFn: async (p: Product) => api.patch(`/catalog/products/${p.id}`, { available: !p.available }),
+    onSuccess: refresh,
+    onError: (e) => alert(apiError(e)),
+  });
+
   if (isLoading) return <Spinner />;
 
   const filtered = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
@@ -61,9 +67,18 @@ export default function Products() {
                 <td className="p-3 text-right">{brl(p.price)}</td>
                 <td className="p-3 text-center text-gray-500">{p.avgPrepMin} min</td>
                 <td className="p-3 text-center">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${p.available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {p.available ? 'Sim' : 'Não'}
-                  </span>
+                  <button
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium transition ${
+                      p.available
+                        ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
+                        : 'bg-gray-200 text-gray-600 hover:bg-green-100 hover:text-green-700'
+                    }`}
+                    disabled={toggleAvailable.isPending}
+                    title={p.available ? 'Marcar como esgotado' : 'Marcar como disponível'}
+                    onClick={() => toggleAvailable.mutate(p)}
+                  >
+                    {p.available ? 'Disponível' : 'Esgotado'}
+                  </button>
                 </td>
                 <td className="p-3 text-right">
                   <button className="btn-secondary !px-2 !py-1" onClick={() => setEditing(p)}><Pencil size={14} /></button>

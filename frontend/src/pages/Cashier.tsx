@@ -78,6 +78,8 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
   const [discount, setDiscount] = useState(order.discount);
   const [lines, setLines] = useState<{ method: PaymentMethod; amount: number; cashReceived?: number }[]>([]);
   const [error, setError] = useState('');
+  const [splitCount, setSplitCount] = useState(2);
+  const [splitMethod, setSplitMethod] = useState<PaymentMethod>('PIX');
 
   useEffect(() => setDiscount(order.discount), [order.id, order.discount]);
 
@@ -110,6 +112,22 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
 
   const addLine = (method: PaymentMethod) => {
     setLines([...lines, { method, amount: Math.round(remaining * 100) / 100 }]);
+  };
+
+  // Divide o valor restante em N parcelas iguais (distribuindo os centavos de
+  // arredondamento entre as primeiras parcelas), gerando uma linha de pagamento por pessoa.
+  const perPerson = splitCount > 0 ? order.totals.remaining / splitCount : 0;
+  const applySplit = () => {
+    const n = Math.max(1, Math.floor(splitCount));
+    const totalCents = Math.round(order.totals.remaining * 100);
+    const baseCents = Math.floor(totalCents / n);
+    const extraCents = totalCents - baseCents * n;
+    setLines(
+      Array.from({ length: n }, (_, i) => ({
+        method: splitMethod,
+        amount: (baseCents + (i < extraCents ? 1 : 0)) / 100,
+      })),
+    );
   };
 
   return (
@@ -185,6 +203,35 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
       {/* Payment */}
       <div className="border-t border-gray-100 p-4 dark:border-gray-800">
         <div className="mb-2 text-sm font-medium">Pagamento</div>
+
+        <div className="mb-4 rounded-md border border-gray-200 p-3 dark:border-gray-800">
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Dividir a conta</div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="label">Pessoas</label>
+              <input
+                type="number"
+                min={1}
+                className="input !w-20 !py-1"
+                value={splitCount}
+                onChange={(e) => setSplitCount(Math.max(1, Number(e.target.value)))}
+              />
+            </div>
+            <div>
+              <label className="label">Forma</label>
+              <select className="input !py-1" value={splitMethod} onChange={(e) => setSplitMethod(e.target.value as PaymentMethod)}>
+                {METHODS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+              </select>
+            </div>
+            <button className="btn-secondary text-xs" onClick={applySplit}>
+              Gerar {Math.max(1, Math.floor(splitCount))}x de {brl(perPerson)}
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Gera uma parcela por pessoa com o valor restante dividido igualmente. Você ainda pode ajustar cada valor abaixo.
+          </p>
+        </div>
+
         <div className="mb-3 flex flex-wrap gap-2">
           {METHODS.map((m) => (
             <button key={m.key} className="btn-secondary text-xs" onClick={() => addLine(m.key)}>
