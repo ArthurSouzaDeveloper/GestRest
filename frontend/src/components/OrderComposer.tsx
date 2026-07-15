@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Minus, X, Search } from 'lucide-react';
+import { Plus, Minus, X, Search, Pencil } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { JuiceBuilder } from './JuiceBuilder';
@@ -12,6 +12,13 @@ export interface DraftItem {
   quantity: number;
   notes: string;
   additionalIds: string[];
+  /** Sum of the selected additionals' unit price, captured at selection time so the cart can show a running total without re-fetching every product's additionals. */
+  additionalsTotal: number;
+}
+
+/** Price of one unit of this draft line (base product + its additionals). */
+export function draftItemUnitPrice(item: DraftItem): number {
+  return item.product.price + item.additionalsTotal;
 }
 
 /** Product grid + item drafting used by the waiter to build an order. */
@@ -51,15 +58,28 @@ export function OrderComposer({
     return products.filter((p) => activeCat === 'all' || p.categoryId === activeCat);
   }, [products, activeCat, term, searching]);
 
+  const simpleIndex = (productId: string) =>
+    draft.findIndex((d) => d.product.id === productId && d.additionalIds.length === 0 && !d.notes);
+  const simpleQty = (productId: string) => draft[simpleIndex(productId)]?.quantity ?? 0;
+
   const addSimple = (product: Product) => {
-    const idx = draft.findIndex((d) => d.product.id === product.id && d.additionalIds.length === 0 && !d.notes);
+    const idx = simpleIndex(product.id);
     if (idx >= 0) {
       const next = [...draft];
       next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 };
       setDraft(next);
     } else {
-      setDraft([...draft, { product, quantity: 1, notes: '', additionalIds: [] }]);
+      setDraft([...draft, { product, quantity: 1, notes: '', additionalIds: [], additionalsTotal: 0 }]);
     }
+  };
+
+  const decSimple = (product: Product) => {
+    const idx = simpleIndex(product.id);
+    if (idx < 0) return;
+    const next = [...draft];
+    if (next[idx].quantity > 1) next[idx] = { ...next[idx], quantity: next[idx].quantity - 1 };
+    else next.splice(idx, 1);
+    setDraft(next);
   };
 
   const addFromBuilder = (item: DraftItem) => setDraft([...draft, item]);
@@ -77,16 +97,16 @@ export function OrderComposer({
       <div>
         {/* Busca instantânea por nome/descrição do produto */}
         <div className="relative mb-3">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
-            className="input !pl-9"
+            className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-9 text-[15px] text-gray-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             placeholder="Pesquisar produto..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           {search && (
             <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-600"
               onClick={() => setSearch('')}
               title="Limpar"
             >
@@ -96,9 +116,9 @@ export function OrderComposer({
         </div>
 
         {!searching && (
-          <div className="mb-3 flex flex-wrap gap-2">
+          <div className="mb-2 flex flex-wrap gap-2">
             <button
-              className={`rounded-full px-3 py-1 text-xs font-medium ${activeCat === 'all' ? 'bg-brand text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
+              className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === 'all' ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
               onClick={() => setActiveCat('all')}
             >
               Todos
@@ -106,7 +126,7 @@ export function OrderComposer({
             {categories.map((c) => (
               <button
                 key={c.id}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${activeCat === c.id ? 'bg-brand text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
+                className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === c.id ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
                 onClick={() => setActiveCat(c.id)}
               >
                 {c.name}
@@ -123,27 +143,62 @@ export function OrderComposer({
             {searching ? `Nenhum produto encontrado para "${search}".` : 'Nenhum produto nesta categoria.'}
           </p>
         ) : (
-          <div className="grid max-h-[50vh] grid-cols-2 gap-2 overflow-y-auto pr-1">
-            {filtered.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => addSimple(p)}
-                className="card flex flex-col items-start p-3 text-left transition hover:border-brand hover:shadow"
-              >
-                {searching && (
-                  <span className="mb-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800">
-                    {categoryName(p.categoryId)}
-                  </span>
-                )}
-                <span className="text-sm font-medium leading-tight">{p.name}</span>
-                {p.description && (
-                  <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-gray-400">
-                    {p.description}
-                  </span>
-                )}
-                <span className="mt-1 text-xs text-gray-500">{brl(p.price)}</span>
-              </button>
-            ))}
+          <div className="max-h-[55vh] overflow-y-auto pr-1">
+            {filtered.map((p) => {
+              const qty = simpleQty(p.id);
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => addSimple(p)}
+                  className="flex cursor-pointer items-center gap-3 border-b border-gray-100 py-3.5 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                >
+                  <div className="min-w-0 flex-1">
+                    {searching && (
+                      <span className="mb-0.5 block w-fit rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800">
+                        {categoryName(p.categoryId)}
+                      </span>
+                    )}
+                    <div className="text-[15px] font-semibold leading-tight text-gray-900 dark:text-gray-50">{p.name}</div>
+                    {p.description && (
+                      <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-gray-500">{p.description}</div>
+                    )}
+                    <div className="mt-0.5 text-sm font-bold text-brand">{brl(p.price)}</div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {qty > 0 && (
+                      <button
+                        onClick={() => setConfiguring(p)}
+                        className="text-gray-400 hover:text-brand"
+                        title="Observações / adicionais"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                    {qty === 0 ? (
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-brand text-lg font-semibold leading-none text-brand">
+                        +
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => decSimple(p)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-brand text-brand"
+                        >
+                          <Minus size={13} />
+                        </button>
+                        <span className="min-w-[16px] text-center text-sm font-bold">{qty}</span>
+                        <button
+                          onClick={() => addSimple(p)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-white"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -161,6 +216,7 @@ export function OrderComposer({
                   {item.additionalIds.length > 0 && (
                     <div className="text-xs text-gray-500">+ {item.additionalIds.length} adicional(is)</div>
                   )}
+                  <div className="text-xs font-semibold text-brand">{brl(draftItemUnitPrice(item) * item.quantity)}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="btn-secondary !px-2 !py-1" onClick={() => {
@@ -198,10 +254,10 @@ export function OrderComposer({
           product={configuring}
           current={draft.find((d) => d.product.id === configuring.id)}
           onClose={() => setConfiguring(null)}
-          onSave={(notes, additionalIds) => {
+          onSave={(notes, additionalIds, additionalsTotal) => {
             const idx = draft.findIndex((d) => d.product.id === configuring.id);
             const next = [...draft];
-            if (idx >= 0) next[idx] = { ...next[idx], notes, additionalIds };
+            if (idx >= 0) next[idx] = { ...next[idx], notes, additionalIds, additionalsTotal };
             setDraft(next);
             setConfiguring(null);
           }}
@@ -220,7 +276,7 @@ function ItemConfigModal({
   product: Product;
   current?: DraftItem;
   onClose: () => void;
-  onSave: (notes: string, additionalIds: string[]) => void;
+  onSave: (notes: string, additionalIds: string[], additionalsTotal: number) => void;
 }) {
   const [notes, setNotes] = useState(current?.notes ?? '');
   const [selected, setSelected] = useState<string[]>(current?.additionalIds ?? []);
@@ -232,9 +288,11 @@ function ItemConfigModal({
         .data,
   });
 
+  const selectedTotal = additionals.filter((a) => selected.includes(a.id)).reduce((sum, a) => sum + a.price, 0);
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 font-semibold">{product.name}</h3>
         {additionals.length > 0 && (
           <div className="mb-4">
@@ -282,7 +340,7 @@ function ItemConfigModal({
         </div>
         <div className="flex justify-end gap-2">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" onClick={() => onSave(notes, selected)}>Salvar</button>
+          <button className="btn-primary" onClick={() => onSave(notes, selected, selectedTotal)}>Salvar</button>
         </div>
       </div>
     </div>

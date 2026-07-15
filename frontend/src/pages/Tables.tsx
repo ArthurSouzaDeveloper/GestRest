@@ -13,7 +13,7 @@ import {
   tableClass,
   tableLabels,
 } from '../components/ui';
-import { OrderComposer, DraftItem } from '../components/OrderComposer';
+import { OrderComposer, DraftItem, draftItemUnitPrice } from '../components/OrderComposer';
 import { useRealtime } from '../hooks/useRealtime';
 import type { Order, RestaurantTable } from '../types';
 
@@ -246,6 +246,9 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
     },
   });
 
+  const draftCount = draft.reduce((a, d) => a + d.quantity, 0);
+  const draftTotal = draft.reduce((a, d) => a + draftItemUnitPrice(d) * d.quantity, 0);
+
   return (
     <Modal open onClose={onClose} title={order ? `Mesa ${order.table.number} — Comanda #${order.number}` : 'Pedido'} wide>
       {isLoading || !order ? (
@@ -255,7 +258,10 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
             <span>Cliente: {order.customer?.name ?? '—'}</span>
             <span>Garçom: {order.waiter.name}</span>
-            <span>Aberta às {time(order.openedAt)}</span>
+            <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-600 dark:bg-green-300" />
+              Aberta às {time(order.openedAt)}
+            </span>
           </div>
 
           {/* Existing items */}
@@ -289,15 +295,33 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
             <OrderComposer draft={draft} setDraft={setDraft} />
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
-            <button className="btn-secondary" onClick={onClose}>Fechar</button>
-            <button
-              className="btn-primary"
-              disabled={draft.length === 0 || addItems.isPending}
-              onClick={() => addItems.mutate()}
-            >
-              {addItems.isPending ? 'Enviando...' : `Confirmar Pedido (${draft.reduce((a, d) => a + d.quantity, 0)})`}
-            </button>
+          <div className="sticky bottom-0 -mx-6 -mb-6 border-t border-gray-100 bg-white px-6 py-3 dark:border-gray-800 dark:bg-gray-900">
+            {draftCount > 0 ? (
+              <div className="flex items-center justify-between gap-4 rounded-2xl bg-brand px-5 py-3.5 shadow-lg shadow-brand/25">
+                <div className="flex flex-col leading-tight">
+                  <span className="text-xs font-semibold text-white/85">
+                    {draftCount} {draftCount === 1 ? 'item' : 'itens'}
+                  </span>
+                  <span className="text-lg font-extrabold text-white">{brl(draftTotal)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="text-sm font-medium text-white/80 hover:text-white" onClick={onClose}>
+                    Fechar
+                  </button>
+                  <button
+                    className="h-10 rounded-lg bg-white px-5 text-sm font-bold text-brand disabled:opacity-60"
+                    disabled={addItems.isPending}
+                    onClick={() => addItems.mutate()}
+                  >
+                    {addItems.isPending ? 'Enviando...' : 'Confirmar Pedido'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-end">
+                <button className="btn-secondary" onClick={onClose}>Fechar</button>
+              </div>
+            )}
           </div>
         </div>
       )}
