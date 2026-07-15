@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Trash2, Users, XCircle } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl, time } from '../lib/format';
 import {
@@ -222,6 +222,7 @@ function OpenTableModal({
 function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<DraftItem[]>([]);
+  const [error, setError] = useState('');
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['orders', orderId],
@@ -246,6 +247,25 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
     },
   });
 
+  const cancelItem = useMutation({
+    mutationFn: async (itemId: string) => api.delete(`/orders/items/${itemId}`),
+    onSuccess: () => {
+      setError('');
+      qc.invalidateQueries({ queryKey: ['orders', orderId] });
+      qc.invalidateQueries({ queryKey: ['tables'] });
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+
+  const cancelOrder = useMutation({
+    mutationFn: async () => api.post(`/orders/${orderId}/cancel`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tables'] });
+      onClose();
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+
   const draftCount = draft.reduce((a, d) => a + d.quantity, 0);
   const draftTotal = draft.reduce((a, d) => a + draftItemUnitPrice(d) * d.quantity, 0);
 
@@ -255,14 +275,30 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
         <Spinner />
       ) : (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
-            <span>Cliente: {order.customer?.name ?? '—'}</span>
-            <span>Garçom: {order.waiter.name}</span>
-            <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-600 dark:bg-green-300" />
-              Aberta às {time(order.openedAt)}
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+              <span>Cliente: {order.customer?.name ?? '—'}</span>
+              <span>Garçom: {order.waiter.name}</span>
+              <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-600 dark:bg-green-300" />
+                Aberta às {time(order.openedAt)}
+              </span>
+            </div>
+            {order.status !== 'CANCELLED' && (
+              <button
+                className="flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700"
+                disabled={cancelOrder.isPending}
+                onClick={() => {
+                  if (window.confirm('Cancelar esta comanda inteira? Só é possível antes de a cozinha começar a preparar.')) {
+                    cancelOrder.mutate();
+                  }
+                }}
+              >
+                <XCircle size={14} /> Cancelar comanda
+              </button>
+            )}
           </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
           {/* Existing items */}
           {order.items.length > 0 && (
@@ -278,7 +314,21 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
                       )}
                       {it.notes && <span className="ml-1 text-xs italic text-gray-500">— {it.notes}</span>}
                     </div>
-                    <ProductionBadge status={it.status} />
+                    <div className="flex items-center gap-2">
+                      <ProductionBadge status={it.status} />
+                      {it.status !== 'CANCELLED' && (
+                        <button
+                          className="text-gray-400 hover:text-red-600"
+                          title="Cancelar item (lançado por engano)"
+                          disabled={cancelItem.isPending}
+                          onClick={() => {
+                            if (window.confirm(`Cancelar ${it.product.name}?`)) cancelItem.mutate(it.id);
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
