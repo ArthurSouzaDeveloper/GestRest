@@ -1,7 +1,7 @@
 import { TableStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
-import { emitTo, ROOMS } from '../../socket';
+import { emitTenant, ROOMS } from '../../socket';
 
 export const tableService = {
   list(tenantId: string) {
@@ -30,7 +30,7 @@ export const tableService = {
   async setStatus(tenantId: string, id: string, status: TableStatus) {
     await tableService.get(tenantId, id);
     const table = await prisma.restaurantTable.update({ where: { id }, data: { status } });
-    emitTo([ROOMS.FLOOR, ROOMS.DASHBOARD], 'table:updated', table);
+    emitTenant(tenantId, [ROOMS.FLOOR, ROOMS.DASHBOARD], 'table:updated', table);
     return table;
   },
 

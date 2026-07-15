@@ -50,23 +50,38 @@ for i in $(seq 1 40); do
   sleep 3
 done
 
-echo "==> 5/5  Populando dados iniciais (apenas na primeira vez)..."
+echo "==> 5/5  Criando o seu super admin (apenas na primeira vez)..."
+# Não usamos mais "prisma db seed" aqui de propósito: ele criava um restaurante de
+# demonstração inteiro com senha fixa "123456" documentada no código-fonte, e este
+# script anunciava essa senha no terminal — em produção real isso é uma conta
+# SUPERADMIN (o papel mais privilegiado da plataforma) com senha pública. Em vez
+# disso, você escolhe seu próprio e-mail e senha agora.
 if [ ! -f .seeded ]; then
-  if $COMPOSE exec -T backend npx prisma db seed; then
+  echo ""
+  echo "    Escolha o e-mail e a senha do SEU super admin (não são os do banco, são só seus):"
+  read -rp "    E-mail: " SUPER_EMAIL
+  read -rsp "    Senha (mínimo 8 caracteres): " SUPER_PASSWORD
+  echo ""
+  read -rp "    Nome: " SUPER_NAME
+
+  if $COMPOSE exec -T backend node dist/scripts/create-superadmin.js \
+      --email="$SUPER_EMAIL" --senha="$SUPER_PASSWORD" --nome="$SUPER_NAME"; then
     touch .seeded
-    echo "    Seed concluído. Usuários demo (senha 123456): admin@ / gerente@ / garcom@ / suqueiro@ / cozinha@ / caixa@ gestrest.com"
+    echo "    Super admin criado. Acesse /super com o e-mail e senha que você digitou."
   else
-    echo "    !! O SEED FALHOU. O banco pode estar sem usuários. Veja o erro acima e rode de novo:"
-    echo "       $COMPOSE exec backend npx prisma db seed"
+    echo "    !! Falhou ao criar o super admin. Veja o erro acima e rode de novo manualmente:"
+    echo "       $COMPOSE exec backend node dist/scripts/create-superadmin.js --email=... --senha=... --nome=..."
   fi
 else
-  echo "    Já foi populado antes (arquivo .seeded existe). Pulando."
+  echo "    Já foi configurado antes (arquivo .seeded existe). Pulando."
+  echo "    Para trocar a senha do super admin: $COMPOSE exec backend node dist/scripts/create-superadmin.js --email=... --senha=... --nome=..."
 fi
 
 IP=$(grep '^PUBLIC_URL=' .env | cut -d= -f2-)
 echo ""
 echo "======================================================================"
 echo "  ✅ GestRest no ar!  Acesse:  ${IP:-http://SEU_IP}"
+echo "  Painel da plataforma (crie restaurantes aqui): ${IP:-http://SEU_IP}/super"
 echo "  Comandos úteis:"
 echo "    Ver logs:      $COMPOSE logs -f"
 echo "    Reiniciar:     $COMPOSE restart"

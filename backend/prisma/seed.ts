@@ -4,6 +4,28 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 const hash = (p: string) => bcrypt.hashSync(p, 10);
 
+const DEFAULT_DEV_PASSWORD = '123456';
+const isProd = (process.env.NODE_ENV ?? 'development') === 'production';
+const SEED_PASSWORD = process.env.SEED_PASSWORD;
+
+// Refuses to fall back to the well-known "123456" default in production — that password is
+// printed in this very source file, so anyone who has ever cloned this repo knows it. A real
+// deployment must pass its own SEED_PASSWORD (or better, use the superadmin:create script and
+// skip this seed's demo accounts entirely).
+if (isProd && !SEED_PASSWORD) {
+  console.error(
+    '❌ Recusando rodar em produção sem SEED_PASSWORD definido — evita subir a senha padrão "123456" (documentada neste arquivo) para o banco real.',
+  );
+  console.error('   Rode com: SEED_PASSWORD="uma senha forte" npm run prisma:seed');
+  console.error('   Ou, para criar só o superadmin com credenciais próprias: npm run superadmin:create -- --email=... --senha=... --nome=...');
+  process.exit(1);
+}
+if (SEED_PASSWORD && SEED_PASSWORD.length < 8) {
+  console.error('❌ SEED_PASSWORD precisa ter pelo menos 8 caracteres.');
+  process.exit(1);
+}
+const seedPassword = SEED_PASSWORD ?? DEFAULT_DEV_PASSWORD;
+
 async function main() {
   console.log('🌱 Seeding GestRest (multi-tenant)...');
 
@@ -14,7 +36,7 @@ async function main() {
     create: {
       name: 'Super Admin',
       email: 'super@gestrest.com',
-      passwordHash: hash('123456'),
+      passwordHash: hash(seedPassword),
       role: Role.SUPERADMIN,
     },
   });
@@ -40,7 +62,7 @@ async function main() {
     await prisma.user.upsert({
       where: { email: u.email },
       update: {},
-      create: { ...u, passwordHash: hash('123456'), restaurantId: rid },
+      create: { ...u, passwordHash: hash(seedPassword), restaurantId: rid },
     });
   }
 
@@ -122,9 +144,10 @@ async function main() {
     });
   }
 
+  const passwordNote = SEED_PASSWORD ? '(senha definida via SEED_PASSWORD)' : `(senha "${DEFAULT_DEV_PASSWORD}" — só para dev local)`;
   console.log('✅ Seed completo.');
-  console.log('   SUPERADMIN: super@gestrest.com (senha 123456)');
-  console.log('   Restaurante demo (slug "demo"): admin@ / gerente@ / garcom@ / suqueiro@ / cozinha@ / caixa@ gestrest.com (senha 123456)');
+  console.log(`   SUPERADMIN: super@gestrest.com ${passwordNote}`);
+  console.log(`   Restaurante demo (slug "demo"): admin@ / gerente@ / garcom@ / suqueiro@ / cozinha@ / caixa@ gestrest.com ${passwordNote}`);
 }
 
 main()

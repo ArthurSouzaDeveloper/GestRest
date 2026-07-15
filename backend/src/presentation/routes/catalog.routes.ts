@@ -8,7 +8,14 @@ import {
   categoryService,
   productService,
 } from '../../application/services/catalog.service';
-import { additionalSchema, categorySchema, productSchema } from '../validators/schemas';
+import {
+  additionalSchema,
+  additionalUpdateSchema,
+  categorySchema,
+  categoryUpdateSchema,
+  productSchema,
+  productUpdateSchema,
+} from '../validators/schemas';
 import { ctx } from './context';
 
 const router = Router();
@@ -31,6 +38,7 @@ router.post(
 router.patch(
   '/categories/:id',
   manager,
+  validateBody(categoryUpdateSchema),
   asyncHandler(async (req, res) =>
     res.json(await categoryService.update(tid(req), req.params.id, req.body)),
   ),
@@ -66,6 +74,7 @@ router.post(
 router.patch(
   '/products/:id',
   manager,
+  validateBody(productUpdateSchema),
   asyncHandler(async (req, res) =>
     res.json(await productService.update(tid(req), req.params.id, req.body)),
   ),
@@ -102,6 +111,7 @@ router.post(
 router.patch(
   '/additionals/:id',
   manager,
+  validateBody(additionalUpdateSchema),
   asyncHandler(async (req, res) =>
     res.json(await additionalService.update(tid(req), req.params.id, req.body)),
   ),

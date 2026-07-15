@@ -70,8 +70,22 @@ export const productService = {
     await categoryService.ensure(tenantId, data.categoryId);
     return prisma.product.create({ data: { ...data, restaurantId: tenantId } });
   },
-  async update(tenantId: string, id: string, data: Prisma.ProductUpdateInput) {
+  async update(
+    tenantId: string,
+    id: string,
+    data: Partial<{
+      name: string;
+      description: string;
+      price: number;
+      categoryId: string;
+      avgPrepMin: number;
+      imageUrl: string;
+      available: boolean;
+    }>,
+  ) {
     await productService.get(tenantId, id);
+    // Reassigning to a category must stay inside the same tenant, same as on create.
+    if (data.categoryId) await categoryService.ensure(tenantId, data.categoryId);
     return prisma.product.update({ where: { id }, data });
   },
   async remove(tenantId: string, id: string) {
@@ -87,15 +101,23 @@ export const additionalService = {
     if (params.onlyActive) where.active = true;
     return prisma.additional.findMany({ where, orderBy: { name: 'asc' } });
   },
-  create(
+  async create(
     tenantId: string,
     data: { name: string; price: number; categoryId?: string; active?: boolean },
   ) {
+    // Same guard as productService.create — without it, a category from another
+    // tenant could be linked here (data-integrity leak across restaurants).
+    if (data.categoryId) await categoryService.ensure(tenantId, data.categoryId);
     return prisma.additional.create({ data: { ...data, restaurantId: tenantId } });
   },
-  async update(tenantId: string, id: string, data: Prisma.AdditionalUpdateInput) {
+  async update(
+    tenantId: string,
+    id: string,
+    data: Partial<{ name: string; price: number; categoryId: string; active: boolean }>,
+  ) {
     const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });
     if (!a) throw new NotFoundError('Adicional');
+    if (data.categoryId) await categoryService.ensure(tenantId, data.categoryId);
     return prisma.additional.update({ where: { id }, data });
   },
   async remove(tenantId: string, id: string) {
