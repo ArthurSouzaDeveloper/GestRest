@@ -33,6 +33,9 @@ export const productionService = {
         id: item.id,
         orderId: item.orderId,
         tableNumber: item.order.table.number,
+        // A table can have several comandas open at once — the order number tells them
+        // apart on the ticket even when neither comanda has a customer name set.
+        orderNumber: item.order.number,
         customerName: item.order.customer?.name ?? null,
         productName: item.product.name,
         avgPrepMin: item.product.avgPrepMin,

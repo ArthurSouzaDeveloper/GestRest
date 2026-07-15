@@ -4,13 +4,12 @@ import {
   Prisma,
   ProductionStatus,
   Station,
-  TableStatus,
 } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { AppError, ConflictError, NotFoundError } from '../../utils/errors';
 import { emitTenant, ROOMS } from '../../socket';
 import { auditService } from './audit.service';
-import { orderInclude, serializeOrder } from './order.helpers';
+import { orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
 
 interface Ctx {
   userId: string;
@@ -31,7 +30,7 @@ const stationRoom: Record<Station, string | null> = {
   [Station.NONE]: null,
 };
 
-/** Recomputes order status from item statuses and syncs the table status. */
+/** Recomputes order status from item statuses and syncs the table (across ALL of its comandas). */
 async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = prisma) {
   const order = await tx.order.findUnique({
     where: { id: orderId },
@@ -47,15 +46,8 @@ async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = p
     status = allDone ? OrderStatus.READY_FOR_PAYMENT : OrderStatus.IN_PRODUCTION;
   }
 
-  const tableStatus: TableStatus =
-    status === OrderStatus.READY_FOR_PAYMENT
-      ? TableStatus.READY_FOR_PAYMENT
-      : status === OrderStatus.IN_PRODUCTION
-        ? TableStatus.IN_PRODUCTION
-        : TableStatus.OCCUPIED;
-
   await tx.order.update({ where: { id: orderId }, data: { status } });
-  await tx.restaurantTable.update({ where: { id: order.tableId }, data: { status: tableStatus } });
+  await syncTableStatus(order.tableId, tx);
 }
 
 async function loadAndBroadcast(tenantId: string, orderId: string, event: string) {
@@ -103,7 +95,9 @@ export const orderService = {
       where: { id: input.tableId, restaurantId: ctx.tenantId },
     });
     if (!table) throw new NotFoundError('Mesa');
-    if (table.status !== TableStatus.FREE) throw new ConflictError('Mesa não está livre');
+    // Intentionally no "table must be FREE" check — a table can hold several concurrent
+    // comandas (e.g. a big group splitting into separate tabs), so opening a new one is
+    // always allowed regardless of what else is already active there.
 
     const order = await prisma.$transaction(async (tx) => {
       let customerId: string | undefined;
@@ -123,10 +117,7 @@ export const orderService = {
           notes: input.notes,
         },
       });
-      await tx.restaurantTable.update({
-        where: { id: input.tableId },
-        data: { status: TableStatus.OCCUPIED },
-      });
+      await syncTableStatus(input.tableId, tx);
       return created;
     });
 
@@ -331,10 +322,7 @@ export const orderService = {
         where: { id },
         data: { status: OrderStatus.CANCELLED, closedAt: new Date() },
       });
-      await tx.restaurantTable.update({
-        where: { id: order.tableId },
-        data: { status: TableStatus.FREE },
-      });
+      await syncTableStatus(order.tableId, tx);
     });
 
     await auditService.record({

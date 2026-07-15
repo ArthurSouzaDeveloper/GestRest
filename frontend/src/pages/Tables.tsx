@@ -1,9 +1,18 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Users } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl, time } from '../lib/format';
-import { Card, Modal, PageHeader, ProductionBadge, Spinner, tableClass, tableLabels } from '../components/ui';
+import {
+  Card,
+  Modal,
+  PageHeader,
+  ProductionBadge,
+  Spinner,
+  orderStatusLabels,
+  tableClass,
+  tableLabels,
+} from '../components/ui';
 import { OrderComposer, DraftItem } from '../components/OrderComposer';
 import { useRealtime } from '../hooks/useRealtime';
 import type { Order, RestaurantTable } from '../types';
@@ -12,6 +21,7 @@ export default function Tables() {
   useRealtime(['floor'], [['tables'], ['orders']]);
   const qc = useQueryClient();
   const [openTable, setOpenTable] = useState<RestaurantTable | null>(null);
+  const [comandasTable, setComandasTable] = useState<RestaurantTable | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
   const { data: tables = [], isLoading } = useQuery({
@@ -31,36 +41,61 @@ export default function Tables() {
 
   if (isLoading) return <Spinner />;
 
-  const activeOrderIdForTable = (t: RestaurantTable) => t.orders?.[0]?.id ?? null;
+  // Keeps the comandas list modal in sync with fresh data after a refetch (realtime or otherwise).
+  const liveComandasTable = comandasTable ? tables.find((t) => t.id === comandasTable.id) ?? null : null;
 
   return (
     <div>
-      <PageHeader title="Mesas" subtitle="Selecione uma mesa para abrir ou lançar pedidos" />
+      <PageHeader
+        title="Mesas"
+        subtitle="Uma mesa pode ter várias comandas abertas ao mesmo tempo — cada grupo fecha a sua"
+      />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-        {tables.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => {
-              if (t.status === 'FREE') setOpenTable(t);
-              else setActiveOrderId(activeOrderIdForTable(t));
-            }}
-            className={`rounded-lg border-2 p-4 text-left transition hover:shadow ${tableClass(t.status)}`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold">{t.number}</span>
-              <span className="flex items-center gap-1 text-xs opacity-70">
-                <Users size={12} /> {t.seats}
-              </span>
-            </div>
-            <div className="mt-2 text-xs font-medium">{tableLabels[t.status]}</div>
-          </button>
-        ))}
+        {tables.map((t) => {
+          const comandaCount = t.orders?.length ?? 0;
+          return (
+            <button
+              key={t.id}
+              onClick={() => (comandaCount === 0 ? setOpenTable(t) : setComandasTable(t))}
+              className={`relative rounded-lg border-2 p-4 text-left transition hover:shadow ${tableClass(t.status)}`}
+            >
+              {comandaCount > 1 && (
+                <span className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-white shadow">
+                  {comandaCount}
+                </span>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-2xl font-bold">{t.number}</span>
+                <span className="flex items-center gap-1 text-xs opacity-70">
+                  <Users size={12} /> {t.seats}
+                </span>
+              </div>
+              <div className="mt-2 text-xs font-medium">{tableLabels[t.status]}</div>
+              {comandaCount > 1 && <div className="text-[11px] opacity-70">{comandaCount} comandas</div>}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Open table modal */}
+      {/* Comandas list for a table that already has one or more open */}
+      <ComandasListModal
+        table={liveComandasTable}
+        onClose={() => setComandasTable(null)}
+        onPick={(orderId) => {
+          setComandasTable(null);
+          setActiveOrderId(orderId);
+        }}
+        onNewComanda={(table) => {
+          setComandasTable(null);
+          setOpenTable(table);
+        }}
+      />
+
+      {/* Open table / new comanda modal */}
       <OpenTableModal
         table={openTable}
+        isAdditional={(openTable?.orders?.length ?? 0) > 0}
         onClose={() => setOpenTable(null)}
         onSubmit={(v) => openTable && openMutation.mutate({ tableId: openTable.id, ...v })}
         error={openMutation.isError ? apiError(openMutation.error) : ''}
@@ -73,14 +108,62 @@ export default function Tables() {
   );
 }
 
+function ComandasListModal({
+  table,
+  onClose,
+  onPick,
+  onNewComanda,
+}: {
+  table: RestaurantTable | null;
+  onClose: () => void;
+  onPick: (orderId: string) => void;
+  onNewComanda: (table: RestaurantTable) => void;
+}) {
+  const comandas = table?.orders ?? [];
+  return (
+    <Modal open={!!table} onClose={onClose} title={`Mesa ${table?.number ?? ''} — Comandas`}>
+      <div className="space-y-3">
+        {comandas.length === 0 && <p className="text-sm text-gray-400">Nenhuma comanda aberta nesta mesa.</p>}
+        <div className="space-y-2">
+          {comandas.map((o) => (
+            <button
+              key={o.id}
+              onClick={() => onPick(o.id)}
+              className="card flex w-full items-center justify-between p-3 text-left transition hover:border-brand hover:shadow"
+            >
+              <div>
+                <div className="text-sm font-medium">
+                  Comanda #{o.number} {o.customer?.name ? `— ${o.customer.name}` : ''}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {o.peopleCount} pessoa(s) · aberta às {time(o.openedAt)}
+                </div>
+              </div>
+              <span className="text-xs font-medium text-gray-500">{orderStatusLabels[o.status]}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          className="btn-secondary w-full"
+          onClick={() => table && onNewComanda(table)}
+        >
+          <Plus size={16} /> Nova comanda nesta mesa
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 function OpenTableModal({
   table,
+  isAdditional,
   onClose,
   onSubmit,
   error,
   loading,
 }: {
   table: RestaurantTable | null;
+  isAdditional: boolean;
   onClose: () => void;
   onSubmit: (v: { customerName?: string; peopleCount: number; notes?: string }) => void;
   error: string;
@@ -91,8 +174,17 @@ function OpenTableModal({
   const [notes, setNotes] = useState('');
 
   return (
-    <Modal open={!!table} onClose={onClose} title={`Abrir Mesa ${table?.number ?? ''}`}>
+    <Modal
+      open={!!table}
+      onClose={onClose}
+      title={isAdditional ? `Nova Comanda — Mesa ${table?.number ?? ''}` : `Abrir Mesa ${table?.number ?? ''}`}
+    >
       <div className="space-y-4">
+        {isAdditional && (
+          <p className="text-xs text-gray-500">
+            Esta mesa já tem comanda(s) aberta(s). Esta será uma comanda separada, com conta própria.
+          </p>
+        )}
         <div>
           <label className="label">Nome do cliente (opcional)</label>
           <input className="input" value={customerName} onChange={(e) => setName(e.target.value)} />
@@ -119,7 +211,7 @@ function OpenTableModal({
             disabled={loading}
             onClick={() => onSubmit({ customerName: customerName || undefined, peopleCount, notes: notes || undefined })}
           >
-            {loading ? 'Abrindo...' : 'Abrir Mesa'}
+            {loading ? 'Abrindo...' : isAdditional ? 'Abrir Comanda' : 'Abrir Mesa'}
           </button>
         </div>
       </div>

@@ -52,7 +52,9 @@ export default function Cashier() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-semibold">Mesa {o.table.number}</span>
+                <span className="font-semibold">
+                  Mesa {o.table.number} <span className="font-normal text-gray-400">· Comanda #{o.number}</span>
+                </span>
                 <span className="font-semibold text-brand">{brl(o.totals.total)}</span>
               </div>
               <div className="text-xs text-gray-500">

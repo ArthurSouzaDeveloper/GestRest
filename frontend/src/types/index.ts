@@ -65,12 +65,21 @@ export interface Additional {
   categoryId?: string;
 }
 
+export interface TableComandaSummary {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  openedAt: string;
+  peopleCount: number;
+  customer: { name: string } | null;
+}
+
 export interface RestaurantTable {
   id: string;
   number: number;
   status: TableStatus;
   seats: number;
-  orders?: { id: string; status: OrderStatus }[];
+  orders?: TableComandaSummary[];
 }
 
 export interface OrderItemAdditional {
@@ -122,6 +131,7 @@ export interface ProductionTicket {
   id: string;
   orderId: string;
   tableNumber: number;
+  orderNumber: number;
   customerName: string | null;
   productName: string;
   avgPrepMin: number;

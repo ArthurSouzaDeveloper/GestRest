@@ -51,8 +51,14 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
               )}
             >
               <div className="flex items-center justify-between">
-                <span className="rounded-md bg-brand px-2.5 py-1 text-sm font-bold text-white">
-                  Mesa {t.tableNumber}
+                <span className="flex items-center gap-1.5">
+                  <span className="rounded-md bg-brand px-2.5 py-1 text-sm font-bold text-white">
+                    Mesa {t.tableNumber}
+                  </span>
+                  {/* Uma mesa pode ter várias comandas simultâneas — o nº da comanda desambigua. */}
+                  <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                    #{t.orderNumber}
+                  </span>
                 </span>
                 <span
                   className={clsx(
