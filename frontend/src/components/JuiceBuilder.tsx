@@ -73,7 +73,10 @@ export function JuiceBuilder({
 
   const confirm = () => {
     if (!chosen) return;
-    onAdd({ product: chosen, quantity, notes, additionalIds: selectedAdditionals });
+    const additionalsTotal = additionals
+      .filter((a) => selectedAdditionals.includes(a.id))
+      .reduce((sum, a) => sum + a.price, 0);
+    onAdd({ product: chosen, quantity, notes, additionalIds: selectedAdditionals, additionalsTotal });
     reset();
   };
 
