@@ -2,6 +2,16 @@ import { Prisma, Station } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
 
+// Prisma's Decimal serializes to a string over JSON. Left unconverted, arithmetic like
+// `product.price + additionalsTotal` on the client silently does string concatenation
+// instead of addition (e.g. "16" + 0 => "160").
+function serializeProduct<T extends { price: Prisma.Decimal | number }>(p: T) {
+  return { ...p, price: Number(p.price) };
+}
+function serializeAdditional<T extends { price: Prisma.Decimal | number }>(a: T) {
+  return { ...a, price: Number(a.price) };
+}
+
 export const categoryService = {
   list(tenantId: string) {
     return prisma.category.findMany({
@@ -32,7 +42,7 @@ export const categoryService = {
 };
 
 export const productService = {
-  list(
+  async list(
     tenantId: string,
     params: { search?: string; categoryId?: string; onlyAvailable?: boolean } = {},
   ) {
@@ -40,11 +50,12 @@ export const productService = {
     if (params.search) where.name = { contains: params.search, mode: 'insensitive' };
     if (params.categoryId) where.categoryId = params.categoryId;
     if (params.onlyAvailable) where.available = true;
-    return prisma.product.findMany({
+    const products = await prisma.product.findMany({
       where,
       include: { category: true },
       orderBy: { name: 'asc' },
     });
+    return products.map(serializeProduct);
   },
   async get(tenantId: string, id: string) {
     const p = await prisma.product.findFirst({
@@ -52,7 +63,7 @@ export const productService = {
       include: { category: true },
     });
     if (!p) throw new NotFoundError('Produto');
-    return p;
+    return serializeProduct(p);
   },
   async create(
     tenantId: string,
@@ -68,7 +79,8 @@ export const productService = {
   ) {
     // Garante que a categoria pertence ao mesmo restaurante.
     await categoryService.ensure(tenantId, data.categoryId);
-    return prisma.product.create({ data: { ...data, restaurantId: tenantId } });
+    const p = await prisma.product.create({ data: { ...data, restaurantId: tenantId } });
+    return serializeProduct(p);
   },
   async update(
     tenantId: string,
@@ -86,7 +98,8 @@ export const productService = {
     await productService.get(tenantId, id);
     // Reassigning to a category must stay inside the same tenant, same as on create.
     if (data.categoryId) await categoryService.ensure(tenantId, data.categoryId);
-    return prisma.product.update({ where: { id }, data });
+    const p = await prisma.product.update({ where: { id }, data });
+    return serializeProduct(p);
   },
   async remove(tenantId: string, id: string) {
     await productService.get(tenantId, id);
@@ -95,11 +108,12 @@ export const productService = {
 };
 
 export const additionalService = {
-  list(tenantId: string, params: { categoryId?: string; onlyActive?: boolean } = {}) {
+  async list(tenantId: string, params: { categoryId?: string; onlyActive?: boolean } = {}) {
     const where: Prisma.AdditionalWhereInput = { restaurantId: tenantId };
     if (params.categoryId) where.categoryId = params.categoryId;
     if (params.onlyActive) where.active = true;
-    return prisma.additional.findMany({ where, orderBy: { name: 'asc' } });
+    const additionals = await prisma.additional.findMany({ where, orderBy: { name: 'asc' } });
+    return additionals.map(serializeAdditional);
   },
   async create(
     tenantId: string,
@@ -108,7 +122,8 @@ export const additionalService = {
     // Same guard as productService.create — without it, a category from another
     // tenant could be linked here (data-integrity leak across restaurants).
     if (data.categoryId) await categoryService.ensure(tenantId, data.categoryId);
-    return prisma.additional.create({ data: { ...data, restaurantId: tenantId } });
+    const a = await prisma.additional.create({ data: { ...data, restaurantId: tenantId } });
+    return serializeAdditional(a);
   },
   async update(
     tenantId: string,
@@ -118,7 +133,8 @@ export const additionalService = {
     const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });
     if (!a) throw new NotFoundError('Adicional');
     if (data.categoryId) await categoryService.ensure(tenantId, data.categoryId);
-    return prisma.additional.update({ where: { id }, data });
+    const updated = await prisma.additional.update({ where: { id }, data });
+    return serializeAdditional(updated);
   },
   async remove(tenantId: string, id: string) {
     const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });

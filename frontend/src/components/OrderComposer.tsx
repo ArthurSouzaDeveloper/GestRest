@@ -23,18 +23,55 @@ export function draftItemUnitPrice(item: DraftItem): number {
 
 type TopGroup = 'COMIDAS' | 'BEBIDAS' | 'REFRIGERANTES' | 'AGUA';
 
-const isRefrigeranteCategory = (c: Category) => c.name.toLowerCase().includes('refrigerante');
-const isAguaCategory = (c: Category) => {
-  const n = c.name.toLowerCase();
-  return n.includes('água') || n.includes('agua');
-};
-
 const TOP_GROUP_LABELS: Record<TopGroup, string> = {
   COMIDAS: 'Comidas',
   BEBIDAS: 'Bebidas',
   REFRIGERANTES: 'Refrigerantes',
   AGUA: 'Água',
 };
+
+const isRefrigeranteCategory = (c: Category) => c.name.toLowerCase().includes('refrigerante');
+const isAguaCategory = (c: Category) => {
+  const n = c.name.toLowerCase();
+  return n.includes('água') || n.includes('agua');
+};
+
+// Marcas/termos de refrigerante — usado pra classificar o produto mesmo quando ele está
+// cadastrado dentro de uma categoria genérica ("Bebidas") em vez de uma categoria própria.
+const REFRIGERANTE_NAME_HINTS = [
+  'coca-cola', 'coca cola', 'coca', 'guaraná', 'guarana', 'fanta', 'sprite', 'pepsi',
+  'kuat', 'soda', 'itubaína', 'itubaina', 'dolly', 'sukita', 'tônica', 'tonica',
+  'schweppes', 'h2o', 'refrigerante', 'refri',
+];
+// "Água de coco"/"água aromatizada" também contam como água pra este agrupamento.
+const AGUA_NAME_HINTS = ['água', 'agua'];
+
+function isRefrigeranteProduct(p: Product): boolean {
+  const n = p.name.toLowerCase();
+  return REFRIGERANTE_NAME_HINTS.some((hint) => n.includes(hint));
+}
+function isAguaProduct(p: Product): boolean {
+  const n = p.name.toLowerCase();
+  return AGUA_NAME_HINTS.some((hint) => n.includes(hint));
+}
+
+/**
+ * Classifica um produto pelo GRUPO de aba a que pertence. O nome do produto tem prioridade
+ * sobre a categoria cadastrada — várias casas colocam Coca-Cola, Guaraná, H2O etc. todos numa
+ * categoria genérica "Bebidas" em vez de categorias próprias, então confiar só na categoria
+ * deixaria esses itens fora da aba certa.
+ */
+function productTopGroup(p: Product, categoriesById: Map<string, Category>): TopGroup {
+  if (isAguaProduct(p)) return 'AGUA';
+  if (isRefrigeranteProduct(p)) return 'REFRIGERANTES';
+  const cat = categoriesById.get(p.categoryId);
+  if (cat) {
+    if (isAguaCategory(cat)) return 'AGUA';
+    if (isRefrigeranteCategory(cat)) return 'REFRIGERANTES';
+    if (cat.station === 'JUICE_BAR') return 'BEBIDAS';
+  }
+  return 'COMIDAS';
+}
 
 /** Product grid + item drafting used by the waiter to build an order. */
 export function OrderComposer({
@@ -61,29 +98,23 @@ export function OrderComposer({
   const term = search.trim().toLowerCase();
   const searching = term.length > 0;
 
-  // Divide as ~15 categorias em grupos pequenos em vez de uma parede única de pills:
-  // Refrigerantes e Água ganham aba própria (pedido explícito do restaurante); o resto das
-  // categorias do bar de sucos (sucos, açaí, outras bebidas) fica em "Bebidas"; o resto da
-  // cozinha fica em "Comidas".
-  const refrigeranteCategories = useMemo(() => categories.filter(isRefrigeranteCategory), [categories]);
-  const aguaCategories = useMemo(() => categories.filter(isAguaCategory), [categories]);
-  const drinkCategories = useMemo(
-    () => categories.filter((c) => c.station === 'JUICE_BAR' && !isRefrigeranteCategory(c) && !isAguaCategory(c)),
-    [categories],
+  // Divide o cardápio em 4 abas pequenas em vez de uma parede única de ~15 categorias.
+  // Cada PRODUTO (não a categoria) é classificado — ver productTopGroup — porque o
+  // restaurante mistura vários tipos de bebida dentro de uma categoria genérica "Bebidas"
+  // em vez de ter categorias próprias para cada tipo.
+  const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const groupProducts = useMemo(
+    () => products.filter((p) => productTopGroup(p, categoriesById) === topGroup),
+    [products, categoriesById, topGroup],
   );
-  const foodCategories = useMemo(() => categories.filter((c) => c.station !== 'JUICE_BAR'), [categories]);
+  // Só mostra como pill de sub-categoria as categorias que de fato têm produto neste grupo.
+  const groupCategories = useMemo(() => {
+    const ids = new Set(groupProducts.map((p) => p.categoryId));
+    return categories.filter((c) => ids.has(c.id));
+  }, [categories, groupProducts]);
 
-  const groupCategories =
-    topGroup === 'BEBIDAS'
-      ? drinkCategories
-      : topGroup === 'REFRIGERANTES'
-        ? refrigeranteCategories
-        : topGroup === 'AGUA'
-          ? aguaCategories
-          : foodCategories;
-
-  // Buscando: procura em TODAS as categorias por nome ou descrição.
-  // Sem busca: filtra pelo grupo (aba) e, dentro dele, pela categoria selecionada.
+  // Buscando: procura em TODOS os produtos (qualquer aba) por nome ou descrição.
+  // Sem busca: filtra pela aba selecionada e, dentro dela, pela categoria (se escolhida).
   const filtered = useMemo(() => {
     if (searching) {
       return products.filter(
@@ -92,12 +123,9 @@ export function OrderComposer({
           (p.description ?? '').toLowerCase().includes(term),
       );
     }
-    if (activeCat === 'all') {
-      const groupIds = new Set(groupCategories.map((c) => c.id));
-      return products.filter((p) => groupIds.has(p.categoryId));
-    }
-    return products.filter((p) => p.categoryId === activeCat);
-  }, [products, activeCat, term, searching, groupCategories]);
+    if (activeCat === 'all') return groupProducts;
+    return groupProducts.filter((p) => p.categoryId === activeCat);
+  }, [products, groupProducts, activeCat, term, searching]);
 
   const simpleIndex = (productId: string) =>
     draft.findIndex((d) => d.product.id === productId && d.additionalIds.length === 0 && !d.notes);
