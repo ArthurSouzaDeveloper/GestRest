@@ -21,6 +21,21 @@ export function draftItemUnitPrice(item: DraftItem): number {
   return item.product.price + item.additionalsTotal;
 }
 
+type TopGroup = 'COMIDAS' | 'BEBIDAS' | 'REFRIGERANTES' | 'AGUA';
+
+const isRefrigeranteCategory = (c: Category) => c.name.toLowerCase().includes('refrigerante');
+const isAguaCategory = (c: Category) => {
+  const n = c.name.toLowerCase();
+  return n.includes('água') || n.includes('agua');
+};
+
+const TOP_GROUP_LABELS: Record<TopGroup, string> = {
+  COMIDAS: 'Comidas',
+  BEBIDAS: 'Bebidas',
+  REFRIGERANTES: 'Refrigerantes',
+  AGUA: 'Água',
+};
+
 /** Product grid + item drafting used by the waiter to build an order. */
 export function OrderComposer({
   draft,
@@ -29,7 +44,7 @@ export function OrderComposer({
   draft: DraftItem[];
   setDraft: (items: DraftItem[]) => void;
 }) {
-  const [topGroup, setTopGroup] = useState<'COMIDAS' | 'BEBIDAS'>('COMIDAS');
+  const [topGroup, setTopGroup] = useState<TopGroup>('COMIDAS');
   const [activeCat, setActiveCat] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [configuring, setConfiguring] = useState<Product | null>(null);
@@ -46,14 +61,29 @@ export function OrderComposer({
   const term = search.trim().toLowerCase();
   const searching = term.length > 0;
 
-  // Categorias de bebida (estação do bar de sucos) vs. comida (cozinha + sem estação) —
-  // divide as ~15 categorias em dois grupos pequenos em vez de uma parede única de pills.
-  const drinkCategories = useMemo(() => categories.filter((c) => c.station === 'JUICE_BAR'), [categories]);
+  // Divide as ~15 categorias em grupos pequenos em vez de uma parede única de pills:
+  // Refrigerantes e Água ganham aba própria (pedido explícito do restaurante); o resto das
+  // categorias do bar de sucos (sucos, açaí, outras bebidas) fica em "Bebidas"; o resto da
+  // cozinha fica em "Comidas".
+  const refrigeranteCategories = useMemo(() => categories.filter(isRefrigeranteCategory), [categories]);
+  const aguaCategories = useMemo(() => categories.filter(isAguaCategory), [categories]);
+  const drinkCategories = useMemo(
+    () => categories.filter((c) => c.station === 'JUICE_BAR' && !isRefrigeranteCategory(c) && !isAguaCategory(c)),
+    [categories],
+  );
   const foodCategories = useMemo(() => categories.filter((c) => c.station !== 'JUICE_BAR'), [categories]);
-  const groupCategories = topGroup === 'BEBIDAS' ? drinkCategories : foodCategories;
 
-  // Buscando: procura em TODAS as categorias (comida e bebida) por nome ou descrição.
-  // Sem busca: filtra pelo grupo (comida/bebida) e, dentro dele, pela categoria selecionada.
+  const groupCategories =
+    topGroup === 'BEBIDAS'
+      ? drinkCategories
+      : topGroup === 'REFRIGERANTES'
+        ? refrigeranteCategories
+        : topGroup === 'AGUA'
+          ? aguaCategories
+          : foodCategories;
+
+  // Buscando: procura em TODAS as categorias por nome ou descrição.
+  // Sem busca: filtra pelo grupo (aba) e, dentro dele, pela categoria selecionada.
   const filtered = useMemo(() => {
     if (searching) {
       return products.filter(
@@ -128,39 +158,56 @@ export function OrderComposer({
 
         {!searching && (
           <>
-            {/* Grupo principal: comidas vs. bebidas — reduz a lista de categorias visíveis de uma vez */}
+            {/* Grupo principal: comidas / bebidas / refrigerantes / água — reduz a lista de
+                categorias visíveis de uma vez. Refrigerantes e água têm aba própria porque o
+                restaurante pediu acesso direto a elas, sem passar pela aba geral de bebidas. */}
             <div className="mb-2 grid grid-cols-2 gap-2">
               <button
-                className={`h-11 rounded-xl text-[15px] font-bold transition ${topGroup === 'COMIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={`h-11 rounded-xl text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                 onClick={() => { setTopGroup('COMIDAS'); setActiveCat('all'); }}
               >
                 🍽️ Comidas
               </button>
               <button
-                className={`h-11 rounded-xl text-[15px] font-bold transition ${topGroup === 'BEBIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={`h-11 rounded-xl text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                 onClick={() => { setTopGroup('BEBIDAS'); setActiveCat('all'); }}
               >
-                🥤 Bebidas
+                🧃 Bebidas
+              </button>
+              <button
+                className={`h-11 rounded-xl text-[14px] font-bold transition ${topGroup === 'REFRIGERANTES' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                onClick={() => { setTopGroup('REFRIGERANTES'); setActiveCat('all'); }}
+              >
+                🥤 Refrigerantes
+              </button>
+              <button
+                className={`h-11 rounded-xl text-[14px] font-bold transition ${topGroup === 'AGUA' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                onClick={() => { setTopGroup('AGUA'); setActiveCat('all'); }}
+              >
+                💧 Água
               </button>
             </div>
 
-            <div className="mb-2 flex flex-wrap gap-2">
-              <button
-                className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === 'all' ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
-                onClick={() => setActiveCat('all')}
-              >
-                Todos
-              </button>
-              {groupCategories.map((c) => (
+            {/* Sub-categorias dentro do grupo — só faz sentido quando há mais de uma pra escolher. */}
+            {groupCategories.length > 1 && (
+              <div className="mb-2 flex flex-wrap gap-2">
                 <button
-                  key={c.id}
-                  className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === c.id ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
-                  onClick={() => setActiveCat(c.id)}
+                  className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === 'all' ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
+                  onClick={() => setActiveCat('all')}
                 >
-                  {c.name}
+                  Todos
                 </button>
-              ))}
-            </div>
+                {groupCategories.map((c) => (
+                  <button
+                    key={c.id}
+                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === c.id ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
+                    onClick={() => setActiveCat(c.id)}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
         {useBuilder ? (
@@ -172,7 +219,7 @@ export function OrderComposer({
             {searching
               ? `Nenhum produto encontrado para "${search}".`
               : activeCat === 'all'
-                ? `Nenhum produto em ${topGroup === 'BEBIDAS' ? 'Bebidas' : 'Comidas'}.`
+                ? `Nenhum produto em ${TOP_GROUP_LABELS[topGroup]}.`
                 : 'Nenhum produto nesta categoria.'}
           </p>
         ) : (
