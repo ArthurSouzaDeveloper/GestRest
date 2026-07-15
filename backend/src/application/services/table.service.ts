@@ -9,9 +9,19 @@ export const tableService = {
       where: { restaurantId: tenantId },
       orderBy: { number: 'asc' },
       include: {
+        // Several comandas can be active on the same table at once (big groups splitting
+        // into separate tabs) — the caller needs enough per-comanda detail to list them.
         orders: {
           where: { status: { notIn: ['PAID', 'CANCELLED'] } },
-          select: { id: true, status: true, openedAt: true },
+          select: {
+            id: true,
+            number: true,
+            status: true,
+            openedAt: true,
+            peopleCount: true,
+            customer: { select: { name: true } },
+          },
+          orderBy: { openedAt: 'asc' },
         },
       },
     });

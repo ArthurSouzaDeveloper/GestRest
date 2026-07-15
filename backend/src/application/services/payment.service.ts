@@ -1,9 +1,9 @@
-import { AuditAction, OrderStatus, PaymentMethod, TableStatus } from '@prisma/client';
+import { AuditAction, OrderStatus, PaymentMethod } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { AppError, ConflictError, NotFoundError } from '../../utils/errors';
 import { emitTenant, ROOMS } from '../../socket';
 import { auditService } from './audit.service';
-import { computeTotals, orderInclude, serializeOrder } from './order.helpers';
+import { computeTotals, orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
 
 interface PaymentLine {
   method: PaymentMethod;
@@ -61,10 +61,9 @@ export const paymentService = {
         where: { id: orderId },
         data: { status: OrderStatus.PAID, closedAt: new Date() },
       });
-      await tx.restaurantTable.update({
-        where: { id: order.tableId },
-        data: { status: TableStatus.FREE },
-      });
+      // Other comandas may still be active at this table — recompute from all of them
+      // rather than assuming the table is free just because this one comanda paid out.
+      await syncTableStatus(order.tableId, tx);
     });
 
     await auditService.record({

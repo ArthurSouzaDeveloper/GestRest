@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { OrderStatus, Prisma, TableStatus } from '@prisma/client';
 
 /** Standard include used whenever we return a full order to clients. */
 export const orderInclude = {
@@ -55,6 +55,34 @@ export function computeTotals(order: OrderWithRelations): OrderTotals {
     paid: money(paid),
     remaining: money(Math.max(0, total - paid)),
   };
+}
+
+/**
+ * Recomputes a table's status from ALL of its currently active (non-paid, non-cancelled)
+ * comandas — a table can have several at once (common for big groups splitting into separate
+ * tabs), so its status can no longer be derived from a single order in isolation. Priority
+ * favors whichever state still needs attention: any comanda still in production outweighs one
+ * that's merely open-with-no-items-yet, which in turn outweighs one that's ready for payment —
+ * the table only shows READY_FOR_PAYMENT once every comanda on it is.
+ */
+export async function syncTableStatus(tableId: string, tx: Prisma.TransactionClient): Promise<void> {
+  const activeOrders = await tx.order.findMany({
+    where: { tableId, status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] } },
+    select: { status: true },
+  });
+
+  let status: TableStatus;
+  if (activeOrders.length === 0) {
+    status = TableStatus.FREE;
+  } else if (activeOrders.some((o) => o.status === OrderStatus.IN_PRODUCTION)) {
+    status = TableStatus.IN_PRODUCTION;
+  } else if (activeOrders.some((o) => o.status === OrderStatus.OPEN)) {
+    status = TableStatus.OCCUPIED;
+  } else {
+    status = TableStatus.READY_FOR_PAYMENT;
+  }
+
+  await tx.restaurantTable.update({ where: { id: tableId }, data: { status } });
 }
 
 /** Serializes Prisma Decimals to numbers and appends computed totals. */
