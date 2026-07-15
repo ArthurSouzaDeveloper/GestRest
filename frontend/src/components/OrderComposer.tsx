@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, Minus, X, Search, Pencil } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
-import { JuiceBuilder } from './JuiceBuilder';
+import { FRUIT_BASE_RE, JuiceBuilder } from './JuiceBuilder';
 import { DRINK_NOTE_PRESETS, FOOD_NOTE_PRESETS, toggleNotePreset } from '../lib/notePresets';
 import type { Additional, Category, Product } from '../types';
 
@@ -60,10 +60,17 @@ function isAguaProduct(p: Product): boolean {
  * sobre a categoria cadastrada — várias casas colocam Coca-Cola, Guaraná, H2O etc. todos numa
  * categoria genérica "Bebidas" em vez de categorias próprias, então confiar só na categoria
  * deixaria esses itens fora da aba certa.
+ *
+ * Exceção: produtos do montador de suco (nome "Fruta (Base)", ex. "Morango (Água)") nunca
+ * usam os hints de nome — a base "Água" de um suco não deve mandar o item pra aba Água, que é
+ * só pra água mineral de verdade. Esses produtos ficam na aba Bebidas/Sucos pela categoria.
  */
 function productTopGroup(p: Product, categoriesById: Map<string, Category>): TopGroup {
-  if (isAguaProduct(p)) return 'AGUA';
-  if (isRefrigeranteProduct(p)) return 'REFRIGERANTES';
+  const isJuiceBuilderItem = FRUIT_BASE_RE.test(p.name);
+  if (!isJuiceBuilderItem) {
+    if (isAguaProduct(p)) return 'AGUA';
+    if (isRefrigeranteProduct(p)) return 'REFRIGERANTES';
+  }
   const cat = categoriesById.get(p.categoryId);
   if (cat) {
     if (isAguaCategory(cat)) return 'AGUA';
@@ -71,6 +78,11 @@ function productTopGroup(p: Product, categoriesById: Map<string, Category>): Top
     if (cat.station === 'JUICE_BAR') return 'BEBIDAS';
   }
   return 'COMIDAS';
+}
+
+/** A categoria genérica "Bebidas" (o que sobra depois de separar sucos/refrigerante/água) é onde ficam as bebidas alcoólicas — o rótulo do subfiltro reflete isso. */
+function categoryDisplayName(name: string): string {
+  return name.trim().toLowerCase() === 'bebidas' ? 'Bebidas Alcoólicas' : name;
 }
 
 /** Product grid + item drafting used by the waiter to build an order. */
@@ -158,7 +170,7 @@ export function OrderComposer({
   // combinações como botões separados.
   const activeCategory = categories.find((c) => c.id === activeCat);
   const useBuilder = activeCategory?.name.toLowerCase() === 'sucos' && !searching;
-  const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? '';
+  const categoryName = (id: string) => categoryDisplayName(categories.find((c) => c.id === id)?.name ?? '');
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -231,7 +243,7 @@ export function OrderComposer({
                     className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === c.id ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
                     onClick={() => setActiveCat(c.id)}
                   >
-                    {c.name}
+                    {categoryDisplayName(c.name)}
                   </button>
                 ))}
               </div>
