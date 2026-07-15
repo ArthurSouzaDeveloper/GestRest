@@ -8,7 +8,7 @@ import type { Additional, Product } from '../types';
 import type { DraftItem } from './OrderComposer';
 
 /** Matches product names built by the menu importer, e.g. "Morango (Frapê)". */
-const FRUIT_BASE_RE = /^(.+) \(([^)]+)\)$/;
+export const FRUIT_BASE_RE = /^(.+) \(([^)]+)\)$/;
 
 interface FruitEntry {
   fruit: string;
