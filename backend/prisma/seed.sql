@@ -1,19 +1,36 @@
 -- GestRest seed multi-tenant (SQL puro). Idempotente.
+--
+-- ATENÇÃO — Este script cria contas de DEMONSTRAÇÃO (superadmin + restaurante "demo") com uma
+-- senha que VOCÊ escolhe na hora de rodar — não roda mais com uma senha fixa embutida no arquivo.
+-- NUNCA rode isto contra o banco de um restaurante real que já está em produção com clientes.
+--
+-- Uso:
+--   1) Gere o hash bcrypt da senha escolhida (mínimo 8 caracteres):
+--        node -e "console.log(require('bcryptjs').hashSync(process.argv[1], 10))" 'SUA_SENHA_FORTE'
+--   2) Rode passando o hash como variável psql:
+--        psql "$DATABASE_URL" -v password_hash="'<hash gerado>'" -f seed.sql
+--
+\if :{?password_hash}
+\else
+  \warn 'password_hash não foi definido. Rode com: psql ... -v password_hash="''<hash bcrypt>''" -f seed.sql'
+  \quit
+\endif
+
 BEGIN;
 
 -- Superadmin (sem restaurante)
-INSERT INTO "users" ("id","name","email","passwordHash","role","updatedAt") VALUES (gen_random_uuid()::text,'Super Admin','super@gestrest.com','$2a$10$D7Q7dvxPtCglkxxi9xVq1.gLH/u2owT1WyOFnFC0mqyhNrBMhNJ9C','SUPERADMIN',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
+INSERT INTO "users" ("id","name","email","passwordHash","role","updatedAt") VALUES (gen_random_uuid()::text,'Super Admin','super@gestrest.com',:password_hash,'SUPERADMIN',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
 
 -- Restaurante demo
 INSERT INTO "restaurants" ("id","name","slug","updatedAt") VALUES ('b86636c3-c6db-4195-867d-7e79a14a6827','Restaurante Demo','demo',CURRENT_TIMESTAMP) ON CONFLICT ("slug") DO NOTHING;
 
 -- Equipe do restaurante
-INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Administrador','admin@gestrest.com','$2a$10$D7Q7dvxPtCglkxxi9xVq1.gLH/u2owT1WyOFnFC0mqyhNrBMhNJ9C','ADMIN','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
-INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Gerente','gerente@gestrest.com','$2a$10$D7Q7dvxPtCglkxxi9xVq1.gLH/u2owT1WyOFnFC0mqyhNrBMhNJ9C','MANAGER','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
-INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Garçom João','garcom@gestrest.com','$2a$10$D7Q7dvxPtCglkxxi9xVq1.gLH/u2owT1WyOFnFC0mqyhNrBMhNJ9C','WAITER','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
-INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Suqueiro Ana','suqueiro@gestrest.com','$2a$10$D7Q7dvxPtCglkxxi9xVq1.gLH/u2owT1WyOFnFC0mqyhNrBMhNJ9C','JUICER','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
-INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Cozinheiro Pedro','cozinha@gestrest.com','$2a$10$D7Q7dvxPtCglkxxi9xVq1.gLH/u2owT1WyOFnFC0mqyhNrBMhNJ9C','COOK','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
-INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Caixa Maria','caixa@gestrest.com','$2a$10$D7Q7dvxPtCglkxxi9xVq1.gLH/u2owT1WyOFnFC0mqyhNrBMhNJ9C','CASHIER','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
+INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Administrador','admin@gestrest.com',:password_hash,'ADMIN','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
+INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Gerente','gerente@gestrest.com',:password_hash,'MANAGER','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
+INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Garçom João','garcom@gestrest.com',:password_hash,'WAITER','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
+INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Suqueiro Ana','suqueiro@gestrest.com',:password_hash,'JUICER','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
+INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Cozinheiro Pedro','cozinha@gestrest.com',:password_hash,'COOK','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
+INSERT INTO "users" ("id","name","email","passwordHash","role","restaurantId","updatedAt") VALUES (gen_random_uuid()::text,'Caixa Maria','caixa@gestrest.com',:password_hash,'CASHIER','b86636c3-c6db-4195-867d-7e79a14a6827',CURRENT_TIMESTAMP) ON CONFLICT ("email") DO NOTHING;
 
 -- Categorias
 INSERT INTO "categories" ("id","name","station","sortOrder","restaurantId") VALUES ('c03cf1a1-69bb-4914-ac55-293f049c7d57','Sucos','JUICE_BAR',1,'b86636c3-c6db-4195-867d-7e79a14a6827') ON CONFLICT ("restaurantId","name") DO NOTHING;

@@ -89,7 +89,7 @@ O GestRest opera como plataforma: cada restaurante é um **tenant** isolado, com
 
 ## 👥 Usuários de demonstração
 
-Senha para todos: **`123456`**
+Senha para todos em **dev local**: **`123456`** (só funciona assim fora de produção — em `NODE_ENV=production` o seed exige `SEED_PASSWORD=<sua senha>` e recusa rodar sem ela, veja `backend/prisma/seed.ts`).
 
 | Acesso | E-mail | Onde entrar |
 |--------|--------|-------------|

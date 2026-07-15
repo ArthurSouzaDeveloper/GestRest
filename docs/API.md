@@ -19,7 +19,7 @@ Todos os erros seguem o formato:
 
 ```bash
 curl -X POST /api/auth/login -H 'Content-Type: application/json' \
-  -d '{"email":"caixa@gestrest.com","password":"123456"}'
+  -d '{"email":"seu@email.com","password":"suaSenha"}'
 ```
 
 ## Mesas

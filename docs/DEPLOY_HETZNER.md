@@ -54,7 +54,7 @@ Salve no `nano` com `Ctrl+O`, `Enter`, depois `Ctrl+X`.
 bash deploy/hetzner-setup.sh
 ```
 
-O script instala o Docker (se faltar), libera a porta 80, sobe o banco + backend + frontend, aplica as migrações e popula os dados iniciais. Ao final mostra o endereço de acesso.
+O script instala o Docker (se faltar), libera a porta 80, sobe o banco + backend + frontend, aplica as migrações e pede o e-mail/senha do **seu** super admin (não vem nenhuma conta com senha padrão). Ao final mostra o endereço de acesso.
 
 ## 5. Liberar a porta no firewall do Hetzner
 
@@ -73,49 +73,46 @@ Abra no navegador:
 http://SEU_IP
 ```
 
-Entre com um usuário demo (senha `123456`): `admin@gestrest.com`.
+Acesse `http://SEU_IP/super` com o e-mail e a senha que você digitou no passo 4.
 
-> **Importante:** em produção, entre em **Usuários**, crie as contas reais da sua equipe e **remova/altere** os usuários de demonstração.
+No painel `/super`, clique em **Novo Restaurante** e cadastre cada casa com o **e-mail e senha próprios do admin dela** — esse admin entra pelo link `/r/<slug>` e monta o cardápio.
+
+> Não existe mais restaurante nem usuário de demonstração criado automaticamente — cada conta em produção é criada explicitamente com e-mail/senha próprios, seja pelo `hetzner-setup.sh` (super admin) seja pelo painel `/super` (admin de cada restaurante).
+
+### Redefinir a senha do super admin
+
+Os parâmetros são **nomeados** e podem vir em qualquer ordem (não há como confundir
+qual valor é o quê):
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env exec backend \
+  node dist/scripts/create-superadmin.js --email=seu@email.com --senha=SuaSenhaForte123 --nome="Seu Nome"
+```
+
+Rode o mesmo comando de novo a qualquer momento para **redefinir a senha** do superadmin (é idempotente — não cria duplicado).
 
 ---
 
 ## Atualizar um servidor já rodando para a versão multi-restaurante
 
-A versão multi-restaurante muda a estrutura do banco. Como o banco em produção
-ainda só tinha dados de demonstração, o caminho seguro é **recriar o banco** e
-popular de novo (isso apaga os dados de teste):
+A versão multi-restaurante muda a estrutura do banco. Se o seu banco em produção
+ainda só tinha dados de demonstração (do fluxo antigo, anterior a este guia), o
+caminho seguro é **recriar o banco**:
 
 ```bash
 cd ~/GestRest
 git pull origin main
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 
-# Recria o schema (apaga dados de demonstração) e popula com superadmin + restaurante demo
+# Recria o schema do zero (apaga tudo o que já existir no banco)
 docker compose -f docker-compose.prod.yml --env-file .env exec backend npx prisma migrate reset --force --skip-seed
-docker compose -f docker-compose.prod.yml --env-file .env exec -T db \
-  psql -U gestrest -d gestrest < backend/prisma/seed.sql
-```
 
-### Criar o SEU super admin (e-mail e senha próprios)
-
-Em vez de usar o `super@gestrest.com` padrão, crie o superadmin com o seu e-mail.
-Os parâmetros são **nomeados** e podem vir em qualquer ordem (não há como confundir
-qual valor é o quê):
-
-```bash
+# Cria o seu super admin com e-mail e senha próprios
 docker compose -f docker-compose.prod.yml --env-file .env exec backend \
-  node dist/scripts/create-superadmin.js --email=seu@email.com --senha=SuaSenha123 --nome="Seu Nome"
+  node dist/scripts/create-superadmin.js --email=seu@email.com --senha=SuaSenhaForte123 --nome="Seu Nome"
 ```
 
-Rode o mesmo comando de novo a qualquer momento para **redefinir a senha** do superadmin.
-
-Depois acesse:
-- **Painel da plataforma:** `http://SEU_IP:8081/super` → seu e-mail / sua senha
-- **Restaurante demo (opcional):** `http://SEU_IP:8081/r/demo` → `admin@gestrest.com` / `123456`
-
-No painel `/super`, clique em **Novo Restaurante** e cadastre cada casa com o **e-mail próprio do admin dela** — esse admin entra pelo link `/r/<slug>` e monta o cardápio.
-
-> ⚠️ Troque/remova as credenciais de demonstração em produção.
+> ⚠️ **Se este servidor já tem clientes reais usando o sistema, NÃO rode `prisma migrate reset`** — isso apaga todos os pedidos e pagamentos. Fale comigo antes de rodar isso num banco com dados reais.
 
 ## Operação do dia a dia
 

@@ -30,10 +30,17 @@ docker compose up --build -d
 
 Sobe três serviços: `db` (PostgreSQL), `backend` (API — aplica migrações no boot) e `frontend` (nginx servindo a SPA + proxy para a API).
 
-Popular dados iniciais (apenas na primeira vez / demonstração):
+Criar o super admin (necessário para acessar `/super` e cadastrar restaurantes):
 
 ```bash
-docker compose exec backend npx prisma db seed
+docker compose exec backend node dist/scripts/create-superadmin.js \
+  --email=seu@email.com --senha=SuaSenhaForte123 --nome="Seu Nome"
+```
+
+Populares dados de demonstração (opcional, só para ambiente de teste — **nunca em produção com clientes reais**, exige `SEED_PASSWORD` para não usar a senha padrão de desenvolvimento):
+
+```bash
+docker compose exec -e SEED_PASSWORD=SuaSenhaForte123 backend npx prisma db seed
 ```
 
 Acesse:
@@ -68,7 +75,7 @@ npx prisma studio            # inspeção visual do banco
 
 ## 6. Primeiro acesso
 
-Faça login com `admin@gestrest.com` / `123456` (se rodou o seed) e **troque a senha** imediatamente em produção, criando os usuários reais em **Usuários**.
+Acesse `/super` com o e-mail e senha que você definiu no `create-superadmin.js`, cadastre cada restaurante (com o e-mail/senha próprios do admin dele) e crie a equipe real em **Usuários** dentro de cada restaurante.
 
 ## 7. Checklist de produção
 

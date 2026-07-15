@@ -39,8 +39,13 @@ async function main() {
   const name = args.nome ?? args.name ?? 'Super Admin';
 
   if (!email || !email.includes('@')) usageAndExit('Informe um e-mail válido em --email=...');
-  if (!password || password.length < 6) {
-    usageAndExit('Informe uma senha com pelo menos 6 caracteres em --senha=...');
+  // Mesma régua da API (SUPERADMIN é a conta mais privilegiada da plataforma, não deveria
+  // ter uma barra mais baixa que a de um usuário comum de restaurante).
+  if (!password || password.length < 8 || password.length > 72) {
+    usageAndExit('Informe uma senha com 8 a 72 caracteres em --senha=...');
+  }
+  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+    usageAndExit('A senha precisa ter pelo menos uma letra e um número.');
   }
 
   const passwordHash = bcrypt.hashSync(password, 10);
