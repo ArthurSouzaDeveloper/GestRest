@@ -20,6 +20,9 @@ router.use(authenticate);
 const waiter = authorize(Role.WAITER, Role.MANAGER, Role.ADMIN);
 const cashier = authorize(Role.CASHIER, Role.MANAGER, Role.ADMIN);
 const production = authorize(Role.JUICER, Role.COOK, Role.MANAGER, Role.ADMIN);
+// Cancelamento: tanto o garçom (corrige o próprio lançamento, com o serviço aplicando o
+// limite de "antes da cozinha começar") quanto o caixa (sem limite) podem acionar.
+const canCancel = authorize(Role.WAITER, Role.CASHIER, Role.MANAGER, Role.ADMIN);
 
 router.get(
   '/',
@@ -83,7 +86,7 @@ router.post(
 
 router.delete(
   '/items/:itemId',
-  cashier,
+  canCancel,
   asyncHandler(async (req, res) =>
     res.json(await orderService.cancelItem(req.params.itemId, ctx(req))),
   ),
@@ -91,7 +94,7 @@ router.delete(
 
 router.post(
   '/:id/cancel',
-  cashier,
+  canCancel,
   asyncHandler(async (req, res) => res.json(await orderService.cancel(req.params.id, ctx(req)))),
 );
 

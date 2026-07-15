@@ -3,6 +3,7 @@ import {
   OrderStatus,
   Prisma,
   ProductionStatus,
+  Role,
   Station,
 } from '@prisma/client';
 import { prisma } from '../../config/prisma';
@@ -15,7 +16,14 @@ interface Ctx {
   userId: string;
   ip?: string;
   tenantId: string;
+  role: Role;
 }
+
+// Garçom só pode cancelar o que ele mesmo lançou por engano, e só enquanto a cozinha
+// ainda não colocou a mão: item ainda não finalizado, pedido ainda sem nenhum item em
+// preparo. Caixa/gerente/admin mantêm o poder de cancelar em qualquer estágio (ex.:
+// correção de conta, cliente foi embora sem pagar).
+const UNRESTRICTED_CANCEL_ROLES: Role[] = [Role.CASHIER, Role.MANAGER, Role.ADMIN];
 
 interface NewItemInput {
   productId: string;
@@ -260,6 +268,10 @@ export const orderService = {
       where: { id: itemId, order: { restaurantId: ctx.tenantId } },
     });
     if (!item) throw new NotFoundError('Item');
+    if (item.status === ProductionStatus.CANCELLED) throw new ConflictError('Item já cancelado');
+    if (!UNRESTRICTED_CANCEL_ROLES.includes(ctx.role) && item.status === ProductionStatus.DONE) {
+      throw new ConflictError('Item já finalizado pela cozinha — peça ao caixa para cancelar');
+    }
     await prisma.$transaction(async (tx) => {
       await tx.orderItem.update({
         where: { id: itemId },
@@ -312,6 +324,19 @@ export const orderService = {
   async cancel(id: string, ctx: Ctx) {
     const order = await requireOrder(ctx.tenantId, id);
     if (order.status === OrderStatus.PAID) throw new ConflictError('Pedido já pago');
+    if (order.status === OrderStatus.CANCELLED) throw new ConflictError('Pedido já cancelado');
+    if (!UNRESTRICTED_CANCEL_ROLES.includes(ctx.role)) {
+      // order.status só distingue "sem itens ativos" de "tem itens ativos" (IN_PRODUCTION
+      // cobre tanto WAITING quanto PREPARING/DONE) — pra saber se a cozinha JÁ COMEÇOU a
+      // preparar de fato, precisa olhar o status de cada item.
+      const items = await prisma.orderItem.findMany({ where: { orderId: id } });
+      const started = items.some(
+        (i) => i.status === ProductionStatus.PREPARING || i.status === ProductionStatus.DONE,
+      );
+      if (started) {
+        throw new ConflictError('A cozinha já começou a preparar este pedido — peça ao caixa para cancelar');
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.orderItem.updateMany({

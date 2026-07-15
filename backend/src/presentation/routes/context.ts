@@ -1,9 +1,11 @@
 import { Request } from 'express';
+import { Role } from '@prisma/client';
 
 export interface Ctx {
   userId: string;
   ip?: string;
   tenantId: string;
+  role: Role;
 }
 
 /**
@@ -16,5 +18,6 @@ export function ctx(req: Request): Ctx {
     userId: req.user!.sub,
     ip: req.ip,
     tenantId: req.user!.restaurantId as string,
+    role: req.user!.role,
   };
 }
