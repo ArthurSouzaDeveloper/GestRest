@@ -26,5 +26,8 @@ COPY prisma ./prisma
 RUN npx prisma generate
 COPY --from=build /app/dist ./dist
 EXPOSE 4000
+# Runs as the non-root "node" user (built into the base image) instead of root — limits
+# blast radius if a future RCE-class bug in a dependency ever gets code execution here.
+USER node
 # Apply migrations then start
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]

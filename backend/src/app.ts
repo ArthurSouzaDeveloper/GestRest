@@ -26,8 +26,11 @@ export function createApp(): Application {
   // Static uploads
   app.use('/uploads', express.static(path.resolve(process.cwd(), env.uploadDir)));
 
-  // API docs
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
+  // API docs — dev/staging only. In production this would hand anyone who finds the
+  // URL a full unauthenticated map of every endpoint and payload shape.
+  if (!env.isProd) {
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
+  }
 
   // Rate-limited API
   app.use('/api', apiLimiter, api);
