@@ -15,7 +15,7 @@ async function bootstrap(): Promise<void> {
 
   server.listen(env.port, () => {
     logger.info(`GestRest API running on http://localhost:${env.port}`);
-    logger.info(`API docs at http://localhost:${env.port}/api/docs`);
+    if (!env.isProd) logger.info(`API docs at http://localhost:${env.port}/api/docs`);
   });
 
   const shutdown = async (signal: string) => {

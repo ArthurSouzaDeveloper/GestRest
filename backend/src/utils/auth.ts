@@ -19,8 +19,16 @@ export function comparePassword(plain: string, hash: string): Promise<boolean> {
   return bcrypt.compare(plain, hash);
 }
 
+// Pinned explicitly on both sign and verify so a token can never be forged by switching to
+// a different algorithm (e.g. "none", or an asymmetric alg the server would otherwise accept
+// using the secret as a public key) — classic JWT "alg confusion" attack surface.
+const JWT_ALGORITHM = 'HS256';
+
 export function signAccessToken(payload: AccessTokenPayload): string {
-  return jwt.sign(payload, env.jwt.accessSecret, { expiresIn: env.jwt.accessExpires } as jwt.SignOptions);
+  return jwt.sign(payload, env.jwt.accessSecret, {
+    expiresIn: env.jwt.accessExpires,
+    algorithm: JWT_ALGORITHM,
+  } as jwt.SignOptions);
 }
 
 export function signRefreshToken(userId: string): string {
@@ -29,13 +37,14 @@ export function signRefreshToken(userId: string): string {
   // claims would produce identical tokens and collide on the unique index.
   return jwt.sign({ sub: userId, jti: randomUUID() }, env.jwt.refreshSecret, {
     expiresIn: env.jwt.refreshExpires,
+    algorithm: JWT_ALGORITHM,
   } as jwt.SignOptions);
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  return jwt.verify(token, env.jwt.accessSecret) as AccessTokenPayload;
+  return jwt.verify(token, env.jwt.accessSecret, { algorithms: [JWT_ALGORITHM] }) as AccessTokenPayload;
 }
 
 export function verifyRefreshToken(token: string): { sub: string } {
-  return jwt.verify(token, env.jwt.refreshSecret) as { sub: string };
+  return jwt.verify(token, env.jwt.refreshSecret, { algorithms: [JWT_ALGORITHM] }) as { sub: string };
 }
