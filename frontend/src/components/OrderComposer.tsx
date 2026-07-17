@@ -4,6 +4,7 @@ import { Plus, Minus, X, Search, Pencil } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { FRUIT_BASE_RE, JuiceBuilder } from './JuiceBuilder';
+import { Spinner } from './ui';
 import { DRINK_NOTE_PRESETS, FOOD_NOTE_PRESETS, toggleNotePreset } from '../lib/notePresets';
 import type { Additional, Category, Product } from '../types';
 
@@ -102,14 +103,15 @@ export function OrderComposer({
   const [search, setSearch] = useState('');
   const [configuring, setConfiguring] = useState<Product | null>(null);
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [], isLoading: loadingCategories } = useQuery({
     queryKey: ['categories', basePath],
     queryFn: async () => (await api.get<Category[]>(`${basePath}/categories`)).data,
   });
-  const { data: products = [] } = useQuery({
+  const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ['products', basePath],
     queryFn: async () => (await api.get<Product[]>(`${basePath}/products`, { params: { available: true } })).data,
   });
+  const loadingCatalog = loadingCategories || loadingProducts;
 
   const term = search.trim().toLowerCase();
   const searching = term.length > 0;
@@ -254,7 +256,11 @@ export function OrderComposer({
             )}
           </>
         )}
-        {useBuilder ? (
+        {loadingCatalog ? (
+          <div className="py-8">
+            <Spinner />
+          </div>
+        ) : useBuilder ? (
           <div className="max-h-[55vh] overflow-y-auto pr-1">
             <JuiceBuilder products={filtered} categoryId={activeCat} onAdd={addFromBuilder} basePath={basePath} />
           </div>

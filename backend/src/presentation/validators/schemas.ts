@@ -174,8 +174,10 @@ export const publicOrderSchema = z
     declaredPaymentMethod: z.enum(['PIX', 'CASH', 'CREDIT', 'DEBIT']),
     changeFor: z.number().positive().optional(),
     notes: z.string().max(300).optional(),
-    // honeypot: campo invisível pro cliente real; bot que preenche todo input do form cai aqui.
-    website: z.string().max(0).optional(),
+    // Honeypot: campo invisível pro cliente real; bot que preenche todo input do form cai
+    // aqui. Nome propositalmente sem relação com nenhum campo comum (nome/email/telefone/
+    // endereço/site) pra não colidir com autofill do navegador e barrar cliente de verdade.
+    gr_hp: z.string().max(0).optional(),
     items: z
       .array(
         z.object({

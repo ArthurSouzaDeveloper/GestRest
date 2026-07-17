@@ -38,7 +38,10 @@ export default function PublicOrder() {
   const [draft, setDraft] = useState<DraftItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PublicPaymentMethod | ''>('');
   const [changeFor, setChangeFor] = useState('');
-  const [website, setWebsite] = useState(''); // honeypot — invisível pro cliente real
+  // Honeypot — nome propositalmente neutro pra não colidir com autofill do navegador
+  // (campos chamados "website"/"empresa" são alvo comum de autofill, o que barraria
+  // um cliente de verdade sem ele nunca ter digitado nada aqui).
+  const [grHp, setGrHp] = useState('');
   const [confirmedOrderNumber, setConfirmedOrderNumber] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState('');
 
@@ -83,7 +86,7 @@ export default function PublicOrder() {
           : {}),
         declaredPaymentMethod: paymentMethod,
         changeFor: paymentMethod === 'CASH' && changeFor ? Number(changeFor) : undefined,
-        website: website || undefined,
+        gr_hp: grHp || undefined,
         items: draft.map((d) => ({
           productId: d.product.id,
           quantity: d.quantity,
@@ -224,8 +227,8 @@ export default function PublicOrder() {
             total={total}
             paymentMethod={paymentMethod}
             changeFor={changeFor}
-            website={website}
-            setWebsite={setWebsite}
+            grHp={grHp}
+            setGrHp={setGrHp}
             submitting={submitOrder.isPending}
             error={submitError}
             onConfirm={() => submitOrder.mutate()}
@@ -607,8 +610,8 @@ function ReviewStep({
   total,
   paymentMethod,
   changeFor,
-  website,
-  setWebsite,
+  grHp,
+  setGrHp,
   submitting,
   error,
   onConfirm,
@@ -626,8 +629,8 @@ function ReviewStep({
   total: number;
   paymentMethod: PublicPaymentMethod | '';
   changeFor: string;
-  website: string;
-  setWebsite: (v: string) => void;
+  grHp: string;
+  setGrHp: (v: string) => void;
   submitting: boolean;
   error: string;
   onConfirm: () => void;
@@ -684,12 +687,13 @@ function ReviewStep({
         </div>
       </div>
 
-      {/* Honeypot — invisível pra gente, um bot que preenche todo campo do form cai aqui. */}
+      {/* Honeypot — invisível pra gente, um bot que preenche todo campo do form cai aqui.
+          Nome neutro de propósito, pra não ser alvo de autofill do navegador. */}
       <input
         type="text"
-        name="website"
-        value={website}
-        onChange={(e) => setWebsite(e.target.value)}
+        name="gr_hp"
+        value={grHp}
+        onChange={(e) => setGrHp(e.target.value)}
         className="absolute -left-[9999px] h-0 w-0 opacity-0"
         tabIndex={-1}
         autoComplete="off"
