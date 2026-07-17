@@ -158,3 +158,38 @@ export const paymentSchema = z.object({
     )
     .min(1),
 });
+
+// Site público de pedidos (delivery/retirada) — pagamento é sempre cobrado na
+// entrega/retirada (sem gateway), por isso não inclui MEAL_VOUCHER (só faz sentido
+// presencial num sistema à parte) e nunca aceita 'PAID'/valor de pagamento.
+export const publicOrderSchema = z
+  .object({
+    orderType: z.enum(['DELIVERY', 'PICKUP']),
+    customerName: z.string().min(2).max(80),
+    customerPhone: z.string().min(8).max(20),
+    deliveryZoneId: z.string().uuid().optional(),
+    deliveryStreet: z.string().min(2).max(200).optional(),
+    deliveryNumber: z.string().min(1).max(20).optional(),
+    deliveryComplement: z.string().max(200).optional(),
+    declaredPaymentMethod: z.enum(['PIX', 'CASH', 'CREDIT', 'DEBIT']),
+    changeFor: z.number().positive().optional(),
+    notes: z.string().max(300).optional(),
+    // honeypot: campo invisível pro cliente real; bot que preenche todo input do form cai aqui.
+    website: z.string().max(0).optional(),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().uuid(),
+          quantity: z.number().int().positive().max(20),
+          notes: z.string().max(200).optional(),
+          additionalIds: z.array(z.string().uuid()).optional(),
+        }),
+      )
+      .min(1)
+      .max(40),
+  })
+  .strict()
+  .refine((d) => d.orderType !== 'DELIVERY' || (d.deliveryZoneId && d.deliveryStreet && d.deliveryNumber), {
+    message: 'Bairro, endereço e número são obrigatórios para entrega',
+    path: ['deliveryZoneId'],
+  });
