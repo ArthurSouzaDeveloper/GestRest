@@ -1,4 +1,4 @@
-import { AuditAction, OrderStatus, PaymentMethod } from '@prisma/client';
+import { AuditAction, OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { AppError, ConflictError, NotFoundError } from '../../utils/errors';
 import { emitTenant, ROOMS } from '../../socket';
@@ -81,5 +81,36 @@ export const paymentService = {
     const payload = updated ? serializeOrder(updated) : null;
     emitTenant(ctx.tenantId, [ROOMS.FLOOR, ROOMS.CASHIER, ROOMS.DASHBOARD], 'order:paid', payload);
     return payload;
+  },
+
+  /**
+   * "Marcar Entregue" for an online order (delivery/pickup) — since payment is COD, handing
+   * the order over IS the payment moment. Reuses pay() with a single line synthesized from
+   * what the customer already declared at checkout (declaredPaymentMethod/changeFor), so the
+   * whole payment/audit/status machinery stays identical to the dine-in cashier flow.
+   */
+  async deliverOnline(orderId: string, ctx: Ctx) {
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, restaurantId: ctx.tenantId },
+      include: orderInclude,
+    });
+    if (!order) throw new NotFoundError('Pedido');
+    if (order.orderType === OrderType.DINE_IN) throw new AppError('Este pedido não é online');
+    if (order.status !== OrderStatus.READY_FOR_PAYMENT) {
+      throw new ConflictError('Pedido ainda não está pronto para entrega');
+    }
+
+    const totals = computeTotals(order);
+    return paymentService.pay(
+      orderId,
+      [
+        {
+          method: order.declaredPaymentMethod ?? PaymentMethod.CASH,
+          amount: totals.total,
+          cashReceived: order.changeFor !== null ? Number(order.changeFor) : undefined,
+        },
+      ],
+      ctx,
+    );
   },
 };
