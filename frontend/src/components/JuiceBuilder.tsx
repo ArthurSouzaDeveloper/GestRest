@@ -44,10 +44,13 @@ export function JuiceBuilder({
   products,
   categoryId,
   onAdd,
+  basePath = '/catalog',
 }: {
   products: Product[];
   categoryId: string;
   onAdd: (item: DraftItem) => void;
+  /** Same purpose as OrderComposer's basePath — passed through from there. */
+  basePath?: string;
 }) {
   const { fruits, standalone } = useMemo(() => groupByFruit(products), [products]);
   const [fruit, setFruit] = useState<FruitEntry | null>(null);
@@ -57,9 +60,9 @@ export function JuiceBuilder({
   const [selectedAdditionals, setSelectedAdditionals] = useState<string[]>([]);
 
   const { data: additionals = [] } = useQuery({
-    queryKey: ['additionals', categoryId],
+    queryKey: ['additionals', categoryId, basePath],
     queryFn: async () =>
-      (await api.get<Additional[]>('/catalog/additionals', { params: { categoryId, active: true } })).data,
+      (await api.get<Additional[]>(`${basePath}/additionals`, { params: { categoryId, active: true } })).data,
     enabled: !!chosen,
   });
 
