@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import clsx from 'clsx';
-import type { OrderStatus, ProductionStatus, TableStatus } from '../types';
+import type { OrderStatus, OrderType, PaymentMethod, ProductionStatus, TableStatus } from '../types';
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={clsx('card p-4', className)}>{children}</div>;
@@ -93,9 +93,36 @@ export function tableClass(status: TableStatus) {
 }
 
 export const orderStatusLabels: Record<OrderStatus, string> = {
+  PENDING: 'Aguardando aceite',
   OPEN: 'Aberto',
   IN_PRODUCTION: 'Em Produção',
   READY_FOR_PAYMENT: 'Pronto p/ Pagamento',
   PAID: 'Pago',
   CANCELLED: 'Cancelado',
+};
+
+export const orderTypeLabels: Record<OrderType, string> = {
+  DINE_IN: 'Salão',
+  DELIVERY: 'Entrega',
+  PICKUP: 'Retirada',
+};
+const orderTypeStyles: Record<OrderType, string> = {
+  DINE_IN: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+  DELIVERY: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  PICKUP: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+};
+export function OrderTypeBadge({ type }: { type: OrderType }) {
+  return (
+    <span className={clsx('rounded-full px-2.5 py-0.5 text-xs font-medium', orderTypeStyles[type])}>
+      {orderTypeLabels[type]}
+    </span>
+  );
+}
+
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
+  PIX: 'PIX',
+  CASH: 'Dinheiro',
+  CREDIT: 'Crédito',
+  DEBIT: 'Débito',
+  MEAL_VOUCHER: 'Vale Alim.',
 };

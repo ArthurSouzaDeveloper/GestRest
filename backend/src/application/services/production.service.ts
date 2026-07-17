@@ -11,7 +11,8 @@ export const productionService = {
       where: {
         station,
         status: { in: [ProductionStatus.WAITING, ProductionStatus.PREPARING] },
-        order: { restaurantId: tenantId, status: { notIn: ['PAID', 'CANCELLED'] } },
+        // PENDING = pedido online ainda não aceito pela equipe — não deve aparecer na fila.
+        order: { restaurantId: tenantId, status: { notIn: ['PAID', 'CANCELLED', 'PENDING'] } },
       },
       include: {
         product: { include: { category: true } },
@@ -32,7 +33,9 @@ export const productionService = {
       return {
         id: item.id,
         orderId: item.orderId,
-        tableNumber: item.order.table.number,
+        // Pedido online (delivery/retirada) não tem mesa.
+        tableNumber: item.order.table?.number ?? null,
+        orderType: item.order.orderType,
         // A table can have several comandas open at once — the order number tells them
         // apart on the ticket even when neither comanda has a customer name set.
         orderNumber: item.order.number,

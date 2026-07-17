@@ -41,11 +41,19 @@ enum TableStatus {
 }
 
 enum OrderStatus {
+  PENDING // Pedido online aguardando a equipe aceitar — nunca usado por comanda de mesa
   OPEN
   IN_PRODUCTION
   READY_FOR_PAYMENT
   PAID
   CANCELLED
+}
+
+// Canal de origem do pedido. DINE_IN é o único usado por comandas de mesa (garçom).
+enum OrderType {
+  DINE_IN
+  DELIVERY
+  PICKUP
 }
 
 enum ProductionStatus {
@@ -77,6 +85,8 @@ enum AuditAction {
   LOGIN
   USER_CREATED
   RESTAURANT_CREATED
+  PUBLIC_ORDER_CREATED // Pedido criado pelo site público (delivery/retirada), sem usuário autenticado
+  ORDER_ACCEPTED // Equipe aceitou um pedido online, tirando-o de PENDING
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -91,16 +101,17 @@ model Restaurant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users       User[]
-  categories  Category[]
-  products    Product[]
-  additionals Additional[]
-  tables      RestaurantTable[]
-  customers   Customer[]
-  orders      Order[]
-  payments    Payment[]
-  auditLogs   AuditLog[]
-  settings    Setting[]
+  users         User[]
+  categories    Category[]
+  products      Product[]
+  additionals   Additional[]
+  tables        RestaurantTable[]
+  customers     Customer[]
+  orders        Order[]
+  payments      Payment[]
+  auditLogs     AuditLog[]
+  settings      Setting[]
+  deliveryZones DeliveryZone[]
 
   @@map("restaurants")
 }
@@ -179,6 +190,25 @@ model RestaurantTable {
   @@map("tables")
 }
 
+// Bairro + taxa de entrega, cadastrado pelo restaurante — usado pelo site público de
+// pedidos pra calcular o frete conforme o bairro escolhido pelo cliente.
+model DeliveryZone {
+  id           String     @id @default(uuid())
+  name         String
+  fee          Decimal    @db.Decimal(10, 2)
+  active       Boolean    @default(true)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  orders Order[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId, active])
+  @@map("delivery_zones")
+}
+
 // ─────────────────────────────────────────────────────────────
 // CATÁLOGO: CATEGORIAS, PRODUTOS, ADICIONAIS
 // ─────────────────────────────────────────────────────────────
@@ -225,7 +255,7 @@ model Product {
 model Additional {
   id           String     @id @default(uuid())
   name         String
-  price        Decimal    @db.Decimal(10, 2) @default(0)
+  price        Decimal    @default(0) @db.Decimal(10, 2)
   active       Boolean    @default(true)
   categoryId   String?
   category     Category?  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -244,31 +274,47 @@ model Additional {
 // ─────────────────────────────────────────────────────────────
 
 model Order {
-  id           String          @id @default(uuid())
-  number       Int             @default(autoincrement())
-  tableId      String
-  table        RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  id           String           @id @default(uuid())
+  number       Int              @default(autoincrement())
+  orderType    OrderType        @default(DINE_IN)
+  // tableId/waiterId são opcionais só pra abrir espaço pro pedido online (sem mesa, sem
+  // garçom) — toda comanda de mesa continua sempre preenchendo os dois normalmente.
+  tableId      String?
+  table        RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: Cascade)
   customerId   String?
-  customer     Customer?       @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  waiterId     String
-  waiter       User            @relation("WaiterOrders", fields: [waiterId], references: [id], onDelete: Cascade)
+  customer     Customer?        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  waiterId     String?
+  waiter       User?            @relation("WaiterOrders", fields: [waiterId], references: [id], onDelete: Cascade)
   restaurantId String
-  restaurant   Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  status       OrderStatus     @default(OPEN)
-  peopleCount  Int             @default(1)
+  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  status       OrderStatus      @default(OPEN)
+  peopleCount  Int              @default(1)
   notes        String?
-  serviceRate  Decimal         @db.Decimal(5, 2) @default(10)
-  discount     Decimal         @db.Decimal(10, 2) @default(0)
-  version      Int             @default(0)
-  openedAt     DateTime        @default(now())
-  closedAt     DateTime?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  serviceRate  Decimal          @default(10) @db.Decimal(5, 2)
+  discount     Decimal          @default(0) @db.Decimal(10, 2)
+  version      Int              @default(0)
+
+  // Campos de delivery/retirada — só preenchidos quando orderType != DINE_IN.
+  deliveryZoneId        String?
+  deliveryZone          DeliveryZone?  @relation(fields: [deliveryZoneId], references: [id], onDelete: SetNull)
+  deliveryFee           Decimal        @default(0) @db.Decimal(10, 2) // snapshot da taxa no momento do pedido
+  deliveryStreet        String?
+  deliveryNumber        String?
+  deliveryComplement    String?
+  declaredPaymentMethod PaymentMethod? // forma escolhida pelo cliente no site (cobrada na entrega/retirada)
+  changeFor             Decimal?       @db.Decimal(10, 2) // "troco pra quanto", se Dinheiro
+  acceptedAt            DateTime? // quando a equipe aceitou um pedido online (PENDING -> OPEN)
+
+  openedAt  DateTime  @default(now())
+  closedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   items    OrderItem[]
   payments Payment[]
 
   @@index([restaurantId, status])
+  @@index([restaurantId, orderType, status])
   @@index([tableId])
   @@index([waiterId])
   @@map("orders")
@@ -319,7 +365,7 @@ model Payment {
   order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   method       PaymentMethod
   amount       Decimal       @db.Decimal(10, 2)
-  change       Decimal       @db.Decimal(10, 2) @default(0)
+  change       Decimal       @default(0) @db.Decimal(10, 2)
   cashierId    String
   cashier      User          @relation(fields: [cashierId], references: [id], onDelete: Cascade)
   restaurantId String

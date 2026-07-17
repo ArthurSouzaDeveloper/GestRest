@@ -63,7 +63,8 @@ export const paymentService = {
       });
       // Other comandas may still be active at this table — recompute from all of them
       // rather than assuming the table is free just because this one comanda paid out.
-      await syncTableStatus(order.tableId, tx);
+      // Pedido online (delivery/retirada) não tem mesa — nada a sincronizar nesse caso.
+      if (order.tableId) await syncTableStatus(order.tableId, tx);
     });
 
     await auditService.record({

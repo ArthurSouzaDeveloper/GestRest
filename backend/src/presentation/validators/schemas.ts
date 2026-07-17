@@ -96,6 +96,20 @@ export const additionalUpdateSchema = z
   })
   .strict();
 
+export const deliveryZoneSchema = z.object({
+  name: z.string().min(2),
+  fee: z.number().nonnegative(),
+  active: z.boolean().optional(),
+});
+
+export const deliveryZoneUpdateSchema = z
+  .object({
+    name: z.string().min(2).optional(),
+    fee: z.number().nonnegative().optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+
 export const tableSchema = z.object({
   number: z.number().int().positive(),
   seats: z.number().int().positive().optional(),

@@ -5,6 +5,7 @@ function makeOrder(overrides: Partial<OrderWithRelations> = {}): OrderWithRelati
   const base = {
     discount: 0 as never,
     serviceRate: 10 as never,
+    deliveryFee: 0 as never,
     payments: [] as never,
     items: [
       {
@@ -55,5 +56,13 @@ describe('computeTotals', () => {
     const t = computeTotals(order);
     expect(t.paid).toBe(20);
     expect(t.remaining).toBe(24);
+  });
+
+  it('adds the delivery fee (online order) to the total, after the service fee', () => {
+    const order = makeOrder({ deliveryFee: 5 as never });
+    const t = computeTotals(order);
+    // 40 subtotal + 4 service fee + 5 delivery fee
+    expect(t.deliveryFee).toBe(5);
+    expect(t.total).toBe(49);
   });
 });

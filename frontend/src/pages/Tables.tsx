@@ -270,7 +270,7 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
   const draftTotal = draft.reduce((a, d) => a + draftItemUnitPrice(d) * d.quantity, 0);
 
   return (
-    <Modal open onClose={onClose} title={order ? `Mesa ${order.table.number} — Comanda #${order.number}` : 'Pedido'} wide>
+    <Modal open onClose={onClose} title={order ? `Mesa ${order.table?.number ?? '—'} — Comanda #${order.number}` : 'Pedido'} wide>
       {isLoading || !order ? (
         <Spinner />
       ) : (
@@ -278,7 +278,7 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
               <span>Cliente: {order.customer?.name ?? '—'}</span>
-              <span>Garçom: {order.waiter.name}</span>
+              <span>Garçom: {order.waiter?.name ?? '—'}</span>
               <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-200">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-600 dark:bg-green-300" />
                 Aberta às {time(order.openedAt)}

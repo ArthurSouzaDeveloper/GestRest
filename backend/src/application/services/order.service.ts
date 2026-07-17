@@ -44,7 +44,16 @@ async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = p
     where: { id: orderId },
     include: { items: true },
   });
-  if (!order || order.status === OrderStatus.PAID || order.status === OrderStatus.CANCELLED) return;
+  // PENDING (pedido online aguardando aceite) só sai desse estado via accept() — nunca
+  // por recálculo automático a partir do status dos itens.
+  if (
+    !order ||
+    order.status === OrderStatus.PAID ||
+    order.status === OrderStatus.CANCELLED ||
+    order.status === OrderStatus.PENDING
+  ) {
+    return;
+  }
 
   const active = order.items.filter((i) => i.status !== ProductionStatus.CANCELLED);
 
@@ -55,7 +64,8 @@ async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = p
   }
 
   await tx.order.update({ where: { id: orderId }, data: { status } });
-  await syncTableStatus(order.tableId, tx);
+  // Pedido online (delivery/retirada) não tem mesa — nada a sincronizar nesse caso.
+  if (order.tableId) await syncTableStatus(order.tableId, tx);
 }
 
 async function loadAndBroadcast(tenantId: string, orderId: string, event: string) {
@@ -347,7 +357,7 @@ export const orderService = {
         where: { id },
         data: { status: OrderStatus.CANCELLED, closedAt: new Date() },
       });
-      await syncTableStatus(order.tableId, tx);
+      if (order.tableId) await syncTableStatus(order.tableId, tx);
     });
 
     await auditService.record({
