@@ -12,6 +12,7 @@ import { prisma } from '../../config/prisma';
 import { AppError, ConflictError, NotFoundError } from '../../utils/errors';
 import { emitTenant, ROOMS } from '../../socket';
 import { auditService } from './audit.service';
+import { etaService } from './eta.service';
 import { orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
 
 interface Ctx {
@@ -246,6 +247,11 @@ export const orderService = {
       deliveryFee = Number(zone.fee);
     }
 
+    // Trava a previsão no momento da confirmação, a partir da fila agora — o cliente já viu
+    // esse mesmo número (ou próximo) nas telas anteriores via GET /public/:slug/eta.
+    const { minutes: etaMinutes } = await etaService.estimate(tenantId, input.orderType);
+    const estimatedReadyAt = new Date(Date.now() + etaMinutes * 60_000);
+
     const orderId = await prisma.$transaction(async (tx) => {
       const customer = await tx.customer.create({
         data: {
@@ -271,6 +277,7 @@ export const orderService = {
           declaredPaymentMethod: input.declaredPaymentMethod,
           changeFor: input.changeFor,
           notes: input.notes,
+          estimatedReadyAt,
         },
       });
       await createOrderItems(tx, tenantId, order.id, input.items);

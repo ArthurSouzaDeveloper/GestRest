@@ -304,6 +304,7 @@ model Order {
   declaredPaymentMethod PaymentMethod? // forma escolhida pelo cliente no site (cobrada na entrega/retirada)
   changeFor             Decimal?       @db.Decimal(10, 2) // "troco pra quanto", se Dinheiro
   acceptedAt            DateTime? // quando a equipe aceitou um pedido online (PENDING -> OPEN)
+  estimatedReadyAt      DateTime? // previsão travada no momento da confirmação, calculada por eta.service a partir da fila
 
   openedAt  DateTime  @default(now())
   closedAt  DateTime?

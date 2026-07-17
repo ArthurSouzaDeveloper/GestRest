@@ -1,12 +1,31 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Bike, ChevronLeft, ShoppingBag, BookOpen, Minus, Plus, X, Check, Banknote, CreditCard, QrCode } from 'lucide-react';
+import { Bike, ChevronLeft, ShoppingBag, BookOpen, Minus, Plus, X, Check, Banknote, CreditCard, QrCode, Clock } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Spinner } from '../components/ui';
 import { OrderComposer, draftItemUnitPrice, type DraftItem } from '../components/OrderComposer';
-import type { DeliveryZone, PaymentMethod } from '../types';
+import type { DeliveryZone, EtaEstimate, PaymentMethod } from '../types';
+
+/** "19:45" a partir de um ISO — usado pra mostrar a previsão travada na confirmação. */
+function formatClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Nota de previsão reaproveitada nas telas de Dados/Carrinho/Revisão — some se a estimativa ainda não carregou. */
+function EtaNote({ eta }: { eta?: EtaEstimate }) {
+  if (!eta) return null;
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-brand/10 px-3 py-2 text-xs text-brand">
+      <Clock size={14} className="shrink-0" />
+      <span>
+        Previsão agora: até {eta.minutes} min
+        {eta.activeOrders > 5 ? ' — cozinha com fluxo alto no momento' : ''}
+      </span>
+    </div>
+  );
+}
 
 type Step = 'intro' | 'details' | 'menu' | 'cart' | 'payment' | 'review' | 'confirmation';
 type OrderKind = 'DELIVERY' | 'PICKUP';
@@ -43,7 +62,17 @@ export default function PublicOrder() {
   // um cliente de verdade sem ele nunca ter digitado nada aqui).
   const [grHp, setGrHp] = useState('');
   const [confirmedOrderNumber, setConfirmedOrderNumber] = useState<number | null>(null);
+  const [confirmedEta, setConfirmedEta] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState('');
+
+  // Recalcula enquanto o cliente ainda está decidindo (Dados/Cardápio/Carrinho/Pagamento/
+  // Revisão); trava um valor só no momento da confirmação (openPublic() no backend).
+  const { data: eta } = useQuery({
+    queryKey: ['public-eta', slug, orderKind],
+    queryFn: async () => (await api.get<EtaEstimate>(`/public/${slug}/eta`, { params: { orderType: orderKind } })).data,
+    enabled: !!slug && !!orderKind && step !== 'intro' && step !== 'confirmation',
+    refetchInterval: 20_000,
+  });
 
   const { data: restaurant, isLoading: loadingRestaurant, isError: restaurantNotFound } = useQuery({
     queryKey: ['public-restaurant', slug],
@@ -94,11 +123,12 @@ export default function PublicOrder() {
           additionalIds: d.additionalIds,
         })),
       };
-      return (await api.post<{ number: number }>(`/public/${slug}/orders`, payload)).data;
+      return (await api.post<{ number: number; estimatedReadyAt: string | null }>(`/public/${slug}/orders`, payload)).data;
     },
     onSuccess: (order) => {
       setSubmitError('');
       setConfirmedOrderNumber(order.number);
+      setConfirmedEta(order.estimatedReadyAt);
       setStep('confirmation');
     },
     onError: (e) => setSubmitError(apiError(e)),
@@ -184,6 +214,7 @@ export default function PublicOrder() {
             setDeliveryComplement={setDeliveryComplement}
             canContinue={!!canContinueDetails}
             onContinue={() => setStep('menu')}
+            eta={eta}
           />
         )}
 
@@ -198,6 +229,7 @@ export default function PublicOrder() {
             total={total}
             orderKind={orderKind}
             onContinue={() => setStep('payment')}
+            eta={eta}
           />
         )}
 
@@ -232,6 +264,7 @@ export default function PublicOrder() {
             submitting={submitOrder.isPending}
             error={submitError}
             onConfirm={() => submitOrder.mutate()}
+            eta={eta}
           />
         )}
 
@@ -239,6 +272,7 @@ export default function PublicOrder() {
           <ConfirmationStep
             orderNumber={confirmedOrderNumber}
             orderKind={orderKind}
+            estimatedReadyAt={confirmedEta}
             onNewOrder={() => {
               setStep('intro');
               setOrderKind(null);
@@ -252,6 +286,7 @@ export default function PublicOrder() {
               setPaymentMethod('');
               setChangeFor('');
               setConfirmedOrderNumber(null);
+              setConfirmedEta(null);
             }}
           />
         )}
@@ -360,6 +395,7 @@ function DetailsStep({
   setDeliveryComplement,
   canContinue,
   onContinue,
+  eta,
 }: {
   orderKind: OrderKind;
   customerName: string;
@@ -377,6 +413,7 @@ function DetailsStep({
   setDeliveryComplement: (v: string) => void;
   canContinue: boolean;
   onContinue: () => void;
+  eta?: EtaEstimate;
 }) {
   const selectedFee = zones.find((z) => z.id === deliveryZoneId)?.fee;
   return (
@@ -384,6 +421,7 @@ function DetailsStep({
       <h2 className="text-lg font-semibold">
         {orderKind === 'DELIVERY' ? 'Seus dados para entrega' : 'Seus dados para retirada'}
       </h2>
+      <EtaNote eta={eta} />
 
       <div>
         <label className="label">Nome</label>
@@ -447,6 +485,7 @@ function CartStep({
   total,
   orderKind,
   onContinue,
+  eta,
 }: {
   draft: DraftItem[];
   setDraft: (items: DraftItem[]) => void;
@@ -455,10 +494,12 @@ function CartStep({
   total: number;
   orderKind: OrderKind | null;
   onContinue: () => void;
+  eta?: EtaEstimate;
 }) {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Seu carrinho</h2>
+      <EtaNote eta={eta} />
 
       {draft.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">Seu carrinho está vazio.</p>
@@ -615,6 +656,7 @@ function ReviewStep({
   submitting,
   error,
   onConfirm,
+  eta,
 }: {
   orderKind: OrderKind;
   customerName: string;
@@ -634,11 +676,13 @@ function ReviewStep({
   submitting: boolean;
   error: string;
   onConfirm: () => void;
+  eta?: EtaEstimate;
 }) {
   const paymentLabel = PAYMENT_OPTIONS.find((p) => p.key === paymentMethod)?.label ?? '—';
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Revisão do pedido</h2>
+      <EtaNote eta={eta} />
 
       <div className="card space-y-2 p-4 text-sm">
         <div className="font-medium">{orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada'}</div>
@@ -712,10 +756,12 @@ function ReviewStep({
 function ConfirmationStep({
   orderNumber,
   orderKind,
+  estimatedReadyAt,
   onNewOrder,
 }: {
   orderNumber: number | null;
   orderKind: OrderKind | null;
+  estimatedReadyAt: string | null;
   onNewOrder: () => void;
 }) {
   return (
@@ -730,6 +776,12 @@ function ConfirmationStep({
           ? 'Assim que o restaurante aceitar, seu pedido entra em preparo.'
           : 'Assim que o restaurante aceitar, seu pedido entra em preparo. Vá até o balcão no horário combinado.'}
       </p>
+      {estimatedReadyAt && (
+        <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-lg bg-brand/10 px-4 py-2 text-sm font-medium text-brand">
+          <Clock size={16} />
+          {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
+        </div>
+      )}
       <button className="btn-secondary mt-6" onClick={onNewOrder}>Fazer novo pedido</button>
     </div>
   );

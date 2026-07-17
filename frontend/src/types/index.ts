@@ -148,6 +148,13 @@ export interface Order {
   declaredPaymentMethod?: PaymentMethod;
   changeFor?: number | null;
   acceptedAt?: string | null;
+  /** Previsão travada no momento da confirmação (site público) — cálculo em eta.service.ts. */
+  estimatedReadyAt?: string | null;
+}
+
+export interface EtaEstimate {
+  minutes: number;
+  activeOrders: number;
 }
 
 export interface ProductionTicket {

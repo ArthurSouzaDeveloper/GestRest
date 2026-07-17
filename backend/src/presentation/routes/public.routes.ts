@@ -4,6 +4,7 @@ import { publicOrderService } from '../../application/services/publicOrder.servi
 import { validateBody } from '../middlewares/validate.middleware';
 import { publicOrderLimiter } from '../middlewares/rateLimit.middleware';
 import { publicOrderSchema } from '../validators/schemas';
+import { AppError } from '../../utils/errors';
 
 /**
  * Public (unauthenticated) routes for the online ordering site, resolved by :slug rather
@@ -33,6 +34,17 @@ router.get(
 router.get(
   '/:slug/delivery-zones',
   asyncHandler(async (req, res) => res.json(await publicOrderService.deliveryZones(req.params.slug))),
+);
+
+router.get(
+  '/:slug/eta',
+  asyncHandler(async (req, res) => {
+    const orderType = req.query.orderType;
+    if (orderType !== 'PICKUP' && orderType !== 'DELIVERY') {
+      throw new AppError('orderType deve ser PICKUP ou DELIVERY');
+    }
+    res.json(await publicOrderService.eta(req.params.slug, orderType));
+  }),
 );
 
 router.post(
