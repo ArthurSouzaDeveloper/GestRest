@@ -135,7 +135,7 @@ export interface Order {
   serviceRate: number;
   version: number;
   openedAt: string;
-  customer?: { id: string; name: string };
+  customer?: { id: string; name: string; phone?: string };
   items: OrderItem[];
   totals: OrderTotals;
   // Campos de delivery/retirada — só preenchidos quando orderType != 'DINE_IN'.

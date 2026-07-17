@@ -153,10 +153,14 @@ async function requireOrder(tenantId: string, id: string) {
 }
 
 export const orderService = {
-  async list(tenantId: string, params: { status?: OrderStatus; tableId?: string } = {}) {
+  async list(
+    tenantId: string,
+    params: { status?: OrderStatus; tableId?: string; orderType?: OrderType } = {},
+  ) {
     const where: Prisma.OrderWhereInput = { restaurantId: tenantId };
     if (params.status) where.status = params.status;
     if (params.tableId) where.tableId = params.tableId;
+    if (params.orderType) where.orderType = params.orderType;
     const orders = await prisma.order.findMany({
       where,
       include: orderInclude,
@@ -285,6 +289,33 @@ export const orderService = {
     });
 
     return loadAndBroadcast(tenantId, orderId, 'order:created');
+  },
+
+  /** Staff accepts a pending online order, moving it into the normal production flow. */
+  async accept(id: string, ctx: Ctx) {
+    const order = await requireOrder(ctx.tenantId, id);
+    if (order.status !== OrderStatus.PENDING) throw new ConflictError('Pedido não está aguardando aceite');
+
+    const items = await prisma.orderItem.findMany({ where: { orderId: id } });
+    const touchedStations = new Set(items.map((i) => i.station));
+
+    await prisma.order.update({
+      where: { id },
+      data: { status: OrderStatus.OPEN, acceptedAt: new Date() },
+    });
+
+    await auditService.record({
+      action: AuditAction.ORDER_ACCEPTED,
+      userId: ctx.userId,
+      restaurantId: ctx.tenantId,
+      entity: 'Order',
+      entityId: id,
+      ip: ctx.ip,
+    });
+
+    const rooms = [...touchedStations].map((s) => stationRoom[s]).filter((r): r is string => Boolean(r));
+    if (rooms.length) emitTenant(ctx.tenantId, rooms, 'production:updated', { orderId: id });
+    return loadAndBroadcast(ctx.tenantId, id, 'order:updated');
   },
 
   async addItems(orderId: string, items: NewItemInput[], ctx: Ctx) {
