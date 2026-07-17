@@ -89,9 +89,13 @@ function categoryDisplayName(name: string): string {
 export function OrderComposer({
   draft,
   setDraft,
+  basePath = '/catalog',
 }: {
   draft: DraftItem[];
   setDraft: (items: DraftItem[]) => void;
+  /** Catalog endpoint prefix. Defaults to the authenticated staff catalog; the public
+   * ordering site passes `/public/:slug/catalog` instead — same shape, no auth required. */
+  basePath?: string;
 }) {
   const [topGroup, setTopGroup] = useState<TopGroup>('COMIDAS');
   const [activeCat, setActiveCat] = useState<string>('all');
@@ -99,12 +103,12 @@ export function OrderComposer({
   const [configuring, setConfiguring] = useState<Product | null>(null);
 
   const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => (await api.get<Category[]>('/catalog/categories')).data,
+    queryKey: ['categories', basePath],
+    queryFn: async () => (await api.get<Category[]>(`${basePath}/categories`)).data,
   });
   const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: async () => (await api.get<Product[]>('/catalog/products', { params: { available: true } })).data,
+    queryKey: ['products', basePath],
+    queryFn: async () => (await api.get<Product[]>(`${basePath}/products`, { params: { available: true } })).data,
   });
 
   const term = search.trim().toLowerCase();
@@ -252,7 +256,7 @@ export function OrderComposer({
         )}
         {useBuilder ? (
           <div className="max-h-[55vh] overflow-y-auto pr-1">
-            <JuiceBuilder products={filtered} categoryId={activeCat} onAdd={addFromBuilder} />
+            <JuiceBuilder products={filtered} categoryId={activeCat} onAdd={addFromBuilder} basePath={basePath} />
           </div>
         ) : filtered.length === 0 ? (
           <p className="py-8 text-center text-sm text-gray-400">
@@ -373,6 +377,7 @@ export function OrderComposer({
         <ItemConfigModal
           product={configuring}
           current={draft.find((d) => d.product.id === configuring.id)}
+          basePath={basePath}
           onClose={() => setConfiguring(null)}
           onSave={(notes, additionalIds, additionalsTotal) => {
             const idx = draft.findIndex((d) => d.product.id === configuring.id);
@@ -390,11 +395,13 @@ export function OrderComposer({
 function ItemConfigModal({
   product,
   current,
+  basePath,
   onClose,
   onSave,
 }: {
   product: Product;
   current?: DraftItem;
+  basePath: string;
   onClose: () => void;
   onSave: (notes: string, additionalIds: string[], additionalsTotal: number) => void;
 }) {
@@ -402,10 +409,13 @@ function ItemConfigModal({
   const [selected, setSelected] = useState<string[]>(current?.additionalIds ?? []);
 
   const { data: additionals = [] } = useQuery({
-    queryKey: ['additionals', product.categoryId],
+    queryKey: ['additionals', product.categoryId, basePath],
     queryFn: async () =>
-      (await api.get<Additional[]>('/catalog/additionals', { params: { categoryId: product.categoryId, active: true } }))
-        .data,
+      (
+        await api.get<Additional[]>(`${basePath}/additionals`, {
+          params: { categoryId: product.categoryId, active: true },
+        })
+      ).data,
   });
 
   const selectedTotal = additionals.filter((a) => selected.includes(a.id)).reduce((sum, a) => sum + a.price, 0);

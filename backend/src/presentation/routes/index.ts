@@ -4,6 +4,7 @@ import catalogRoutes from './catalog.routes';
 import tableRoutes from './table.routes';
 import orderRoutes from './order.routes';
 import productionRoutes from './production.routes';
+import publicOrderRoutes from './public.routes';
 import {
   auditRouter,
   dashboardRouter,
@@ -18,6 +19,7 @@ api.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOS
 
 api.use('/auth', authRoutes);
 api.use('/public', publicRouter); // resolve restaurante por slug (sem auth)
+api.use('/public', publicOrderRoutes); // cardápio + bairros do site de pedidos online (sem auth)
 api.use('/superadmin', superadminRouter);
 api.use('/catalog', catalogRoutes);
 api.use('/tables', tableRoutes);

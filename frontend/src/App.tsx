@@ -15,6 +15,7 @@ import UsersPage from './pages/Users';
 import Reports from './pages/Reports';
 import Audit from './pages/Audit';
 import DeliveryZones from './pages/DeliveryZones';
+import PublicOrder from './pages/PublicOrder';
 
 function Protected({ children, roles }: { children: JSX.Element; roles?: Role[] }) {
   const { user, loading, hasRole } = useAuth();
@@ -55,6 +56,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/r/:slug" element={<Login />} />
+      <Route path="/pedido/:slug" element={<PublicOrder />} />
       <Route path="/super" element={<SuperAdmin />} />
       <Route path="/" element={<Protected><Home /></Protected>} />
       <Route path="/mesas" element={<Protected roles={['ADMIN', 'MANAGER', 'WAITER']}><Tables /></Protected>} />
