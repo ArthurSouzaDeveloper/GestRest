@@ -11,6 +11,9 @@ function serializeProduct<T extends { price: Prisma.Decimal | number }>(p: T) {
 function serializeAdditional<T extends { price: Prisma.Decimal | number }>(a: T) {
   return { ...a, price: Number(a.price) };
 }
+function serializeDeliveryZone<T extends { fee: Prisma.Decimal | number }>(z: T) {
+  return { ...z, fee: Number(z.fee) };
+}
 
 export const categoryService = {
   list(tenantId: string) {
@@ -140,5 +143,38 @@ export const additionalService = {
     const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });
     if (!a) throw new NotFoundError('Adicional');
     return prisma.additional.delete({ where: { id } });
+  },
+};
+
+// Bairros + taxa de entrega, usados pelo site público de pedidos (delivery) pra calcular
+// o frete conforme o bairro escolhido pelo cliente.
+export const deliveryZoneService = {
+  async list(tenantId: string, params: { onlyActive?: boolean } = {}) {
+    const where: Prisma.DeliveryZoneWhereInput = { restaurantId: tenantId };
+    if (params.onlyActive) where.active = true;
+    const zones = await prisma.deliveryZone.findMany({ where, orderBy: { name: 'asc' } });
+    return zones.map(serializeDeliveryZone);
+  },
+  async create(tenantId: string, data: { name: string; fee: number; active?: boolean }) {
+    const z = await prisma.deliveryZone.create({ data: { ...data, restaurantId: tenantId } });
+    return serializeDeliveryZone(z);
+  },
+  async update(
+    tenantId: string,
+    id: string,
+    data: Partial<{ name: string; fee: number; active: boolean }>,
+  ) {
+    await deliveryZoneService.ensure(tenantId, id);
+    const z = await prisma.deliveryZone.update({ where: { id }, data });
+    return serializeDeliveryZone(z);
+  },
+  async remove(tenantId: string, id: string) {
+    await deliveryZoneService.ensure(tenantId, id);
+    return prisma.deliveryZone.delete({ where: { id } });
+  },
+  async ensure(tenantId: string, id: string) {
+    const z = await prisma.deliveryZone.findFirst({ where: { id, restaurantId: tenantId } });
+    if (!z) throw new NotFoundError('Bairro');
+    return z;
   },
 };

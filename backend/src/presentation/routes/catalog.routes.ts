@@ -6,6 +6,7 @@ import { validateBody } from '../middlewares/validate.middleware';
 import {
   additionalService,
   categoryService,
+  deliveryZoneService,
   productService,
 } from '../../application/services/catalog.service';
 import {
@@ -13,6 +14,8 @@ import {
   additionalUpdateSchema,
   categorySchema,
   categoryUpdateSchema,
+  deliveryZoneSchema,
+  deliveryZoneUpdateSchema,
   productSchema,
   productUpdateSchema,
 } from '../validators/schemas';
@@ -121,6 +124,38 @@ router.delete(
   manager,
   asyncHandler(async (req, res) => {
     await additionalService.remove(tid(req), req.params.id);
+    res.status(204).end();
+  }),
+);
+
+// ── Delivery zones (bairros + taxa de entrega, usados pelo site de pedidos online) ──
+router.get(
+  '/delivery-zones',
+  asyncHandler(async (req, res) =>
+    res.json(await deliveryZoneService.list(tid(req), { onlyActive: req.query.active === 'true' })),
+  ),
+);
+router.post(
+  '/delivery-zones',
+  manager,
+  validateBody(deliveryZoneSchema),
+  asyncHandler(async (req, res) =>
+    res.status(201).json(await deliveryZoneService.create(tid(req), req.body)),
+  ),
+);
+router.patch(
+  '/delivery-zones/:id',
+  manager,
+  validateBody(deliveryZoneUpdateSchema),
+  asyncHandler(async (req, res) =>
+    res.json(await deliveryZoneService.update(tid(req), req.params.id, req.body)),
+  ),
+);
+router.delete(
+  '/delivery-zones/:id',
+  manager,
+  asyncHandler(async (req, res) => {
+    await deliveryZoneService.remove(tid(req), req.params.id);
     res.status(204).end();
   }),
 );

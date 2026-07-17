@@ -5,6 +5,7 @@ export const orderInclude = {
   table: true,
   customer: true,
   waiter: { select: { id: true, name: true } },
+  deliveryZone: true,
   items: {
     include: {
       product: { include: { category: true } },
@@ -26,6 +27,7 @@ export interface OrderTotals {
   subtotal: number;
   serviceFee: number;
   discount: number;
+  deliveryFee: number;
   total: number;
   paid: number;
   remaining: number;
@@ -43,14 +45,17 @@ export function computeTotals(order: OrderWithRelations): OrderTotals {
     }, 0);
 
   const discount = Number(order.discount);
+  // Comanda de mesa sempre tem deliveryFee 0 (padrão da coluna) — só pedido online usa isto.
+  const deliveryFee = Number(order.deliveryFee);
   const serviceFee = money(((subtotal - discount) * Number(order.serviceRate)) / 100);
-  const total = money(subtotal - discount + serviceFee);
+  const total = money(subtotal - discount + serviceFee + deliveryFee);
   const paid = order.payments.reduce((acc, p) => acc + Number(p.amount), 0);
 
   return {
     subtotal: money(subtotal),
     serviceFee,
     discount: money(discount),
+    deliveryFee: money(deliveryFee),
     total,
     paid: money(paid),
     remaining: money(Math.max(0, total - paid)),
@@ -91,6 +96,9 @@ export function serializeOrder(order: OrderWithRelations) {
     ...order,
     discount: Number(order.discount),
     serviceRate: Number(order.serviceRate),
+    deliveryFee: Number(order.deliveryFee),
+    changeFor: order.changeFor !== null ? Number(order.changeFor) : null,
+    deliveryZone: order.deliveryZone ? { ...order.deliveryZone, fee: Number(order.deliveryZone.fee) } : null,
     items: order.items.map((item) => ({
       ...item,
       unitPrice: Number(item.unitPrice),

@@ -13,11 +13,14 @@ export type TableStatus =
   | 'READY_FOR_PAYMENT'
   | 'CLOSED';
 export type OrderStatus =
+  | 'PENDING'
   | 'OPEN'
   | 'IN_PRODUCTION'
   | 'READY_FOR_PAYMENT'
   | 'PAID'
   | 'CANCELLED';
+// DINE_IN = comanda de mesa (garçom). DELIVERY/PICKUP vêm do site público de pedidos.
+export type OrderType = 'DINE_IN' | 'DELIVERY' | 'PICKUP';
 export type ProductionStatus = 'WAITING' | 'PREPARING' | 'DONE' | 'CANCELLED';
 export type PaymentMethod = 'PIX' | 'CASH' | 'CREDIT' | 'DEBIT' | 'MEAL_VOUCHER';
 
@@ -82,6 +85,13 @@ export interface RestaurantTable {
   orders?: TableComandaSummary[];
 }
 
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  fee: number;
+  active: boolean;
+}
+
 export interface OrderItemAdditional {
   id: string;
   name: string;
@@ -104,6 +114,7 @@ export interface OrderTotals {
   subtotal: number;
   serviceFee: number;
   discount: number;
+  deliveryFee: number;
   total: number;
   paid: number;
   remaining: number;
@@ -112,7 +123,11 @@ export interface OrderTotals {
 export interface Order {
   id: string;
   number: number;
-  tableId: string;
+  orderType: OrderType;
+  // Pedido online (DELIVERY/PICKUP) não tem mesa nem garçom.
+  tableId?: string;
+  table?: RestaurantTable;
+  waiter?: { id: string; name: string };
   status: OrderStatus;
   peopleCount: number;
   notes?: string;
@@ -120,17 +135,26 @@ export interface Order {
   serviceRate: number;
   version: number;
   openedAt: string;
-  table: RestaurantTable;
   customer?: { id: string; name: string };
-  waiter: { id: string; name: string };
   items: OrderItem[];
   totals: OrderTotals;
+  // Campos de delivery/retirada — só preenchidos quando orderType != 'DINE_IN'.
+  deliveryZoneId?: string;
+  deliveryZone?: DeliveryZone | null;
+  deliveryFee: number;
+  deliveryStreet?: string;
+  deliveryNumber?: string;
+  deliveryComplement?: string;
+  declaredPaymentMethod?: PaymentMethod;
+  changeFor?: number | null;
+  acceptedAt?: string | null;
 }
 
 export interface ProductionTicket {
   id: string;
   orderId: string;
-  tableNumber: number;
+  tableNumber: number | null;
+  orderType: OrderType;
   orderNumber: number;
   customerName: string | null;
   productName: string;

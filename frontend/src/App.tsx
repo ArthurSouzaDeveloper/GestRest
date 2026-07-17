@@ -14,6 +14,7 @@ import Products from './pages/Products';
 import UsersPage from './pages/Users';
 import Reports from './pages/Reports';
 import Audit from './pages/Audit';
+import DeliveryZones from './pages/DeliveryZones';
 
 function Protected({ children, roles }: { children: JSX.Element; roles?: Role[] }) {
   const { user, loading, hasRole } = useAuth();
@@ -61,6 +62,7 @@ export default function App() {
       <Route path="/suqueiros" element={<Protected roles={['ADMIN', 'MANAGER', 'JUICER']}><JuiceBar /></Protected>} />
       <Route path="/caixa" element={<Protected roles={['ADMIN', 'MANAGER', 'CASHIER']}><Cashier /></Protected>} />
       <Route path="/produtos" element={<Protected roles={['ADMIN', 'MANAGER']}><Products /></Protected>} />
+      <Route path="/entregas" element={<Protected roles={['ADMIN', 'MANAGER']}><DeliveryZones /></Protected>} />
       <Route path="/relatorios" element={<Protected roles={['ADMIN', 'MANAGER']}><Reports /></Protected>} />
       <Route path="/usuarios" element={<Protected roles={['ADMIN', 'MANAGER']}><UsersPage /></Protected>} />
       <Route path="/auditoria" element={<Protected roles={['ADMIN', 'MANAGER']}><Audit /></Protected>} />

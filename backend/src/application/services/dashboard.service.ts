@@ -76,7 +76,8 @@ export const dashboardService = {
       prisma.order.groupBy({
         by: ['waiterId'],
         _count: true,
-        where: { restaurantId: tenantId, status: OrderStatus.PAID },
+        // Pedido online não tem garçom (waiterId null) — não entra no ranking.
+        where: { restaurantId: tenantId, status: OrderStatus.PAID, waiterId: { not: null } },
         orderBy: { _count: { waiterId: 'desc' } },
         take: 5,
       }),
@@ -102,7 +103,7 @@ export const dashboardService = {
       select: { id: true, name: true },
     });
     const waiters = await prisma.user.findMany({
-      where: { id: { in: topWaiters.map((w) => w.waiterId) } },
+      where: { id: { in: topWaiters.map((w) => w.waiterId).filter((id): id is string => id !== null) } },
       select: { id: true, name: true },
     });
 

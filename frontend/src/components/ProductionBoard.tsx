@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
-import { PageHeader, Spinner } from './ui';
+import { PageHeader, Spinner, orderTypeLabels } from './ui';
 import { useRealtime } from '../hooks/useRealtime';
 import type { ProductionStatus, ProductionTicket } from '../types';
 
@@ -53,7 +53,7 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <span className="rounded-md bg-brand px-2.5 py-1 text-sm font-bold text-white">
-                    Mesa {t.tableNumber}
+                    {t.tableNumber !== null ? `Mesa ${t.tableNumber}` : orderTypeLabels[t.orderType]}
                   </span>
                   {/* Uma mesa pode ter várias comandas simultâneas — o nº da comanda desambigua. */}
                   <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">

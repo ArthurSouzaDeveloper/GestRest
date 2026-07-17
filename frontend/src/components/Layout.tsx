@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   LogOut,
   Menu,
+  Bike,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,6 +32,7 @@ const NAV: NavItem[] = [
   { to: '/suqueiros', label: 'Suqueiros', icon: <CupSoda size={18} />, roles: ['ADMIN', 'MANAGER', 'JUICER'] },
   { to: '/caixa', label: 'Caixa', icon: <CreditCard size={18} />, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
   { to: '/produtos', label: 'Produtos', icon: <Package size={18} />, roles: ['ADMIN', 'MANAGER'] },
+  { to: '/entregas', label: 'Entregas', icon: <Bike size={18} />, roles: ['ADMIN', 'MANAGER'] },
   { to: '/relatorios', label: 'Relatórios', icon: <BarChart3 size={18} />, roles: ['ADMIN', 'MANAGER'] },
   { to: '/usuarios', label: 'Usuários', icon: <Users size={18} />, roles: ['ADMIN', 'MANAGER'] },
   { to: '/auditoria', label: 'Auditoria', icon: <ShieldCheck size={18} />, roles: ['ADMIN', 'MANAGER'] },

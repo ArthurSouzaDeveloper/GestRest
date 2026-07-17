@@ -3,17 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2, Receipt } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl, time } from '../lib/format';
-import { Card, PageHeader, Spinner } from '../components/ui';
+import { Card, PageHeader, Spinner, orderTypeLabels, paymentMethodLabels } from '../components/ui';
 import { useRealtime } from '../hooks/useRealtime';
 import type { Order, PaymentMethod } from '../types';
 
-const METHODS: { key: PaymentMethod; label: string }[] = [
-  { key: 'PIX', label: 'PIX' },
-  { key: 'CASH', label: 'Dinheiro' },
-  { key: 'CREDIT', label: 'Crédito' },
-  { key: 'DEBIT', label: 'Débito' },
-  { key: 'MEAL_VOUCHER', label: 'Vale Alim.' },
-];
+const METHOD_KEYS: PaymentMethod[] = ['PIX', 'CASH', 'CREDIT', 'DEBIT', 'MEAL_VOUCHER'];
 
 export default function Cashier() {
   useRealtime(['cashier'], [['ready-orders']]);
@@ -53,7 +47,8 @@ export default function Cashier() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-semibold">
-                  Mesa {o.table.number} <span className="font-normal text-gray-400">· Comanda #{o.number}</span>
+                  {o.table ? `Mesa ${o.table.number}` : orderTypeLabels[o.orderType]}{' '}
+                  <span className="font-normal text-gray-400">· Comanda #{o.number}</span>
                 </span>
                 <span className="font-semibold text-brand">{brl(o.totals.total)}</span>
               </div>
@@ -136,8 +131,12 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
     <Card className="!p-0">
       <div className="border-b border-gray-100 p-4 dark:border-gray-800">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Mesa {order.table.number} — Comanda #{order.number}</h3>
-          <span className="text-xs text-gray-500">Garçom: {order.waiter.name}</span>
+          <h3 className="font-semibold">
+            {order.table ? `Mesa ${order.table.number}` : orderTypeLabels[order.orderType]} — Comanda #{order.number}
+          </h3>
+          <span className="text-xs text-gray-500">
+            {order.waiter ? `Garçom: ${order.waiter.name}` : order.customer?.name ? `Cliente: ${order.customer.name}` : '—'}
+          </span>
         </div>
       </div>
 
@@ -196,6 +195,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
           </div>
         </div>
         <Row label={`Taxa de serviço (${order.serviceRate}%)`} value={brl(order.totals.serviceFee)} />
+        {order.totals.deliveryFee > 0 && <Row label="Taxa de entrega" value={brl(order.totals.deliveryFee)} />}
         <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold dark:border-gray-800">
           <span>Valor Final</span>
           <span className="text-brand">{brl(order.totals.total)}</span>
@@ -222,7 +222,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
             <div>
               <label className="label">Forma</label>
               <select className="input !py-1" value={splitMethod} onChange={(e) => setSplitMethod(e.target.value as PaymentMethod)}>
-                {METHODS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+                {METHOD_KEYS.map((m) => <option key={m} value={m}>{paymentMethodLabels[m]}</option>)}
               </select>
             </div>
             <button className="btn-secondary text-xs" onClick={applySplit}>
@@ -235,9 +235,9 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
         </div>
 
         <div className="mb-3 flex flex-wrap gap-2">
-          {METHODS.map((m) => (
-            <button key={m.key} className="btn-secondary text-xs" onClick={() => addLine(m.key)}>
-              + {m.label}
+          {METHOD_KEYS.map((m) => (
+            <button key={m} className="btn-secondary text-xs" onClick={() => addLine(m)}>
+              + {paymentMethodLabels[m]}
             </button>
           ))}
         </div>
@@ -245,7 +245,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
         <div className="space-y-2">
           {lines.map((l, i) => (
             <div key={i} className="flex items-center gap-2 text-sm">
-              <span className="w-24">{METHODS.find((m) => m.key === l.method)?.label}</span>
+              <span className="w-24">{paymentMethodLabels[l.method]}</span>
               <input
                 type="number"
                 className="input !w-28 !py-1 text-right"
