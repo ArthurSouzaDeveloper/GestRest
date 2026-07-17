@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Bike, ChevronLeft, ShoppingBag, BookOpen, Minus, Plus, X } from 'lucide-react';
-import api from '../lib/api';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Bike, ChevronLeft, ShoppingBag, BookOpen, Minus, Plus, X, Check, Banknote, CreditCard, QrCode } from 'lucide-react';
+import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Spinner } from '../components/ui';
 import { OrderComposer, draftItemUnitPrice, type DraftItem } from '../components/OrderComposer';
-import type { DeliveryZone } from '../types';
+import type { DeliveryZone, PaymentMethod } from '../types';
 
-type Step = 'intro' | 'details' | 'menu' | 'cart';
+type Step = 'intro' | 'details' | 'menu' | 'cart' | 'payment' | 'review' | 'confirmation';
 type OrderKind = 'DELIVERY' | 'PICKUP';
+/** Subset of PaymentMethod the public site offers — sem vale-refeição (só faz sentido presencial). */
+type PublicPaymentMethod = Extract<PaymentMethod, 'PIX' | 'CASH' | 'CREDIT' | 'DEBIT'>;
 
 interface PublicRestaurant {
   name: string;
@@ -34,6 +36,11 @@ export default function PublicOrder() {
   const [deliveryNumber, setDeliveryNumber] = useState('');
   const [deliveryComplement, setDeliveryComplement] = useState('');
   const [draft, setDraft] = useState<DraftItem[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<PublicPaymentMethod | ''>('');
+  const [changeFor, setChangeFor] = useState('');
+  const [website, setWebsite] = useState(''); // honeypot — invisível pro cliente real
+  const [confirmedOrderNumber, setConfirmedOrderNumber] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState('');
 
   const { data: restaurant, isLoading: loadingRestaurant, isError: restaurantNotFound } = useQuery({
     queryKey: ['public-restaurant', slug],
@@ -59,6 +66,40 @@ export default function PublicOrder() {
     customerName.trim().length >= 2 &&
     customerPhone.trim().length >= 8 &&
     (orderKind === 'PICKUP' || (deliveryZoneId && deliveryStreet.trim() && deliveryNumber.trim()));
+
+  const submitOrder = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        orderType: orderKind,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        ...(orderKind === 'DELIVERY'
+          ? {
+              deliveryZoneId,
+              deliveryStreet: deliveryStreet.trim(),
+              deliveryNumber: deliveryNumber.trim(),
+              deliveryComplement: deliveryComplement.trim() || undefined,
+            }
+          : {}),
+        declaredPaymentMethod: paymentMethod,
+        changeFor: paymentMethod === 'CASH' && changeFor ? Number(changeFor) : undefined,
+        website: website || undefined,
+        items: draft.map((d) => ({
+          productId: d.product.id,
+          quantity: d.quantity,
+          notes: d.notes || undefined,
+          additionalIds: d.additionalIds,
+        })),
+      };
+      return (await api.post<{ number: number }>(`/public/${slug}/orders`, payload)).data;
+    },
+    onSuccess: (order) => {
+      setSubmitError('');
+      setConfirmedOrderNumber(order.number);
+      setStep('confirmation');
+    },
+    onError: (e) => setSubmitError(apiError(e)),
+  });
 
   if (loadingRestaurant) {
     return (
@@ -98,7 +139,9 @@ export default function PublicOrder() {
         restaurantName={restaurant.name}
         step={step}
         onBack={() => {
-          if (step === 'cart') setStep('menu');
+          if (step === 'review') setStep('payment');
+          else if (step === 'payment') setStep('cart');
+          else if (step === 'cart') setStep('menu');
           else if (step === 'menu') setStep(orderKind ? 'details' : 'intro');
           else if (step === 'details') setStep('intro');
         }}
@@ -151,6 +194,62 @@ export default function PublicOrder() {
             deliveryFee={deliveryFee}
             total={total}
             orderKind={orderKind}
+            onContinue={() => setStep('payment')}
+          />
+        )}
+
+        {step === 'payment' && (
+          <PaymentStep
+            paymentMethod={paymentMethod}
+            setPaymentMethod={setPaymentMethod}
+            changeFor={changeFor}
+            setChangeFor={setChangeFor}
+            total={total}
+            onContinue={() => setStep('review')}
+          />
+        )}
+
+        {step === 'review' && orderKind && (
+          <ReviewStep
+            orderKind={orderKind}
+            customerName={customerName}
+            customerPhone={customerPhone}
+            deliveryZoneName={selectedZone?.name}
+            deliveryStreet={deliveryStreet}
+            deliveryNumber={deliveryNumber}
+            deliveryComplement={deliveryComplement}
+            draft={draft}
+            subtotal={subtotal}
+            deliveryFee={deliveryFee}
+            total={total}
+            paymentMethod={paymentMethod}
+            changeFor={changeFor}
+            website={website}
+            setWebsite={setWebsite}
+            submitting={submitOrder.isPending}
+            error={submitError}
+            onConfirm={() => submitOrder.mutate()}
+          />
+        )}
+
+        {step === 'confirmation' && (
+          <ConfirmationStep
+            orderNumber={confirmedOrderNumber}
+            orderKind={orderKind}
+            onNewOrder={() => {
+              setStep('intro');
+              setOrderKind(null);
+              setDraft([]);
+              setCustomerName('');
+              setCustomerPhone('');
+              setDeliveryZoneId('');
+              setDeliveryStreet('');
+              setDeliveryNumber('');
+              setDeliveryComplement('');
+              setPaymentMethod('');
+              setChangeFor('');
+              setConfirmedOrderNumber(null);
+            }}
           />
         )}
       </div>
@@ -179,7 +278,7 @@ function PublicHeader({
   return (
     <div className="sticky top-0 z-10 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-3">
-        {step !== 'intro' && (
+        {step !== 'intro' && step !== 'confirmation' && (
           <button onClick={onBack} className="text-gray-500 hover:text-gray-700" title="Voltar">
             <ChevronLeft size={22} />
           </button>
@@ -344,6 +443,7 @@ function CartStep({
   deliveryFee,
   total,
   orderKind,
+  onContinue,
 }: {
   draft: DraftItem[];
   setDraft: (items: DraftItem[]) => void;
@@ -351,6 +451,7 @@ function CartStep({
   deliveryFee: number;
   total: number;
   orderKind: OrderKind | null;
+  onContinue: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -415,9 +516,217 @@ function CartStep({
         </div>
       </div>
 
-      <button className="btn-primary w-full !py-3" disabled title="Disponível em breve">
-        Finalizar Pedido (em breve)
+      <button className="btn-primary w-full !py-3" disabled={draft.length === 0} onClick={onContinue}>
+        Continuar para pagamento
       </button>
+    </div>
+  );
+}
+
+const PAYMENT_OPTIONS: { key: PublicPaymentMethod; label: string; icon: typeof QrCode }[] = [
+  { key: 'PIX', label: 'PIX', icon: QrCode },
+  { key: 'CREDIT', label: 'Cartão de Crédito', icon: CreditCard },
+  { key: 'DEBIT', label: 'Cartão de Débito', icon: CreditCard },
+  { key: 'CASH', label: 'Dinheiro', icon: Banknote },
+];
+
+function PaymentStep({
+  paymentMethod,
+  setPaymentMethod,
+  changeFor,
+  setChangeFor,
+  total,
+  onContinue,
+}: {
+  paymentMethod: PublicPaymentMethod | '';
+  setPaymentMethod: (m: PublicPaymentMethod) => void;
+  changeFor: string;
+  setChangeFor: (v: string) => void;
+  total: number;
+  onContinue: () => void;
+}) {
+  const needsChange = paymentMethod === 'CASH';
+  const canContinue = !!paymentMethod && (!needsChange || !changeFor || Number(changeFor) >= total);
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold">Forma de pagamento</h2>
+      <p className="text-sm text-gray-500">Pago na entrega/retirada — igual já é hoje.</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        {PAYMENT_OPTIONS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            className={`card flex flex-col items-center gap-2 p-4 text-center transition ${
+              paymentMethod === key ? 'border-brand ring-1 ring-brand' : 'hover:border-brand hover:shadow'
+            }`}
+            onClick={() => setPaymentMethod(key)}
+          >
+            <Icon className="text-brand" size={24} />
+            <span className="text-sm font-medium">{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {needsChange && (
+        <div>
+          <label className="label">Precisa de troco? Troco para quanto?</label>
+          <input
+            className="input"
+            type="number"
+            step="0.01"
+            min={0}
+            placeholder={`Deixe em branco se não precisar (total: ${brl(total)})`}
+            value={changeFor}
+            onChange={(e) => setChangeFor(e.target.value)}
+          />
+          {changeFor && Number(changeFor) < total && (
+            <p className="mt-1 text-xs text-red-600">O valor precisa ser maior ou igual ao total ({brl(total)}).</p>
+          )}
+        </div>
+      )}
+
+      <button className="btn-primary w-full !py-3" disabled={!canContinue} onClick={onContinue}>
+        Revisar Pedido
+      </button>
+    </div>
+  );
+}
+
+function ReviewStep({
+  orderKind,
+  customerName,
+  customerPhone,
+  deliveryZoneName,
+  deliveryStreet,
+  deliveryNumber,
+  deliveryComplement,
+  draft,
+  subtotal,
+  deliveryFee,
+  total,
+  paymentMethod,
+  changeFor,
+  website,
+  setWebsite,
+  submitting,
+  error,
+  onConfirm,
+}: {
+  orderKind: OrderKind;
+  customerName: string;
+  customerPhone: string;
+  deliveryZoneName?: string;
+  deliveryStreet: string;
+  deliveryNumber: string;
+  deliveryComplement: string;
+  draft: DraftItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  paymentMethod: PublicPaymentMethod | '';
+  changeFor: string;
+  website: string;
+  setWebsite: (v: string) => void;
+  submitting: boolean;
+  error: string;
+  onConfirm: () => void;
+}) {
+  const paymentLabel = PAYMENT_OPTIONS.find((p) => p.key === paymentMethod)?.label ?? '—';
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold">Revisão do pedido</h2>
+
+      <div className="card space-y-2 p-4 text-sm">
+        <div className="font-medium">{orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada'}</div>
+        <div className="text-gray-500">{customerName} · {customerPhone}</div>
+        {orderKind === 'DELIVERY' && (
+          <div className="text-gray-500">
+            {deliveryStreet}, {deliveryNumber}{deliveryComplement ? ` — ${deliveryComplement}` : ''} · {deliveryZoneName}
+          </div>
+        )}
+      </div>
+
+      <div className="card space-y-2 p-4 text-sm">
+        <div className="font-medium">Itens</div>
+        {draft.map((item, i) => (
+          <div key={i} className="flex justify-between">
+            <span>{item.quantity}× {item.product.name}</span>
+            <span>{brl(draftItemUnitPrice(item) * item.quantity)}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="card space-y-1 p-4 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Forma de pagamento</span>
+          <span>{paymentLabel}</span>
+        </div>
+        {paymentMethod === 'CASH' && changeFor && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Troco para</span>
+            <span>{brl(Number(changeFor))}</span>
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span className="text-gray-500">Subtotal</span>
+          <span>{brl(subtotal)}</span>
+        </div>
+        {orderKind === 'DELIVERY' && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Taxa de entrega</span>
+            <span>{brl(deliveryFee)}</span>
+          </div>
+        )}
+        <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold dark:border-gray-800">
+          <span>Total</span>
+          <span className="text-brand">{brl(total)}</span>
+        </div>
+      </div>
+
+      {/* Honeypot — invisível pra gente, um bot que preenche todo campo do form cai aqui. */}
+      <input
+        type="text"
+        name="website"
+        value={website}
+        onChange={(e) => setWebsite(e.target.value)}
+        className="absolute -left-[9999px] h-0 w-0 opacity-0"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+      />
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <button className="btn-primary w-full !py-3" disabled={submitting} onClick={onConfirm}>
+        {submitting ? 'Enviando...' : 'Confirmar Pedido'}
+      </button>
+    </div>
+  );
+}
+
+function ConfirmationStep({
+  orderNumber,
+  orderKind,
+  onNewOrder,
+}: {
+  orderNumber: number | null;
+  orderKind: OrderKind | null;
+  onNewOrder: () => void;
+}) {
+  return (
+    <div className="pt-10 text-center">
+      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+        <Check className="text-green-600 dark:text-green-400" size={32} />
+      </div>
+      <h1 className="text-xl font-bold">Pedido recebido!</h1>
+      {orderNumber && <p className="mt-1 text-gray-500">Pedido #{orderNumber}</p>}
+      <p className="mt-3 text-sm text-gray-500">
+        {orderKind === 'DELIVERY'
+          ? 'Assim que o restaurante aceitar, seu pedido entra em preparo.'
+          : 'Assim que o restaurante aceitar, seu pedido entra em preparo. Vá até o balcão no horário combinado.'}
+      </p>
+      <button className="btn-secondary mt-6" onClick={onNewOrder}>Fazer novo pedido</button>
     </div>
   );
 }

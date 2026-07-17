@@ -1,6 +1,8 @@
 import {
   AuditAction,
   OrderStatus,
+  OrderType,
+  PaymentMethod,
   Prisma,
   ProductionStatus,
   Role,
@@ -30,6 +32,20 @@ interface NewItemInput {
   quantity: number;
   notes?: string;
   additionalIds?: string[];
+}
+
+export interface PublicOrderInput {
+  orderType: 'DELIVERY' | 'PICKUP';
+  customerName: string;
+  customerPhone: string;
+  deliveryZoneId?: string;
+  deliveryStreet?: string;
+  deliveryNumber?: string;
+  deliveryComplement?: string;
+  declaredPaymentMethod: PaymentMethod;
+  changeFor?: number;
+  notes?: string;
+  items: NewItemInput[];
 }
 
 const stationRoom: Record<Station, string | null> = {
@@ -66,6 +82,59 @@ async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = p
   await tx.order.update({ where: { id: orderId }, data: { status } });
   // Pedido online (delivery/retirada) não tem mesa — nada a sincronizar nesse caso.
   if (order.tableId) await syncTableStatus(order.tableId, tx);
+}
+
+/**
+ * Validates and creates order items inside an existing transaction — shared by addItems()
+ * (staff, an already-open order) and openPublic() (online ordering, a brand new order) so
+ * both paths enforce identical rules: product must belong to the tenant, must be available,
+ * price/additionals are snapshotted at order time. Returns the set of stations touched, so
+ * callers know which production room(s) to wake up.
+ */
+async function createOrderItems(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  orderId: string,
+  items: NewItemInput[],
+): Promise<Set<Station>> {
+  const touchedStations = new Set<Station>();
+  for (const item of items) {
+    const product = await tx.product.findFirst({
+      where: { id: item.productId, restaurantId: tenantId },
+      include: { category: true },
+    });
+    if (!product) throw new NotFoundError('Produto');
+    if (!product.available) throw new AppError(`Produto indisponível: ${product.name}`);
+
+    const station = product.category.station;
+    touchedStations.add(station);
+
+    const additionals = item.additionalIds?.length
+      ? await tx.additional.findMany({
+          where: { id: { in: item.additionalIds }, restaurantId: tenantId },
+        })
+      : [];
+
+    await tx.orderItem.create({
+      data: {
+        orderId,
+        productId: product.id,
+        quantity: Math.max(1, item.quantity),
+        unitPrice: product.price,
+        notes: item.notes,
+        station,
+        status: station === Station.NONE ? ProductionStatus.DONE : ProductionStatus.WAITING,
+        additionals: {
+          create: additionals.map((a) => ({
+            additionalId: a.id,
+            name: a.name,
+            price: a.price,
+          })),
+        },
+      },
+    });
+  }
+  return touchedStations;
 }
 
 async function loadAndBroadcast(tenantId: string, orderId: string, event: string) {
@@ -153,6 +222,71 @@ export const orderService = {
     return loadAndBroadcast(ctx.tenantId, order.id, 'order:created');
   },
 
+  /**
+   * Creates an order from the public (unauthenticated) online ordering site — no table, no
+   * waiter, no ctx.userId. Lands in PENDING, invisible to Kitchen/JuiceBar (production.service's
+   * queue() excludes it) until the staff explicitly accepts it via accept(). Payment is COD —
+   * declaredPaymentMethod/changeFor are just what the customer said they'll pay with, recorded
+   * for the staff to see; the actual Payment row is only created later, at handover.
+   */
+  async openPublic(tenantId: string, input: PublicOrderInput, ip?: string) {
+    if (input.items.length === 0) throw new AppError('Nenhum item informado');
+
+    let deliveryFee = 0;
+    if (input.orderType === 'DELIVERY') {
+      if (!input.deliveryZoneId) throw new AppError('Bairro obrigatório para entrega');
+      const zone = await prisma.deliveryZone.findFirst({
+        where: { id: input.deliveryZoneId, restaurantId: tenantId, active: true },
+      });
+      if (!zone) throw new NotFoundError('Bairro');
+      deliveryFee = Number(zone.fee);
+    }
+
+    const orderId = await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.create({
+        data: {
+          name: input.customerName.trim(),
+          phone: input.customerPhone.trim(),
+          restaurantId: tenantId,
+        },
+      });
+      const order = await tx.order.create({
+        data: {
+          restaurantId: tenantId,
+          orderType: input.orderType as OrderType,
+          status: OrderStatus.PENDING,
+          customerId: customer.id,
+          // Taxa de serviço (10% padrão) é um conceito de atendimento em mesa — não se
+          // aplica a delivery/retirada, e o carrinho do site nunca mostrou esse valor.
+          serviceRate: 0,
+          deliveryZoneId: input.orderType === 'DELIVERY' ? input.deliveryZoneId : undefined,
+          deliveryFee,
+          deliveryStreet: input.deliveryStreet,
+          deliveryNumber: input.deliveryNumber,
+          deliveryComplement: input.deliveryComplement,
+          declaredPaymentMethod: input.declaredPaymentMethod,
+          changeFor: input.changeFor,
+          notes: input.notes,
+        },
+      });
+      await createOrderItems(tx, tenantId, order.id, input.items);
+      // De propósito: nem syncOrderStatus nem syncTableStatus aqui — o pedido fica parado
+      // em PENDING (sem mesa) até a equipe aceitar via accept().
+      return order.id;
+    });
+
+    await auditService.record({
+      action: AuditAction.PUBLIC_ORDER_CREATED,
+      restaurantId: tenantId,
+      entity: 'Order',
+      entityId: orderId,
+      ip,
+      metadata: { orderType: input.orderType, itemCount: input.items.length },
+    });
+
+    return loadAndBroadcast(tenantId, orderId, 'order:created');
+  },
+
   async addItems(orderId: string, items: NewItemInput[], ctx: Ctx) {
     if (items.length === 0) throw new AppError('Nenhum item informado');
     const order = await requireOrder(ctx.tenantId, orderId);
@@ -160,46 +294,10 @@ export const orderService = {
       throw new ConflictError('Pedido já finalizado');
     }
 
-    const touchedStations = new Set<Station>();
-
-    await prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        const product = await tx.product.findFirst({
-          where: { id: item.productId, restaurantId: ctx.tenantId },
-          include: { category: true },
-        });
-        if (!product) throw new NotFoundError('Produto');
-        if (!product.available) throw new AppError(`Produto indisponível: ${product.name}`);
-
-        const station = product.category.station;
-        touchedStations.add(station);
-
-        const additionals = item.additionalIds?.length
-          ? await tx.additional.findMany({
-              where: { id: { in: item.additionalIds }, restaurantId: ctx.tenantId },
-            })
-          : [];
-
-        await tx.orderItem.create({
-          data: {
-            orderId,
-            productId: product.id,
-            quantity: Math.max(1, item.quantity),
-            unitPrice: product.price,
-            notes: item.notes,
-            station,
-            status: station === Station.NONE ? ProductionStatus.DONE : ProductionStatus.WAITING,
-            additionals: {
-              create: additionals.map((a) => ({
-                additionalId: a.id,
-                name: a.name,
-                price: a.price,
-              })),
-            },
-          },
-        });
-      }
+    const touchedStations = await prisma.$transaction(async (tx) => {
+      const stations = await createOrderItems(tx, ctx.tenantId, orderId, items);
       await syncOrderStatus(orderId, tx);
+      return stations;
     });
 
     await auditService.record({

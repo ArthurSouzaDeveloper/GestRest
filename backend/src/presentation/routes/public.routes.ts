@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../utils/http';
 import { publicOrderService } from '../../application/services/publicOrder.service';
+import { validateBody } from '../middlewares/validate.middleware';
+import { publicOrderLimiter } from '../middlewares/rateLimit.middleware';
+import { publicOrderSchema } from '../validators/schemas';
 
 /**
  * Public (unauthenticated) routes for the online ordering site, resolved by :slug rather
@@ -30,6 +33,15 @@ router.get(
 router.get(
   '/:slug/delivery-zones',
   asyncHandler(async (req, res) => res.json(await publicOrderService.deliveryZones(req.params.slug))),
+);
+
+router.post(
+  '/:slug/orders',
+  publicOrderLimiter,
+  validateBody(publicOrderSchema),
+  asyncHandler(async (req, res) =>
+    res.status(201).json(await publicOrderService.createOrder(req.params.slug, req.body, req.ip)),
+  ),
 );
 
 export default router;

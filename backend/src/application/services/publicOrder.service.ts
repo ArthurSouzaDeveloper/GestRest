@@ -1,6 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { additionalService, categoryService, deliveryZoneService, productService } from './catalog.service';
+import { orderService, type PublicOrderInput } from './order.service';
 
 /** Resolves a public :slug to a tenant id, rejecting unknown or inactive restaurants. */
 async function resolveActiveTenant(slug: string): Promise<string> {
@@ -35,5 +36,9 @@ export const publicOrderService = {
   async deliveryZones(slug: string) {
     const tenantId = await resolveActiveTenant(slug);
     return deliveryZoneService.list(tenantId, { onlyActive: true });
+  },
+  async createOrder(slug: string, input: PublicOrderInput, ip?: string) {
+    const tenantId = await resolveActiveTenant(slug);
+    return orderService.openPublic(tenantId, input, ip);
   },
 };
