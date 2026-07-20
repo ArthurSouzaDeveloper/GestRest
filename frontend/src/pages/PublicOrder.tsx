@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { publicBrandVars } from '../lib/publicBrand';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Bike,
@@ -188,7 +189,7 @@ export default function PublicOrder() {
   const introOrConfirmation = step === 'intro' || step === 'confirmation';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-[#FBF7FC]" style={publicBrandVars}>
       {!introOrConfirmation && (
         <PublicHeader
           restaurantName={restaurant.name}
@@ -218,7 +219,7 @@ export default function PublicOrder() {
       )}
 
       {step !== 'intro' && (
-      <div className="mx-auto max-w-md px-4 pb-28 pt-4">
+      <div className={`mx-auto px-4 pb-28 pt-4 ${step === 'menu' ? 'max-w-3xl' : 'max-w-md'}`}>
         {step === 'details' && orderKind && (
           <DetailsStep
             orderKind={orderKind}
@@ -321,7 +322,7 @@ export default function PublicOrder() {
 
       {step === 'menu' && itemCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
-          <button className="btn-primary mx-auto flex w-full max-w-md items-center justify-between !py-3" onClick={() => setStep('cart')}>
+          <button className="btn-primary mx-auto flex w-full max-w-3xl items-center justify-between !py-3" onClick={() => setStep('cart')}>
             <span>{itemCount} {itemCount === 1 ? 'item' : 'itens'}</span>
             <span>Ver carrinho · {brl(subtotal)}</span>
           </button>
@@ -398,7 +399,7 @@ function IntroStep({
         Aberto agora · delivery até 22:30
       </div>
 
-      <div className="mt-16 flex w-full flex-col gap-3">
+      <div className="mx-auto mt-16 flex w-full max-w-md flex-col gap-3">
         <button
           className="flex w-full items-center gap-3.5 rounded-2xl bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72] px-4 py-4 text-left shadow-[0_12px_24px_-10px_rgba(74,29,114,0.55)] transition active:scale-[0.98]"
           onClick={() => onPick('DELIVERY')}
@@ -439,7 +440,7 @@ function IntroStep({
         </button>
       </div>
 
-      <div className="mt-auto flex flex-col items-center gap-2.5 pb-6 pt-10">
+      <div className="mx-auto mt-auto flex w-full max-w-md flex-col items-center gap-2.5 pb-6 pt-10">
         <span className="text-[11px] font-semibold text-gray-500">Pastelaria e Sucaria desde 1996</span>
         <div className="flex items-center gap-2.5">
           <a

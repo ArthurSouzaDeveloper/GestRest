@@ -5,6 +5,11 @@
 
 :root {
   color-scheme: light dark;
+  --brand-rgb: 30 58 138;
+  --brand-50: #eff4ff;
+  --brand-100: #dbe6fe;
+  --brand-600: #1b3478;
+  --brand-700: #172c66;
 }
 
 body {
