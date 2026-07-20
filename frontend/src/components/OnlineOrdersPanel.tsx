@@ -136,6 +136,12 @@ function OnlineOrderCard({
         <span className="font-semibold text-brand">{brl(order.totals.total)}</span>
       </div>
 
+      {order.estimatedReadyAt && (
+        <div className="mt-1 text-xs text-gray-500">
+          Prometido ao cliente: até <span className="font-medium text-gray-700 dark:text-gray-300">{time(order.estimatedReadyAt)}</span>
+        </div>
+      )}
+
       {action && (
         <button
           className="btn-primary mt-2 w-full !py-2 text-sm"

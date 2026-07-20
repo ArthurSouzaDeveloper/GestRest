@@ -1,12 +1,48 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Bike, ChevronLeft, ShoppingBag, BookOpen, Minus, Plus, X, Check, Banknote, CreditCard, QrCode } from 'lucide-react';
+import {
+  Bike,
+  ChevronLeft,
+  ChevronRight,
+  ShoppingBag,
+  BookOpen,
+  Minus,
+  Plus,
+  X,
+  Check,
+  Banknote,
+  CreditCard,
+  QrCode,
+  Clock,
+  Instagram,
+  MessageCircle,
+  MapPin,
+} from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Spinner } from '../components/ui';
 import { OrderComposer, draftItemUnitPrice, type DraftItem } from '../components/OrderComposer';
-import type { DeliveryZone, PaymentMethod } from '../types';
+import type { DeliveryZone, EtaEstimate, PaymentMethod } from '../types';
+
+/** "19:45" a partir de um ISO — usado pra mostrar a previsão travada na confirmação. */
+function formatClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Nota de previsão reaproveitada nas telas de Dados/Carrinho/Revisão — some se a estimativa ainda não carregou. */
+function EtaNote({ eta }: { eta?: EtaEstimate }) {
+  if (!eta) return null;
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-brand/10 px-3 py-2 text-xs text-brand">
+      <Clock size={14} className="shrink-0" />
+      <span>
+        Previsão agora: até {eta.minutes} min
+        {eta.activeOrders > 5 ? ' — cozinha com fluxo alto no momento' : ''}
+      </span>
+    </div>
+  );
+}
 
 type Step = 'intro' | 'details' | 'menu' | 'cart' | 'payment' | 'review' | 'confirmation';
 type OrderKind = 'DELIVERY' | 'PICKUP';
@@ -43,7 +79,17 @@ export default function PublicOrder() {
   // um cliente de verdade sem ele nunca ter digitado nada aqui).
   const [grHp, setGrHp] = useState('');
   const [confirmedOrderNumber, setConfirmedOrderNumber] = useState<number | null>(null);
+  const [confirmedEta, setConfirmedEta] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState('');
+
+  // Recalcula enquanto o cliente ainda está decidindo (Dados/Cardápio/Carrinho/Pagamento/
+  // Revisão); trava um valor só no momento da confirmação (openPublic() no backend).
+  const { data: eta } = useQuery({
+    queryKey: ['public-eta', slug, orderKind],
+    queryFn: async () => (await api.get<EtaEstimate>(`/public/${slug}/eta`, { params: { orderType: orderKind } })).data,
+    enabled: !!slug && !!orderKind && step !== 'intro' && step !== 'confirmation',
+    refetchInterval: 20_000,
+  });
 
   const { data: restaurant, isLoading: loadingRestaurant, isError: restaurantNotFound } = useQuery({
     queryKey: ['public-restaurant', slug],
@@ -94,11 +140,12 @@ export default function PublicOrder() {
           additionalIds: d.additionalIds,
         })),
       };
-      return (await api.post<{ number: number }>(`/public/${slug}/orders`, payload)).data;
+      return (await api.post<{ number: number; estimatedReadyAt: string | null }>(`/public/${slug}/orders`, payload)).data;
     },
     onSuccess: (order) => {
       setSubmitError('');
       setConfirmedOrderNumber(order.number);
+      setConfirmedEta(order.estimatedReadyAt);
       setStep('confirmation');
     },
     onError: (e) => setSubmitError(apiError(e)),
@@ -136,36 +183,40 @@ export default function PublicOrder() {
     );
   }
 
+  const introOrConfirmation = step === 'intro' || step === 'confirmation';
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <PublicHeader
-        restaurantName={restaurant.name}
-        step={step}
-        onBack={() => {
-          if (step === 'review') setStep('payment');
-          else if (step === 'payment') setStep('cart');
-          else if (step === 'cart') setStep('menu');
-          else if (step === 'menu') setStep(orderKind ? 'details' : 'intro');
-          else if (step === 'details') setStep('intro');
-        }}
-      />
+      {!introOrConfirmation && (
+        <PublicHeader
+          restaurantName={restaurant.name}
+          onBack={() => {
+            if (step === 'review') setStep('payment');
+            else if (step === 'payment') setStep('cart');
+            else if (step === 'cart') setStep('menu');
+            else if (step === 'menu') setStep(orderKind ? 'details' : 'intro');
+            else if (step === 'details') setStep('intro');
+          }}
+        />
+      )}
 
+      {step === 'intro' && (
+        <IntroStep
+          restaurantName={restaurant.name}
+          onPick={(kind) => {
+            if (kind === 'MENU') {
+              setOrderKind(null);
+              setStep('menu');
+            } else {
+              setOrderKind(kind);
+              setStep('details');
+            }
+          }}
+        />
+      )}
+
+      {step !== 'intro' && (
       <div className="mx-auto max-w-md px-4 pb-28 pt-4">
-        {step === 'intro' && (
-          <IntroStep
-            restaurantName={restaurant.name}
-            onPick={(kind) => {
-              if (kind === 'MENU') {
-                setOrderKind(null);
-                setStep('menu');
-              } else {
-                setOrderKind(kind);
-                setStep('details');
-              }
-            }}
-          />
-        )}
-
         {step === 'details' && orderKind && (
           <DetailsStep
             orderKind={orderKind}
@@ -184,6 +235,7 @@ export default function PublicOrder() {
             setDeliveryComplement={setDeliveryComplement}
             canContinue={!!canContinueDetails}
             onContinue={() => setStep('menu')}
+            eta={eta}
           />
         )}
 
@@ -198,6 +250,7 @@ export default function PublicOrder() {
             total={total}
             orderKind={orderKind}
             onContinue={() => setStep('payment')}
+            eta={eta}
           />
         )}
 
@@ -232,6 +285,7 @@ export default function PublicOrder() {
             submitting={submitOrder.isPending}
             error={submitError}
             onConfirm={() => submitOrder.mutate()}
+            eta={eta}
           />
         )}
 
@@ -239,6 +293,7 @@ export default function PublicOrder() {
           <ConfirmationStep
             orderNumber={confirmedOrderNumber}
             orderKind={orderKind}
+            estimatedReadyAt={confirmedEta}
             onNewOrder={() => {
               setStep('intro');
               setOrderKind(null);
@@ -252,10 +307,12 @@ export default function PublicOrder() {
               setPaymentMethod('');
               setChangeFor('');
               setConfirmedOrderNumber(null);
+              setConfirmedEta(null);
             }}
           />
         )}
       </div>
+      )}
 
       {step === 'menu' && itemCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
@@ -271,30 +328,32 @@ export default function PublicOrder() {
 
 function PublicHeader({
   restaurantName,
-  step,
   onBack,
 }: {
   restaurantName: string;
-  step: Step;
   onBack: () => void;
 }) {
   return (
-    <div className="sticky top-0 z-10 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <div className="sticky top-0 z-10 bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72]">
       <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-3">
-        {step !== 'intro' && step !== 'confirmation' && (
-          <button onClick={onBack} className="text-gray-500 hover:text-gray-700" title="Voltar">
-            <ChevronLeft size={22} />
-          </button>
-        )}
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-xs font-bold text-white">
+        <button onClick={onBack} className="flex text-white/85 hover:text-white" title="Voltar">
+          <ChevronLeft size={22} />
+        </button>
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-xs font-bold text-[#6D2E9E]">
           {restaurantName.slice(0, 2).toUpperCase()}
         </div>
-        <span className="font-semibold">{restaurantName}</span>
+        <span className="font-semibold text-white">{restaurantName}</span>
       </div>
     </div>
   );
 }
 
+/**
+ * Identidade visual e dados de contato específicos de "O Rei do Suco" — hoje o único
+ * tenant que usa o pedido online. Se um segundo restaurante passar a usar essa mesma
+ * tela, isso precisa virar configurável por tenant (cor, selo, redes sociais) em vez de
+ * fixo aqui.
+ */
 function IntroStep({
   restaurantName,
   onPick,
@@ -303,41 +362,109 @@ function IntroStep({
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
   return (
-    <div className="pt-6 text-center">
-      <h1 className="text-2xl font-bold">{restaurantName}</h1>
-      <p className="mt-1 text-sm text-gray-500">Como você quer pedir hoje?</p>
+    <div className="flex min-h-screen flex-col items-center bg-[#FBF7FC] px-7 pt-12 dark:bg-[#FBF7FC]">
+      <svg width="122" height="122" viewBox="0 0 120 120" role="img" aria-label={restaurantName}>
+        <defs>
+          <radialGradient id="poBadgeFill" cx="50%" cy="38%" r="70%">
+            <stop offset="0%" stopColor="#7A369E" />
+            <stop offset="100%" stopColor="#4A1D72" />
+          </radialGradient>
+        </defs>
+        <circle cx="60" cy="60" r="58" fill="none" stroke="#D9A544" strokeWidth="2" />
+        <circle cx="60" cy="60" r="53" fill="url(#poBadgeFill)" />
+        <g fill="#D9A544" opacity="0.45">
+          <circle cx="27" cy="34" r="1.5" /><circle cx="95" cy="30" r="1.3" /><circle cx="100" cy="62" r="1.4" />
+          <circle cx="92" cy="92" r="1.3" /><circle cx="24" cy="88" r="1.3" /><circle cx="18" cy="58" r="1.5" />
+        </g>
+        <path
+          d="M60 18 C 57 22 57 27 60 30 C 63 27 63 22 60 18 Z M60 30 C 54 28 49 30 47 34 C 52 37 58 36 60 30 Z M60 30 C 66 28 71 30 73 34 C 68 37 62 36 60 30 Z"
+          fill="#8BC53F"
+        />
+        <text x="60" y="60" textAnchor="middle" fontFamily="Georgia,'Times New Roman',serif" fontStyle="italic" fontSize="24" fill="#FBF7FC">
+          o Rei
+        </text>
+        <text x="60" y="82" textAnchor="middle" fontFamily="-apple-system,'Segoe UI',Arial,sans-serif" fontWeight="800" fontSize="17" letterSpacing="0.5" fill="#FBF7FC">
+          do Suco
+        </text>
+      </svg>
 
-      <div className="mt-8 space-y-3">
+      <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+        <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
+        Aberto agora · delivery até 22:30
+      </div>
+
+      <div className="mt-16 flex w-full flex-col gap-3">
         <button
-          className="card flex w-full items-center gap-4 p-5 text-left transition hover:border-brand hover:shadow"
+          className="flex w-full items-center gap-3.5 rounded-2xl bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72] px-4 py-4 text-left shadow-[0_12px_24px_-10px_rgba(74,29,114,0.55)] transition active:scale-[0.98]"
           onClick={() => onPick('DELIVERY')}
         >
-          <Bike className="text-brand" size={28} />
-          <div>
-            <div className="font-semibold">Fazer Pedido Delivery</div>
-            <div className="text-xs text-gray-500">Receba no seu endereço</div>
-          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white">
+            <Bike size={21} />
+          </span>
+          <span className="flex-1">
+            <span className="block text-[15px] font-extrabold text-white">Delivery</span>
+            <span className="block text-xs font-medium text-white/80">Entrega no seu endereço</span>
+          </span>
+          <ChevronRight size={17} className="shrink-0 text-white/70" />
         </button>
+
         <button
-          className="card flex w-full items-center gap-4 p-5 text-left transition hover:border-brand hover:shadow"
+          className="flex w-full items-center gap-3.5 rounded-2xl bg-[#351C4D] px-4 py-4 text-left shadow-[0_12px_24px_-10px_rgba(36,16,48,0.5)] transition active:scale-[0.98]"
           onClick={() => onPick('PICKUP')}
         >
-          <ShoppingBag className="text-brand" size={28} />
-          <div>
-            <div className="font-semibold">Fazer Pedido para Retirada</div>
-            <div className="text-xs text-gray-500">Retire no balcão</div>
-          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
+            <ShoppingBag size={21} />
+          </span>
+          <span className="flex-1">
+            <span className="block text-[15px] font-extrabold text-white">Retirada</span>
+            <span className="block text-xs font-medium text-white/75">Sem taxa de entrega</span>
+          </span>
+          <ChevronRight size={17} className="shrink-0 text-white/70" />
         </button>
+
         <button
-          className="card flex w-full items-center gap-4 p-5 text-left transition hover:border-brand hover:shadow"
+          className="flex w-full items-center gap-3.5 rounded-2xl border-[1.5px] border-[#351C4D]/15 bg-white px-4 py-4 text-left transition active:scale-[0.98]"
           onClick={() => onPick('MENU')}
         >
-          <BookOpen className="text-brand" size={28} />
-          <div>
-            <div className="font-semibold">Ver Cardápio</div>
-            <div className="text-xs text-gray-500">Sem compromisso</div>
-          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F3E8FB] text-[#6D2E9E]">
+            <BookOpen size={21} />
+          </span>
+          <span className="flex-1 text-[15px] font-extrabold text-[#351C4D]">Cardápio</span>
+          <ChevronRight size={17} className="shrink-0 text-[#351C4D]" />
         </button>
+      </div>
+
+      <div className="mt-auto flex flex-col items-center gap-2.5 pb-6 pt-10">
+        <span className="text-[11px] font-semibold text-gray-500">Pastelaria e Sucaria desde 1996</span>
+        <div className="flex items-center gap-2.5">
+          <a
+            href="https://www.instagram.com/oreidosucoamericana"
+            target="_blank"
+            rel="noreferrer"
+            title="Instagram"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#351C4D]/15 bg-white text-[#351C4D]"
+          >
+            <Instagram size={15} />
+          </a>
+          <a
+            href="https://wa.me/551934054361"
+            target="_blank"
+            rel="noreferrer"
+            title="WhatsApp"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#351C4D]/15 bg-white text-[#351C4D]"
+          >
+            <MessageCircle size={15} />
+          </a>
+          <a
+            href="https://www.google.com/maps/place/Rei+do+Suco/@-22.7481879,-47.3612074,17z/data=!3m1!4b1!4m6!3m5!1s0x94c89bef9f7cfaf7:0x607ad2fefac4fcd5!8m2!3d-22.7481879!4d-47.3586271!16s%2Fg%2F11b779z2w4"
+            target="_blank"
+            rel="noreferrer"
+            title="Localização"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#351C4D]/15 bg-white text-[#351C4D]"
+          >
+            <MapPin size={15} />
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -360,6 +487,7 @@ function DetailsStep({
   setDeliveryComplement,
   canContinue,
   onContinue,
+  eta,
 }: {
   orderKind: OrderKind;
   customerName: string;
@@ -377,6 +505,7 @@ function DetailsStep({
   setDeliveryComplement: (v: string) => void;
   canContinue: boolean;
   onContinue: () => void;
+  eta?: EtaEstimate;
 }) {
   const selectedFee = zones.find((z) => z.id === deliveryZoneId)?.fee;
   return (
@@ -384,6 +513,7 @@ function DetailsStep({
       <h2 className="text-lg font-semibold">
         {orderKind === 'DELIVERY' ? 'Seus dados para entrega' : 'Seus dados para retirada'}
       </h2>
+      <EtaNote eta={eta} />
 
       <div>
         <label className="label">Nome</label>
@@ -447,6 +577,7 @@ function CartStep({
   total,
   orderKind,
   onContinue,
+  eta,
 }: {
   draft: DraftItem[];
   setDraft: (items: DraftItem[]) => void;
@@ -455,10 +586,12 @@ function CartStep({
   total: number;
   orderKind: OrderKind | null;
   onContinue: () => void;
+  eta?: EtaEstimate;
 }) {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Seu carrinho</h2>
+      <EtaNote eta={eta} />
 
       {draft.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">Seu carrinho está vazio.</p>
@@ -615,6 +748,7 @@ function ReviewStep({
   submitting,
   error,
   onConfirm,
+  eta,
 }: {
   orderKind: OrderKind;
   customerName: string;
@@ -634,11 +768,13 @@ function ReviewStep({
   submitting: boolean;
   error: string;
   onConfirm: () => void;
+  eta?: EtaEstimate;
 }) {
   const paymentLabel = PAYMENT_OPTIONS.find((p) => p.key === paymentMethod)?.label ?? '—';
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Revisão do pedido</h2>
+      <EtaNote eta={eta} />
 
       <div className="card space-y-2 p-4 text-sm">
         <div className="font-medium">{orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada'}</div>
@@ -712,10 +848,12 @@ function ReviewStep({
 function ConfirmationStep({
   orderNumber,
   orderKind,
+  estimatedReadyAt,
   onNewOrder,
 }: {
   orderNumber: number | null;
   orderKind: OrderKind | null;
+  estimatedReadyAt: string | null;
   onNewOrder: () => void;
 }) {
   return (
@@ -730,6 +868,12 @@ function ConfirmationStep({
           ? 'Assim que o restaurante aceitar, seu pedido entra em preparo.'
           : 'Assim que o restaurante aceitar, seu pedido entra em preparo. Vá até o balcão no horário combinado.'}
       </p>
+      {estimatedReadyAt && (
+        <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-lg bg-brand/10 px-4 py-2 text-sm font-medium text-brand">
+          <Clock size={16} />
+          {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
+        </div>
+      )}
       <button className="btn-secondary mt-6" onClick={onNewOrder}>Fazer novo pedido</button>
     </div>
   );
