@@ -19,12 +19,14 @@ import {
   Instagram,
   MessageCircle,
   MapPin,
+  Loader2,
 } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Spinner } from '../components/ui';
 import { OrderComposer, draftItemUnitPrice, type DraftItem } from '../components/OrderComposer';
-import type { DeliveryZone, EtaEstimate, PaymentMethod } from '../types';
+import AddressAutocomplete from '../components/AddressAutocomplete';
+import type { DeliveryZone, EtaEstimate, PaymentMethod, PlaceDetails } from '../types';
 
 /** "19:45" a partir de um ISO — usado pra mostrar a previsão travada na confirmação. */
 function formatClock(iso: string): string {
@@ -90,6 +92,7 @@ interface PublicRestaurant {
   name: string;
   slug: string;
   active: boolean;
+  deliveryPricingMode: 'ZONE' | 'DISTANCE_BANDS';
 }
 
 /**
@@ -105,6 +108,8 @@ export default function PublicOrder() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryZoneId, setDeliveryZoneId] = useState('');
+  const [deliveryLat, setDeliveryLat] = useState<number | null>(null);
+  const [deliveryLng, setDeliveryLng] = useState<number | null>(null);
   const [deliveryStreet, setDeliveryStreet] = useState('');
   const [deliveryNumber, setDeliveryNumber] = useState('');
   const [deliveryComplement, setDeliveryComplement] = useState('');
@@ -136,14 +141,34 @@ export default function PublicOrder() {
     retry: false,
   });
 
+  const distanceMode = restaurant?.deliveryPricingMode === 'DISTANCE_BANDS';
+
   const { data: zones = [] } = useQuery({
     queryKey: ['public-delivery-zones', slug],
     queryFn: async () => (await api.get<DeliveryZone[]>(`/public/${slug}/delivery-zones`)).data,
-    enabled: !!slug && orderKind === 'DELIVERY',
+    enabled: !!slug && orderKind === 'DELIVERY' && !distanceMode,
+  });
+
+  // Cotação do frete por distância — dispara quando o cliente escolhe um endereço no
+  // autocomplete (não a cada tecla). Reconferida de novo pelo back no momento de confirmar
+  // o pedido, então esse valor aqui é só pra mostrar antes de continuar.
+  const {
+    data: deliveryQuote,
+    isFetching: quotingDelivery,
+    isError: quoteOutOfRange,
+  } = useQuery({
+    queryKey: ['public-delivery-quote', slug, deliveryLat, deliveryLng],
+    queryFn: async () =>
+      (await api.get<{ fee: number; distanceKm: number }>(`/public/${slug}/delivery-quote`, { params: { lat: deliveryLat, lng: deliveryLng } })).data,
+    enabled: !!slug && orderKind === 'DELIVERY' && distanceMode && deliveryLat !== null && deliveryLng !== null,
+    retry: false,
   });
 
   const selectedZone = zones.find((z) => z.id === deliveryZoneId) ?? null;
-  const deliveryFee = orderKind === 'DELIVERY' ? selectedZone?.fee ?? 0 : 0;
+  const deliveryFee = orderKind === 'DELIVERY' ? (distanceMode ? deliveryQuote?.fee ?? 0 : selectedZone?.fee ?? 0) : 0;
+  // Rótulo mostrado ao lado da "Taxa de entrega" no Carrinho/Revisão — bairro escolhido no
+  // modo por bairro, distância calculada no modo por Google Maps.
+  const deliveryFeeLabel = distanceMode ? (deliveryQuote ? `${deliveryQuote.distanceKm.toFixed(1)} km` : undefined) : selectedZone?.name;
 
   const itemCount = draft.reduce((a, d) => a + d.quantity, 0);
   const subtotal = draft.reduce((a, d) => a + draftItemUnitPrice(d) * d.quantity, 0);
@@ -152,7 +177,10 @@ export default function PublicOrder() {
   const canContinueDetails =
     customerName.trim().length >= 2 &&
     customerPhone.trim().length >= 8 &&
-    (orderKind === 'PICKUP' || (deliveryZoneId && deliveryStreet.trim() && deliveryNumber.trim()));
+    (orderKind === 'PICKUP' ||
+      (distanceMode
+        ? deliveryLat !== null && deliveryLng !== null && !!deliveryQuote && !quoteOutOfRange && deliveryNumber.trim()
+        : deliveryZoneId && deliveryStreet.trim() && deliveryNumber.trim()));
 
   const submitOrder = useMutation({
     mutationFn: async () => {
@@ -162,7 +190,9 @@ export default function PublicOrder() {
         customerPhone: customerPhone.trim(),
         ...(orderKind === 'DELIVERY'
           ? {
-              deliveryZoneId,
+              ...(distanceMode
+                ? { deliveryLat: deliveryLat ?? undefined, deliveryLng: deliveryLng ?? undefined }
+                : { deliveryZoneId }),
               deliveryStreet: deliveryStreet.trim(),
               deliveryNumber: deliveryNumber.trim(),
               deliveryComplement: deliveryComplement.trim() || undefined,
@@ -266,15 +296,26 @@ export default function PublicOrder() {
       <div className={`mx-auto px-4 pb-28 pt-4 ${step === 'menu' ? 'max-w-3xl' : 'max-w-md'}`}>
         {step === 'details' && orderKind && (
           <DetailsStep
+            slug={slug}
             orderKind={orderKind}
             onChangeKind={setOrderKind}
             customerName={customerName}
             setCustomerName={setCustomerName}
             customerPhone={customerPhone}
             setCustomerPhone={setCustomerPhone}
+            distanceMode={distanceMode}
             zones={zones}
             deliveryZoneId={deliveryZoneId}
             setDeliveryZoneId={setDeliveryZoneId}
+            deliveryLat={deliveryLat}
+            onPickAddress={(place) => {
+              setDeliveryLat(place.lat);
+              setDeliveryLng(place.lng);
+              setDeliveryStreet(place.formattedAddress);
+            }}
+            deliveryQuote={deliveryQuote}
+            quotingDelivery={quotingDelivery}
+            quoteOutOfRange={quoteOutOfRange}
             deliveryStreet={deliveryStreet}
             setDeliveryStreet={setDeliveryStreet}
             deliveryNumber={deliveryNumber}
@@ -297,7 +338,7 @@ export default function PublicOrder() {
             deliveryFee={deliveryFee}
             total={total}
             orderKind={orderKind}
-            deliveryZoneName={selectedZone?.name}
+            deliveryZoneName={deliveryFeeLabel}
             eta={eta}
           />
         )}
@@ -318,7 +359,7 @@ export default function PublicOrder() {
             orderKind={orderKind}
             customerName={customerName}
             customerPhone={customerPhone}
-            deliveryZoneName={selectedZone?.name}
+            deliveryZoneName={deliveryFeeLabel}
             deliveryStreet={deliveryStreet}
             deliveryNumber={deliveryNumber}
             deliveryComplement={deliveryComplement}
@@ -349,6 +390,8 @@ export default function PublicOrder() {
               setCustomerName('');
               setCustomerPhone('');
               setDeliveryZoneId('');
+              setDeliveryLat(null);
+              setDeliveryLng(null);
               setDeliveryStreet('');
               setDeliveryNumber('');
               setDeliveryComplement('');
@@ -539,15 +582,22 @@ function IntroStep({
 }
 
 function DetailsStep({
+  slug,
   orderKind,
   onChangeKind,
   customerName,
   setCustomerName,
   customerPhone,
   setCustomerPhone,
+  distanceMode,
   zones,
   deliveryZoneId,
   setDeliveryZoneId,
+  deliveryLat,
+  onPickAddress,
+  deliveryQuote,
+  quotingDelivery,
+  quoteOutOfRange,
   deliveryStreet,
   setDeliveryStreet,
   deliveryNumber,
@@ -558,15 +608,22 @@ function DetailsStep({
   onContinue,
   eta,
 }: {
+  slug: string;
   orderKind: OrderKind;
   onChangeKind: (kind: OrderKind) => void;
   customerName: string;
   setCustomerName: (v: string) => void;
   customerPhone: string;
   setCustomerPhone: (v: string) => void;
+  distanceMode: boolean;
   zones: DeliveryZone[];
   deliveryZoneId: string;
   setDeliveryZoneId: (v: string) => void;
+  deliveryLat: number | null;
+  onPickAddress: (place: PlaceDetails) => void;
+  deliveryQuote?: { fee: number; distanceKm: number };
+  quotingDelivery: boolean;
+  quoteOutOfRange: boolean;
   deliveryStreet: string;
   setDeliveryStreet: (v: string) => void;
   deliveryNumber: string;
@@ -618,7 +675,42 @@ function DetailsStep({
         />
       </div>
 
-      {orderKind === 'DELIVERY' && (
+      {orderKind === 'DELIVERY' && distanceMode && (
+        <>
+          <div>
+            <label className={FIELD_LABEL}>Endereço</label>
+            <AddressAutocomplete slug={slug} inputClassName={FIELD_INPUT} placeholder="Digite seu endereço" onSelect={onPickAddress} />
+            {deliveryLat !== null && quotingDelivery && (
+              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#7c7086]">
+                <Loader2 size={11} className="animate-spin" /> Calculando frete...
+              </p>
+            )}
+            {deliveryLat !== null && !quotingDelivery && quoteOutOfRange && (
+              <p className="mt-1 text-[11px] text-red-600">Esse endereço está fora da nossa área de entrega.</p>
+            )}
+            {deliveryQuote && !quotingDelivery && (
+              <p className="mt-1 text-[11px] text-[#7c7086]">
+                Taxa de entrega: {brl(deliveryQuote.fee)} ({deliveryQuote.distanceKm.toFixed(1)} km)
+              </p>
+            )}
+          </div>
+          <div>
+            <label className={FIELD_LABEL}>Número</label>
+            <input className={FIELD_INPUT} value={deliveryNumber} onChange={(e) => setDeliveryNumber(e.target.value)} placeholder="123" />
+          </div>
+          <div>
+            <label className={FIELD_LABEL}>Complemento (opcional)</label>
+            <input
+              className={FIELD_INPUT}
+              value={deliveryComplement}
+              onChange={(e) => setDeliveryComplement(e.target.value)}
+              placeholder="Apto, bloco, ponto de referência"
+            />
+          </div>
+        </>
+      )}
+
+      {orderKind === 'DELIVERY' && !distanceMode && (
         <>
           <div>
             <label className={FIELD_LABEL}>Bairro</label>
@@ -875,7 +967,7 @@ function ReviewStep({
             <div className="text-[12.5px] leading-[1.55] text-[#351C4D]">
               {deliveryStreet}, {deliveryNumber}{deliveryComplement ? ` — ${deliveryComplement}` : ''}
             </div>
-            {deliveryZoneName && <div className="text-[11.5px] text-[#7c7086]">Bairro {deliveryZoneName}</div>}
+            {deliveryZoneName && <div className="text-[11.5px] text-[#7c7086]">{deliveryZoneName}</div>}
           </>
         )}
       </div>

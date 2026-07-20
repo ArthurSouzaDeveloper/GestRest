@@ -113,6 +113,17 @@ export interface DeliveryQuote {
   distanceKm: number;
 }
 
+export interface PlaceSuggestion {
+  placeId: string;
+  description: string;
+}
+
+export interface PlaceDetails {
+  lat: number;
+  lng: number;
+  formattedAddress: string;
+}
+
 export interface OrderItemAdditional {
   id: string;
   name: string;
