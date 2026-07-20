@@ -56,4 +56,9 @@ router.post(
   ),
 );
 
+router.get(
+  '/:slug/orders/:id',
+  asyncHandler(async (req, res) => res.json(await publicOrderService.orderStatus(req.params.slug, req.params.id))),
+);
+
 export default router;

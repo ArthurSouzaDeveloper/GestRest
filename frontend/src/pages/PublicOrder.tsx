@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Bike,
@@ -79,6 +79,7 @@ export default function PublicOrder() {
   // um cliente de verdade sem ele nunca ter digitado nada aqui).
   const [grHp, setGrHp] = useState('');
   const [confirmedOrderNumber, setConfirmedOrderNumber] = useState<number | null>(null);
+  const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
   const [confirmedEta, setConfirmedEta] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState('');
 
@@ -140,11 +141,12 @@ export default function PublicOrder() {
           additionalIds: d.additionalIds,
         })),
       };
-      return (await api.post<{ number: number; estimatedReadyAt: string | null }>(`/public/${slug}/orders`, payload)).data;
+      return (await api.post<{ id: string; number: number; estimatedReadyAt: string | null }>(`/public/${slug}/orders`, payload)).data;
     },
     onSuccess: (order) => {
       setSubmitError('');
       setConfirmedOrderNumber(order.number);
+      setConfirmedOrderId(order.id);
       setConfirmedEta(order.estimatedReadyAt);
       setStep('confirmation');
     },
@@ -291,7 +293,9 @@ export default function PublicOrder() {
 
         {step === 'confirmation' && (
           <ConfirmationStep
+            slug={slug}
             orderNumber={confirmedOrderNumber}
+            orderId={confirmedOrderId}
             orderKind={orderKind}
             estimatedReadyAt={confirmedEta}
             onNewOrder={() => {
@@ -307,6 +311,7 @@ export default function PublicOrder() {
               setPaymentMethod('');
               setChangeFor('');
               setConfirmedOrderNumber(null);
+              setConfirmedOrderId(null);
               setConfirmedEta(null);
             }}
           />
@@ -846,12 +851,16 @@ function ReviewStep({
 }
 
 function ConfirmationStep({
+  slug,
   orderNumber,
+  orderId,
   orderKind,
   estimatedReadyAt,
   onNewOrder,
 }: {
+  slug: string;
   orderNumber: number | null;
+  orderId: string | null;
   orderKind: OrderKind | null;
   estimatedReadyAt: string | null;
   onNewOrder: () => void;
@@ -874,7 +883,15 @@ function ConfirmationStep({
           {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
         </div>
       )}
-      <button className="btn-secondary mt-6" onClick={onNewOrder}>Fazer novo pedido</button>
+      {orderId && (
+        <Link
+          to={`/pedido/${slug}/rastreio/${orderId}`}
+          className="btn-primary mx-auto mt-6 flex w-fit !py-2.5"
+        >
+          Acompanhar pedido
+        </Link>
+      )}
+      <button className="btn-secondary mt-3" onClick={onNewOrder}>Fazer novo pedido</button>
     </div>
   );
 }

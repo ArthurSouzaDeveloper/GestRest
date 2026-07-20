@@ -109,3 +109,23 @@ export function serializeOrder(order: OrderWithRelations) {
     totals: computeTotals(order),
   };
 }
+
+/**
+ * Versão enxuta pro link público de acompanhamento — o id do pedido (não-adivinhável)
+ * já funciona como a "senha" desse link, mas mesmo assim não expõe telefone do cliente,
+ * endereço completo nem o id interno do caixa que registrou o pagamento (presentes em
+ * serializeOrder(), pensado pra tela autenticada da equipe).
+ */
+export function serializePublicStatus(order: OrderWithRelations) {
+  return {
+    number: order.number,
+    status: order.status,
+    orderType: order.orderType,
+    estimatedReadyAt: order.estimatedReadyAt,
+    acceptedAt: order.acceptedAt,
+    items: order.items
+      .filter((i) => i.status !== 'CANCELLED')
+      .map((i) => ({ name: i.product.name, quantity: i.quantity, status: i.status })),
+    total: computeTotals(order).total,
+  };
+}
