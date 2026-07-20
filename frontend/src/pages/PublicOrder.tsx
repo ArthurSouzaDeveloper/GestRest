@@ -35,12 +35,48 @@ function formatClock(iso: string): string {
 function EtaNote({ eta }: { eta?: EtaEstimate }) {
   if (!eta) return null;
   return (
-    <div className="flex items-center gap-2 rounded-lg bg-brand/10 px-3 py-2 text-xs text-brand">
+    <div className="flex items-center gap-2 rounded-[11px] bg-[#F3E8FB] px-3 py-2 text-xs font-medium text-[#6D2E9E]">
       <Clock size={14} className="shrink-0" />
       <span>
         Previsão agora: até {eta.minutes} min
         {eta.activeOrders > 5 ? ' — cozinha com fluxo alto no momento' : ''}
       </span>
+    </div>
+  );
+}
+
+// ─── Tokens visuais do site público — espelham 1:1 as classes do preview
+// (.field/.primary-cta/.step-title/.card/.seg/.cart-bar etc.) ───────────────
+const FIELD_LABEL = 'mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#7c7086]';
+const FIELD_INPUT =
+  'w-full rounded-[11px] border border-[#351C4D]/[0.15] bg-white px-3.5 py-2.5 text-[13.5px] text-[#351C4D] outline-none transition focus:border-[#6D2E9E] focus:ring-2 focus:ring-[#6D2E9E]/20';
+const PRIMARY_CTA =
+  'block w-full rounded-[14px] bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72] px-4 py-3.5 text-center text-[13.5px] font-extrabold text-white shadow-[0_10px_20px_-8px_rgba(74,29,114,0.5)] transition disabled:cursor-not-allowed disabled:opacity-50';
+const STEP_TITLE = 'mb-[18px] text-[18px] font-extrabold tracking-tight text-[#351C4D]';
+const CARD = 'rounded-[14px] border border-[#351C4D]/[0.08] bg-white';
+
+/** Barra fixa no rodapé (Cardápio/Carrinho/Revisão) — igual ao .cart-bar do preview. */
+function CartBar({
+  left,
+  right,
+  onClick,
+  disabled,
+}: {
+  left: string;
+  right: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 border-t border-[#351C4D]/10 bg-[#FBF7FC] p-3 pb-3.5">
+      <button
+        className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-[14px] bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72] px-[18px] py-[13px] text-[13.5px] font-bold text-white shadow-[0_10px_20px_-8px_rgba(74,29,114,0.5)] disabled:cursor-not-allowed disabled:opacity-60"
+        onClick={onClick}
+        disabled={disabled}
+      >
+        <span>{left}</span>
+        <span>{right}</span>
+      </button>
     </div>
   );
 }
@@ -187,12 +223,20 @@ export default function PublicOrder() {
   }
 
   const introOrConfirmation = step === 'intro' || step === 'confirmation';
+  const headerTitle: Record<Exclude<Step, 'intro' | 'confirmation'>, string> = {
+    details: 'Seus dados',
+    menu: 'Cardápio',
+    cart: 'Seu carrinho',
+    payment: 'Pagamento',
+    review: 'Revisar pedido',
+  };
 
   return (
     <div className="min-h-screen bg-[#FBF7FC]" style={publicBrandVars}>
       {!introOrConfirmation && (
         <PublicHeader
           restaurantName={restaurant.name}
+          title={headerTitle[step as Exclude<Step, 'intro' | 'confirmation'>]}
           onBack={() => {
             if (step === 'review') setStep('payment');
             else if (step === 'payment') setStep('cart');
@@ -223,6 +267,7 @@ export default function PublicOrder() {
         {step === 'details' && orderKind && (
           <DetailsStep
             orderKind={orderKind}
+            onChangeKind={setOrderKind}
             customerName={customerName}
             setCustomerName={setCustomerName}
             customerPhone={customerPhone}
@@ -252,7 +297,7 @@ export default function PublicOrder() {
             deliveryFee={deliveryFee}
             total={total}
             orderKind={orderKind}
-            onContinue={() => setStep('payment')}
+            deliveryZoneName={selectedZone?.name}
             eta={eta}
           />
         )}
@@ -285,9 +330,7 @@ export default function PublicOrder() {
             changeFor={changeFor}
             grHp={grHp}
             setGrHp={setGrHp}
-            submitting={submitOrder.isPending}
             error={submitError}
-            onConfirm={() => submitOrder.mutate()}
             eta={eta}
           />
         )}
@@ -321,12 +364,29 @@ export default function PublicOrder() {
       )}
 
       {step === 'menu' && itemCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
-          <button className="btn-primary mx-auto flex w-full max-w-3xl items-center justify-between !py-3" onClick={() => setStep('cart')}>
-            <span>{itemCount} {itemCount === 1 ? 'item' : 'itens'}</span>
-            <span>Ver carrinho · {brl(subtotal)}</span>
-          </button>
-        </div>
+        <CartBar
+          left={`${itemCount} ${itemCount === 1 ? 'item' : 'itens'}`}
+          right={`Ver carrinho · ${brl(subtotal)}`}
+          onClick={() => setStep('cart')}
+        />
+      )}
+
+      {step === 'cart' && (
+        <CartBar
+          left={`${itemCount} ${itemCount === 1 ? 'item' : 'itens'}`}
+          right={`Continuar · ${brl(total)}`}
+          disabled={draft.length === 0}
+          onClick={() => setStep('payment')}
+        />
+      )}
+
+      {step === 'review' && (
+        <CartBar
+          left={submitOrder.isPending ? 'Enviando...' : 'Confirmar'}
+          right={`Fazer Pedido · ${brl(total)}`}
+          disabled={submitOrder.isPending}
+          onClick={() => submitOrder.mutate()}
+        />
       )}
     </div>
   );
@@ -334,21 +394,23 @@ export default function PublicOrder() {
 
 function PublicHeader({
   restaurantName,
+  title,
   onBack,
 }: {
   restaurantName: string;
+  title: string;
   onBack: () => void;
 }) {
   return (
     <div className="sticky top-0 z-10 bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72]">
-      <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-3">
+      <div className={`mx-auto flex items-center gap-2.5 px-4 py-3 ${title === 'Cardápio' ? 'max-w-3xl' : 'max-w-md'}`}>
         <button onClick={onBack} className="flex text-white/85 hover:text-white" title="Voltar">
-          <ChevronLeft size={22} />
+          <ChevronLeft size={20} strokeWidth={2.3} />
         </button>
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-xs font-bold text-[#6D2E9E]">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-white text-[10.5px] font-extrabold text-[#6D2E9E]">
           {restaurantName.slice(0, 2).toUpperCase()}
         </div>
-        <span className="font-semibold text-white">{restaurantName}</span>
+        <span className="text-sm font-extrabold text-white">{title}</span>
       </div>
     </div>
   );
@@ -478,6 +540,7 @@ function IntroStep({
 
 function DetailsStep({
   orderKind,
+  onChangeKind,
   customerName,
   setCustomerName,
   customerPhone,
@@ -496,6 +559,7 @@ function DetailsStep({
   eta,
 }: {
   orderKind: OrderKind;
+  onChangeKind: (kind: OrderKind) => void;
   customerName: string;
   setCustomerName: (v: string) => void;
   customerPhone: string;
@@ -516,22 +580,40 @@ function DetailsStep({
   const selectedFee = zones.find((z) => z.id === deliveryZoneId)?.fee;
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">
-        {orderKind === 'DELIVERY' ? 'Seus dados para entrega' : 'Seus dados para retirada'}
-      </h2>
+      <h2 className={STEP_TITLE}>Pra onde vai o pedido?</h2>
+
+      <div className="mb-[18px] flex gap-1 rounded-[14px] border border-[#351C4D]/10 bg-white p-1">
+        <button
+          className={`flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition ${
+            orderKind === 'DELIVERY' ? 'bg-[#6D2E9E] text-white' : 'text-[#7c7086]'
+          }`}
+          onClick={() => onChangeKind('DELIVERY')}
+        >
+          Entrega
+        </button>
+        <button
+          className={`flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition ${
+            orderKind === 'PICKUP' ? 'bg-[#6D2E9E] text-white' : 'text-[#7c7086]'
+          }`}
+          onClick={() => onChangeKind('PICKUP')}
+        >
+          Retirada
+        </button>
+      </div>
+
       <EtaNote eta={eta} />
 
       <div>
-        <label className="label">Nome</label>
-        <input className="input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Seu nome" />
+        <label className={FIELD_LABEL}>Nome</label>
+        <input className={FIELD_INPUT} value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Seu nome" />
       </div>
       <div>
-        <label className="label">Telefone (WhatsApp)</label>
+        <label className={FIELD_LABEL}>Telefone / WhatsApp</label>
         <input
-          className="input"
+          className={FIELD_INPUT}
           value={customerPhone}
           onChange={(e) => setCustomerPhone(e.target.value)}
-          placeholder="(00) 00000-0000"
+          placeholder="(21) 9 9999-9999"
           inputMode="tel"
         />
       </div>
@@ -539,36 +621,41 @@ function DetailsStep({
       {orderKind === 'DELIVERY' && (
         <>
           <div>
-            <label className="label">Bairro</label>
-            <select className="input" value={deliveryZoneId} onChange={(e) => setDeliveryZoneId(e.target.value)}>
+            <label className={FIELD_LABEL}>Bairro</label>
+            <select className={FIELD_INPUT} value={deliveryZoneId} onChange={(e) => setDeliveryZoneId(e.target.value)}>
               <option value="">Selecione seu bairro</option>
               {zones.map((z) => (
-                <option key={z.id} value={z.id}>{z.name} — {brl(z.fee)}</option>
+                <option key={z.id} value={z.id}>{z.name} — taxa {brl(z.fee)}</option>
               ))}
             </select>
             {zones.length === 0 && (
-              <p className="mt-1 text-xs text-amber-600">Nenhum bairro cadastrado ainda para entrega.</p>
+              <p className="mt-1 text-[11px] text-amber-600">Nenhum bairro cadastrado ainda para entrega.</p>
             )}
-            {selectedFee !== undefined && <p className="mt-1 text-xs text-gray-500">Taxa de entrega: {brl(selectedFee)}</p>}
+            {selectedFee !== undefined && <p className="mt-1 text-[11px] text-[#7c7086]">Taxa de entrega: {brl(selectedFee)}</p>}
+          </div>
+          <div className="grid grid-cols-[1.4fr_1fr] gap-2.5">
+            <div>
+              <label className={FIELD_LABEL}>Rua</label>
+              <input className={FIELD_INPUT} value={deliveryStreet} onChange={(e) => setDeliveryStreet(e.target.value)} placeholder="Rua das Laranjeiras" />
+            </div>
+            <div>
+              <label className={FIELD_LABEL}>Número</label>
+              <input className={FIELD_INPUT} value={deliveryNumber} onChange={(e) => setDeliveryNumber(e.target.value)} placeholder="123" />
+            </div>
           </div>
           <div>
-            <label className="label">Endereço (rua, avenida...)</label>
-            <input className="input" value={deliveryStreet} onChange={(e) => setDeliveryStreet(e.target.value)} placeholder="Rua das Flores" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Número</label>
-              <input className="input" value={deliveryNumber} onChange={(e) => setDeliveryNumber(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Complemento (opcional)</label>
-              <input className="input" value={deliveryComplement} onChange={(e) => setDeliveryComplement(e.target.value)} placeholder="Apto, bloco..." />
-            </div>
+            <label className={FIELD_LABEL}>Complemento (opcional)</label>
+            <input
+              className={FIELD_INPUT}
+              value={deliveryComplement}
+              onChange={(e) => setDeliveryComplement(e.target.value)}
+              placeholder="Apto, bloco, ponto de referência"
+            />
           </div>
         </>
       )}
 
-      <button className="btn-primary w-full !py-3" disabled={!canContinue} onClick={onContinue}>
+      <button className={PRIMARY_CTA} disabled={!canContinue} onClick={onContinue}>
         Continuar para o cardápio
       </button>
     </div>
@@ -582,7 +669,7 @@ function CartStep({
   deliveryFee,
   total,
   orderKind,
-  onContinue,
+  deliveryZoneName,
   eta,
 }: {
   draft: DraftItem[];
@@ -591,76 +678,77 @@ function CartStep({
   deliveryFee: number;
   total: number;
   orderKind: OrderKind | null;
-  onContinue: () => void;
+  deliveryZoneName?: string;
   eta?: EtaEstimate;
 }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Seu carrinho</h2>
       <EtaNote eta={eta} />
 
       {draft.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">Seu carrinho está vazio.</p>
       ) : (
-        <div className="space-y-2">
+        <div>
           {draft.map((item, i) => (
-            <div key={i} className="card p-3">
-              <div className="flex items-start justify-between">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">{item.product.name}</div>
-                  {item.additionalIds.length > 0 && (
-                    <div className="text-xs text-gray-500">+ {item.additionalIds.length} adicional(is)</div>
-                  )}
-                  <div className="text-xs font-semibold text-brand">{brl(draftItemUnitPrice(item) * item.quantity)}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="btn-secondary !px-2 !py-1" onClick={() => {
-                    const next = [...draft];
-                    if (next[i].quantity > 1) next[i] = { ...next[i], quantity: next[i].quantity - 1 };
-                    else next.splice(i, 1);
-                    setDraft(next);
-                  }}>
-                    <Minus size={14} />
+            <div key={i} className="flex items-start justify-between gap-2.5 border-b border-[#351C4D]/[0.08] py-3 last:border-b-0">
+              <span className="w-6 shrink-0 text-[12.5px] font-extrabold text-[#6D2E9E]">{item.quantity}×</span>
+              <div className="flex-1">
+                <div className="text-[13px] font-bold text-[#351C4D]">{item.product.name}</div>
+                {item.notes && <div className="mt-0.5 text-[10.5px] text-[#7c7086]">{item.notes}</div>}
+                {item.additionalIds.length > 0 && (
+                  <div className="mt-0.5 text-[10.5px] text-[#7c7086]">+ {item.additionalIds.length} adicional(is)</div>
+                )}
+                <div className="mt-1.5 flex items-center gap-2">
+                  <button
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[#351C4D]/15 text-[#351C4D]"
+                    onClick={() => {
+                      const next = [...draft];
+                      if (next[i].quantity > 1) next[i] = { ...next[i], quantity: next[i].quantity - 1 };
+                      else next.splice(i, 1);
+                      setDraft(next);
+                    }}
+                  >
+                    <Minus size={12} />
                   </button>
-                  <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
-                  <button className="btn-secondary !px-2 !py-1" onClick={() => {
-                    const next = [...draft];
-                    next[i] = { ...next[i], quantity: next[i].quantity + 1 };
-                    setDraft(next);
-                  }}>
-                    <Plus size={14} />
+                  <button
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[#351C4D]/15 text-[#351C4D]"
+                    onClick={() => {
+                      const next = [...draft];
+                      next[i] = { ...next[i], quantity: next[i].quantity + 1 };
+                      setDraft(next);
+                    }}
+                  >
+                    <Plus size={12} />
                   </button>
                   <button className="text-red-500" onClick={() => setDraft(draft.filter((_, j) => j !== i))}>
-                    <X size={16} />
+                    <X size={14} />
                   </button>
                 </div>
               </div>
-              {item.notes && <div className="mt-1 text-xs italic text-gray-500">“{item.notes}”</div>}
+              <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-[#351C4D]">
+                {brl(draftItemUnitPrice(item) * item.quantity)}
+              </span>
             </div>
           ))}
         </div>
       )}
 
-      <div className="card space-y-1 p-4 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-500">Subtotal</span>
+      <div className="mt-2 border-t border-dashed border-[#351C4D]/[0.18] pt-3.5">
+        <div className="flex justify-between py-1 text-[12.5px] text-[#5B4A66]">
+          <span>Subtotal</span>
           <span>{brl(subtotal)}</span>
         </div>
         {orderKind === 'DELIVERY' && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">Taxa de entrega</span>
+          <div className="flex justify-between py-1 text-[12.5px] text-[#5B4A66]">
+            <span>Taxa de entrega{deliveryZoneName ? ` · ${deliveryZoneName}` : ''}</span>
             <span>{brl(deliveryFee)}</span>
           </div>
         )}
-        <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold dark:border-gray-800">
+        <div className="flex justify-between pt-2 text-[15.5px] font-extrabold text-[#351C4D]">
           <span>Total</span>
-          <span className="text-brand">{brl(total)}</span>
+          <span>{brl(total)}</span>
         </div>
       </div>
-
-      <button className="btn-primary w-full !py-3" disabled={draft.length === 0} onClick={onContinue}>
-        Continuar para pagamento
-      </button>
     </div>
   );
 }
@@ -692,44 +780,44 @@ function PaymentStep({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Forma de pagamento</h2>
-      <p className="text-sm text-gray-500">Pago na entrega/retirada — igual já é hoje.</p>
+      <h2 className={STEP_TITLE}>Como você vai pagar?</h2>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         {PAYMENT_OPTIONS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
-            className={`card flex flex-col items-center gap-2 p-4 text-center transition ${
-              paymentMethod === key ? 'border-brand ring-1 ring-brand' : 'hover:border-brand hover:shadow'
+            className={`flex flex-col items-center gap-2 rounded-[14px] border-2 p-4 text-center transition ${
+              paymentMethod === key ? 'border-[#6D2E9E] bg-[#F3E8FB]' : 'border-[#351C4D]/10 bg-white'
             }`}
             onClick={() => setPaymentMethod(key)}
           >
-            <Icon className="text-brand" size={24} />
-            <span className="text-sm font-medium">{label}</span>
+            <Icon className="text-[#6D2E9E]" size={21} />
+            <span className="text-xs font-bold text-[#351C4D]">{label}</span>
           </button>
         ))}
       </div>
 
       {needsChange && (
-        <div>
-          <label className="label">Precisa de troco? Troco para quanto?</label>
+        <div className="mt-4">
+          <label className={FIELD_LABEL}>Troco pra quanto?</label>
           <input
-            className="input"
+            className={FIELD_INPUT}
             type="number"
             step="0.01"
             min={0}
-            placeholder={`Deixe em branco se não precisar (total: ${brl(total)})`}
+            placeholder="Deixe em branco se não precisar"
             value={changeFor}
             onChange={(e) => setChangeFor(e.target.value)}
           />
+          <div className="mt-[5px] text-[11px] text-[#7c7086]">Total do pedido: {brl(total)}</div>
           {changeFor && Number(changeFor) < total && (
-            <p className="mt-1 text-xs text-red-600">O valor precisa ser maior ou igual ao total ({brl(total)}).</p>
+            <p className="mt-1 text-[11px] text-red-600">O valor precisa ser maior ou igual ao total ({brl(total)}).</p>
           )}
         </div>
       )}
 
-      <button className="btn-primary w-full !py-3" disabled={!canContinue} onClick={onContinue}>
-        Revisar Pedido
+      <button className={`${PRIMARY_CTA} mt-5`} disabled={!canContinue} onClick={onContinue}>
+        Continuar
       </button>
     </div>
   );
@@ -751,9 +839,7 @@ function ReviewStep({
   changeFor,
   grHp,
   setGrHp,
-  submitting,
   error,
-  onConfirm,
   eta,
 }: {
   orderKind: OrderKind;
@@ -771,61 +857,60 @@ function ReviewStep({
   changeFor: string;
   grHp: string;
   setGrHp: (v: string) => void;
-  submitting: boolean;
   error: string;
-  onConfirm: () => void;
   eta?: EtaEstimate;
 }) {
   const paymentLabel = PAYMENT_OPTIONS.find((p) => p.key === paymentMethod)?.label ?? '—';
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Revisão do pedido</h2>
+    <div className="space-y-2.5">
       <EtaNote eta={eta} />
 
-      <div className="card space-y-2 p-4 text-sm">
-        <div className="font-medium">{orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada'}</div>
-        <div className="text-gray-500">{customerName} · {customerPhone}</div>
+      <div className={`${CARD} p-3.5`}>
+        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#9B4FC7]">
+          {orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada'}
+        </h3>
+        <div className="text-[12.5px] leading-[1.55] text-[#351C4D]">{customerName} · {customerPhone}</div>
         {orderKind === 'DELIVERY' && (
-          <div className="text-gray-500">
-            {deliveryStreet}, {deliveryNumber}{deliveryComplement ? ` — ${deliveryComplement}` : ''} · {deliveryZoneName}
-          </div>
+          <>
+            <div className="text-[12.5px] leading-[1.55] text-[#351C4D]">
+              {deliveryStreet}, {deliveryNumber}{deliveryComplement ? ` — ${deliveryComplement}` : ''}
+            </div>
+            {deliveryZoneName && <div className="text-[11.5px] text-[#7c7086]">Bairro {deliveryZoneName}</div>}
+          </>
         )}
       </div>
 
-      <div className="card space-y-2 p-4 text-sm">
-        <div className="font-medium">Itens</div>
+      <div className={`${CARD} p-3.5`}>
+        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#9B4FC7]">Itens</h3>
         {draft.map((item, i) => (
-          <div key={i} className="flex justify-between">
-            <span>{item.quantity}× {item.product.name}</span>
-            <span>{brl(draftItemUnitPrice(item) * item.quantity)}</span>
+          <div key={i} className="text-[12.5px] leading-[1.55] text-[#351C4D]">
+            {item.quantity}× {item.product.name} — {brl(draftItemUnitPrice(item) * item.quantity)}
           </div>
         ))}
       </div>
 
-      <div className="card space-y-1 p-4 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-500">Forma de pagamento</span>
-          <span>{paymentLabel}</span>
+      <div className={`${CARD} p-3.5`}>
+        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#9B4FC7]">Pagamento</h3>
+        <div className="text-[12.5px] leading-[1.55] text-[#351C4D]">
+          {paymentLabel}
+          {paymentMethod === 'CASH' && changeFor ? ` · troco pra ${brl(Number(changeFor))}` : ''}
         </div>
-        {paymentMethod === 'CASH' && changeFor && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">Troco para</span>
-            <span>{brl(Number(changeFor))}</span>
-          </div>
-        )}
-        <div className="flex justify-between">
-          <span className="text-gray-500">Subtotal</span>
+      </div>
+
+      <div className="border-t border-dashed border-[#351C4D]/[0.18] pt-3.5">
+        <div className="flex justify-between py-1 text-[12.5px] text-[#5B4A66]">
+          <span>Subtotal</span>
           <span>{brl(subtotal)}</span>
         </div>
         {orderKind === 'DELIVERY' && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">Taxa de entrega</span>
+          <div className="flex justify-between py-1 text-[12.5px] text-[#5B4A66]">
+            <span>Taxa de entrega</span>
             <span>{brl(deliveryFee)}</span>
           </div>
         )}
-        <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold dark:border-gray-800">
+        <div className="flex justify-between pt-2 text-[15.5px] font-extrabold text-[#351C4D]">
           <span>Total</span>
-          <span className="text-brand">{brl(total)}</span>
+          <span>{brl(total)}</span>
         </div>
       </div>
 
@@ -842,11 +927,7 @@ function ReviewStep({
         aria-hidden="true"
       />
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <button className="btn-primary w-full !py-3" disabled={submitting} onClick={onConfirm}>
-        {submitting ? 'Enviando...' : 'Confirmar Pedido'}
-      </button>
+      {error && <p className="text-[12.5px] text-red-600">{error}</p>}
     </div>
   );
 }
@@ -867,32 +948,35 @@ function ConfirmationStep({
   onNewOrder: () => void;
 }) {
   return (
-    <div className="pt-10 text-center">
-      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-        <Check className="text-green-600 dark:text-green-400" size={32} />
+    <div className="flex flex-col items-center gap-3 pt-[54px] text-center">
+      <div className="flex h-[66px] w-[66px] items-center justify-center rounded-full bg-[#F3E8FB] text-[#6D2E9E]">
+        <Check size={30} strokeWidth={2.4} />
       </div>
-      <h1 className="text-xl font-bold">Pedido recebido!</h1>
-      {orderNumber && <p className="mt-1 text-gray-500">Pedido #{orderNumber}</p>}
-      <p className="mt-3 text-sm text-gray-500">
+      <h1 className="mt-1 text-[18px] font-extrabold text-[#351C4D]">Pedido recebido!</h1>
+      {orderNumber && (
+        <div className="text-[12.5px] text-[#7c7086]">
+          Número do pedido <b className="text-[14.5px] text-[#351C4D]">#{orderNumber}</b>
+        </div>
+      )}
+      <p className="max-w-[26ch] text-[12.5px] leading-[1.5] text-[#5B4A66]">
         {orderKind === 'DELIVERY'
-          ? 'Assim que o restaurante aceitar, seu pedido entra em preparo.'
-          : 'Assim que o restaurante aceitar, seu pedido entra em preparo. Vá até o balcão no horário combinado.'}
+          ? 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo.'
+          : 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo — vá até o balcão no horário combinado.'}
       </p>
       {estimatedReadyAt && (
-        <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-lg bg-brand/10 px-4 py-2 text-sm font-medium text-brand">
+        <div className="mx-auto flex w-fit items-center gap-2 rounded-lg bg-[#F3E8FB] px-4 py-2 text-xs font-medium text-[#6D2E9E]">
           <Clock size={16} />
           {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
         </div>
       )}
       {orderId && (
-        <Link
-          to={`/pedido/${slug}/rastreio/${orderId}`}
-          className="btn-primary mx-auto mt-6 flex w-fit !py-2.5"
-        >
+        <Link to={`/pedido/${slug}/rastreio/${orderId}`} className={`${PRIMARY_CTA} mt-3`}>
           Acompanhar pedido
         </Link>
       )}
-      <button className="btn-secondary mt-3" onClick={onNewOrder}>Fazer novo pedido</button>
+      <button className="mt-[18px] text-[12.5px] font-bold text-[#6D2E9E] underline decoration-[#6D2E9E]/35 underline-offset-2" onClick={onNewOrder}>
+        Fazer novo pedido
+      </button>
     </div>
   );
 }
