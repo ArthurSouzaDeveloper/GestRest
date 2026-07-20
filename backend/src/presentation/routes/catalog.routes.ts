@@ -10,10 +10,17 @@ import {
   productService,
 } from '../../application/services/catalog.service';
 import {
+  deliveryPricingBandService,
+  deliveryPricingSettingsService,
+} from '../../application/services/deliveryPricing.service';
+import {
   additionalSchema,
   additionalUpdateSchema,
   categorySchema,
   categoryUpdateSchema,
+  deliveryDistanceBandSchema,
+  deliveryDistanceBandUpdateSchema,
+  deliveryPricingSettingsSchema,
   deliveryZoneSchema,
   deliveryZoneUpdateSchema,
   productSchema,
@@ -156,6 +163,49 @@ router.delete(
   manager,
   asyncHandler(async (req, res) => {
     await deliveryZoneService.remove(tid(req), req.params.id);
+    res.status(204).end();
+  }),
+);
+
+// ── Frete por distância (Google Maps) — alternativa ao bairro cadastrado acima ──
+router.get(
+  '/delivery-pricing-settings',
+  asyncHandler(async (req, res) => res.json(await deliveryPricingSettingsService.get(tid(req)))),
+);
+router.patch(
+  '/delivery-pricing-settings',
+  manager,
+  validateBody(deliveryPricingSettingsSchema),
+  asyncHandler(async (req, res) => res.json(await deliveryPricingSettingsService.update(tid(req), req.body))),
+);
+
+router.get(
+  '/delivery-distance-bands',
+  asyncHandler(async (req, res) =>
+    res.json(await deliveryPricingBandService.list(tid(req), { onlyActive: req.query.active === 'true' })),
+  ),
+);
+router.post(
+  '/delivery-distance-bands',
+  manager,
+  validateBody(deliveryDistanceBandSchema),
+  asyncHandler(async (req, res) =>
+    res.status(201).json(await deliveryPricingBandService.create(tid(req), req.body)),
+  ),
+);
+router.patch(
+  '/delivery-distance-bands/:id',
+  manager,
+  validateBody(deliveryDistanceBandUpdateSchema),
+  asyncHandler(async (req, res) =>
+    res.json(await deliveryPricingBandService.update(tid(req), req.params.id, req.body)),
+  ),
+);
+router.delete(
+  '/delivery-distance-bands/:id',
+  manager,
+  asyncHandler(async (req, res) => {
+    await deliveryPricingBandService.remove(tid(req), req.params.id);
     res.status(204).end();
   }),
 );

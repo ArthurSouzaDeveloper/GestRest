@@ -72,8 +72,18 @@ export const deliveryPricingSettingsService = {
     tenantId: string,
     data: { mode: DeliveryPricingMode; originAddress?: string; originLat?: number; originLng?: number },
   ) {
+    // Ativar o modo por distância é uma ação separada de configurar a origem (ver
+    // DeliveryZones.tsx) — o PATCH que liga o modo normalmente não reenvia lat/lng, então a
+    // validação precisa considerar o que já está salvo no banco, não só o corpo da
+    // requisição (senão nunca dá pra reativar sem reenviar o endereço de origem de novo).
     if (data.mode === DeliveryPricingMode.DISTANCE_BANDS && (data.originLat === undefined || data.originLng === undefined)) {
-      throw new AppError('Endereço de origem é obrigatório para ativar o modo por distância');
+      const current = await prisma.restaurant.findUniqueOrThrow({
+        where: { id: tenantId },
+        select: { deliveryOriginLat: true, deliveryOriginLng: true },
+      });
+      if (current.deliveryOriginLat === null || current.deliveryOriginLng === null) {
+        throw new AppError('Endereço de origem é obrigatório para ativar o modo por distância');
+      }
     }
     const r = await prisma.restaurant.update({
       where: { id: tenantId },
