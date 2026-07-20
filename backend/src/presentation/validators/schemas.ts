@@ -194,6 +194,11 @@ export const publicOrderSchema = z
     customerName: z.string().min(2).max(80),
     customerPhone: z.string().min(8).max(20),
     deliveryZoneId: z.string().uuid().optional(),
+    // Modo por distância: coordenadas do endereço escolhido no autocomplete (ver
+    // AddressAutocomplete) — o back nunca confia num valor de frete vindo do cliente,
+    // sempre recalcula a distância/faixa de novo a partir daqui em openPublic().
+    deliveryLat: z.number().min(-90).max(90).optional(),
+    deliveryLng: z.number().min(-180).max(180).optional(),
     deliveryStreet: z.string().min(2).max(200).optional(),
     deliveryNumber: z.string().min(1).max(20).optional(),
     deliveryComplement: z.string().max(200).optional(),
@@ -217,7 +222,13 @@ export const publicOrderSchema = z
       .max(40),
   })
   .strict()
-  .refine((d) => d.orderType !== 'DELIVERY' || (d.deliveryZoneId && d.deliveryStreet && d.deliveryNumber), {
-    message: 'Bairro, endereço e número são obrigatórios para entrega',
-    path: ['deliveryZoneId'],
-  });
+  .refine(
+    (d) =>
+      d.orderType !== 'DELIVERY' ||
+      (d.deliveryZoneId && d.deliveryStreet && d.deliveryNumber) ||
+      (d.deliveryLat !== undefined && d.deliveryLng !== undefined && d.deliveryStreet && d.deliveryNumber),
+    {
+      message: 'Endereço, número e bairro (ou localização) são obrigatórios para entrega',
+      path: ['deliveryZoneId'],
+    },
+  );

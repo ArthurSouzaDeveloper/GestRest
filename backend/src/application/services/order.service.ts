@@ -1,5 +1,6 @@
 import {
   AuditAction,
+  DeliveryPricingMode,
   OrderStatus,
   OrderType,
   PaymentMethod,
@@ -12,6 +13,7 @@ import { prisma } from '../../config/prisma';
 import { AppError, ConflictError, NotFoundError } from '../../utils/errors';
 import { emitTenant, ROOMS } from '../../socket';
 import { auditService } from './audit.service';
+import { deliveryPricingService } from './deliveryPricing.service';
 import { etaService } from './eta.service';
 import { orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
 
@@ -40,6 +42,8 @@ export interface PublicOrderInput {
   customerName: string;
   customerPhone: string;
   deliveryZoneId?: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
   deliveryStreet?: string;
   deliveryNumber?: string;
   deliveryComplement?: string;
@@ -238,13 +242,30 @@ export const orderService = {
     if (input.items.length === 0) throw new AppError('Nenhum item informado');
 
     let deliveryFee = 0;
+    let deliveryDistanceKm: number | undefined;
     if (input.orderType === 'DELIVERY') {
-      if (!input.deliveryZoneId) throw new AppError('Bairro obrigatório para entrega');
-      const zone = await prisma.deliveryZone.findFirst({
-        where: { id: input.deliveryZoneId, restaurantId: tenantId, active: true },
+      const restaurant = await prisma.restaurant.findUniqueOrThrow({
+        where: { id: tenantId },
+        select: { deliveryPricingMode: true },
       });
-      if (!zone) throw new NotFoundError('Bairro');
-      deliveryFee = Number(zone.fee);
+      if (restaurant.deliveryPricingMode === DeliveryPricingMode.DISTANCE_BANDS) {
+        // Nunca confia num frete/distância que o cliente tenha visto na tela antes — só
+        // manda lat/lng (o endereço escolhido) e o back recalcula tudo de novo aqui, do
+        // mesmo jeito que o modo por bairro já resolve a taxa de verdade a partir do id.
+        if (input.deliveryLat === undefined || input.deliveryLng === undefined) {
+          throw new AppError('Localização do endereço é obrigatória para entrega');
+        }
+        const quote = await deliveryPricingService.quote(tenantId, { lat: input.deliveryLat, lng: input.deliveryLng });
+        deliveryFee = quote.fee;
+        deliveryDistanceKm = quote.distanceKm;
+      } else {
+        if (!input.deliveryZoneId) throw new AppError('Bairro obrigatório para entrega');
+        const zone = await prisma.deliveryZone.findFirst({
+          where: { id: input.deliveryZoneId, restaurantId: tenantId, active: true },
+        });
+        if (!zone) throw new NotFoundError('Bairro');
+        deliveryFee = Number(zone.fee);
+      }
     }
 
     // Trava a previsão no momento da confirmação, a partir da fila agora — o cliente já viu
@@ -271,6 +292,7 @@ export const orderService = {
           serviceRate: 0,
           deliveryZoneId: input.orderType === 'DELIVERY' ? input.deliveryZoneId : undefined,
           deliveryFee,
+          deliveryDistanceKm,
           deliveryStreet: input.deliveryStreet,
           deliveryNumber: input.deliveryNumber,
           deliveryComplement: input.deliveryComplement,

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../../utils/http';
 import { publicOrderService } from '../../application/services/publicOrder.service';
 import { validateBody } from '../middlewares/validate.middleware';
-import { publicOrderLimiter } from '../middlewares/rateLimit.middleware';
+import { publicOrderLimiter, mapsLookupLimiter } from '../middlewares/rateLimit.middleware';
 import { publicOrderSchema } from '../validators/schemas';
 import { AppError } from '../../utils/errors';
 
@@ -44,6 +44,44 @@ router.get(
       throw new AppError('orderType deve ser PICKUP ou DELIVERY');
     }
     res.json(await publicOrderService.eta(req.params.slug, orderType));
+  }),
+);
+
+// ── Modo por distância (Google Maps) — só faz sentido pra restaurantes em DISTANCE_BANDS,
+// mas quem decide isso é o service (consulta o banco); as rotas só validam o formato. ──
+router.get(
+  '/:slug/places/autocomplete',
+  mapsLookupLimiter,
+  asyncHandler(async (req, res) => {
+    const input = req.query.input;
+    const sessionToken = req.query.sessionToken;
+    if (typeof input !== 'string' || input.trim().length < 3) throw new AppError('Digite pelo menos 3 caracteres');
+    if (typeof sessionToken !== 'string' || !sessionToken) throw new AppError('sessionToken obrigatório');
+    res.json(await publicOrderService.placesAutocomplete(req.params.slug, input, sessionToken));
+  }),
+);
+
+router.get(
+  '/:slug/places/details',
+  mapsLookupLimiter,
+  asyncHandler(async (req, res) => {
+    const placeId = req.query.placeId;
+    const sessionToken = req.query.sessionToken;
+    if (typeof placeId !== 'string' || !placeId) throw new AppError('placeId obrigatório');
+    if (typeof sessionToken !== 'string' || !sessionToken) throw new AppError('sessionToken obrigatório');
+    res.json(await publicOrderService.placeDetails(req.params.slug, placeId, sessionToken));
+  }),
+);
+
+router.get(
+  '/:slug/delivery-quote',
+  mapsLookupLimiter,
+  asyncHandler(async (req, res) => {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new AppError('lat inválida');
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) throw new AppError('lng inválida');
+    res.json(await publicOrderService.deliveryQuote(req.params.slug, { lat, lng }));
   }),
 );
 

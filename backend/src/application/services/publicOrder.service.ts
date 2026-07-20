@@ -1,7 +1,9 @@
 import { prisma } from '../../config/prisma';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { additionalService, categoryService, deliveryZoneService, productService } from './catalog.service';
+import { deliveryPricingService } from './deliveryPricing.service';
 import { etaService } from './eta.service';
+import { googleMapsClient } from './googleMaps.client';
 import { orderInclude, serializePublicStatus } from './order.helpers';
 import { orderService, type PublicOrderInput } from './order.service';
 
@@ -47,6 +49,20 @@ export const publicOrderService = {
   async createOrder(slug: string, input: PublicOrderInput, ip?: string) {
     const tenantId = await resolveActiveTenant(slug);
     return orderService.openPublic(tenantId, input, ip);
+  },
+  /** Autocomplete/detalhes de endereço (modo por distância) — proxy pro Google, chave nunca sai do backend. */
+  async placesAutocomplete(slug: string, input: string, sessionToken: string) {
+    await resolveActiveTenant(slug);
+    return googleMapsClient.autocompleteAddress(input, sessionToken);
+  },
+  async placeDetails(slug: string, placeId: string, sessionToken: string) {
+    await resolveActiveTenant(slug);
+    return googleMapsClient.getPlaceDetails(placeId, sessionToken);
+  },
+  /** Pré-visualização do frete (modo por distância) — reconferida de novo em createOrder(). */
+  async deliveryQuote(slug: string, destination: { lat: number; lng: number }) {
+    const tenantId = await resolveActiveTenant(slug);
+    return deliveryPricingService.quote(tenantId, destination);
   },
   /**
    * Link de acompanhamento — o id do pedido (UUID, não-adivinhável) já autoriza o acesso,

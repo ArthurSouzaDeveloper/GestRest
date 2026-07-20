@@ -25,3 +25,14 @@ export const publicOrderLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: { code: 'RATE_LIMITED', message: 'Muitos pedidos em pouco tempo. Tente novamente em alguns minutos.' } },
 });
+
+// Autocomplete/detalhes de endereço e cotação de frete (modo por distância) — cada chamada
+// custa dinheiro de verdade no Google, então o limite é mais apertado por IP que o do
+// pedido em si, mas ainda generoso o bastante pra digitar um endereço inteiro sem travar.
+export const mapsLookupLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: { code: 'RATE_LIMITED', message: 'Muitas buscas de endereço em pouco tempo. Tente novamente em alguns minutos.' } },
+});
