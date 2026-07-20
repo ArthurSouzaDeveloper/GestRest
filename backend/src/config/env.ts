@@ -29,6 +29,12 @@ export const env = {
     refreshExpires: process.env.JWT_REFRESH_EXPIRES ?? '7d',
   },
   uploadDir: process.env.UPLOAD_DIR ?? 'uploads',
+  // Sem required(): a maioria dos tenants usa o modo de frete por bairro (ZONE) e nunca
+  // toca nisso. Só falha na hora de usar, se algum restaurante estiver em DISTANCE_BANDS
+  // sem a chave configurada — ver googleMaps.client.ts.
+  googleMaps: {
+    apiKey: process.env.GOOGLE_MAPS_API_KEY,
+  },
   logLevel: process.env.LOG_LEVEL ?? (isProd ? 'info' : 'debug'),
   // Only mark the refresh cookie `Secure` when explicitly enabled. Behind plain
   // HTTP (e.g. IP-only deploys) a Secure cookie is never sent, breaking sessions.

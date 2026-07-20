@@ -71,6 +71,15 @@ enum PaymentMethod {
   MEAL_VOUCHER
 }
 
+// Como o restaurante calcula a taxa de entrega. ZONE (bairro cadastrado com taxa fixa) é
+// o modo atual e o default — nenhum restaurante existente muda de comportamento até
+// alguém trocar explicitamente pelo admin. DISTANCE_BANDS calcula a distância via Google
+// Maps e resolve a taxa por faixa de km cadastrada.
+enum DeliveryPricingMode {
+  ZONE
+  DISTANCE_BANDS
+}
+
 enum AuditAction {
   ORDER_CREATED
   ORDER_UPDATED
@@ -112,6 +121,14 @@ model Restaurant {
   auditLogs     AuditLog[]
   settings      Setting[]
   deliveryZones DeliveryZone[]
+
+  // Config do modo de frete por distância (Google Maps) — todos opcionais/com default,
+  // só usados quando deliveryPricingMode = DISTANCE_BANDS. Ver DeliveryDistanceBand.
+  deliveryPricingMode   DeliveryPricingMode    @default(ZONE)
+  deliveryOriginAddress String?
+  deliveryOriginLat     Decimal?               @db.Decimal(9, 6)
+  deliveryOriginLng     Decimal?               @db.Decimal(9, 6)
+  deliveryDistanceBands DeliveryDistanceBand[]
 
   @@map("restaurants")
 }
@@ -209,6 +226,25 @@ model DeliveryZone {
   @@map("delivery_zones")
 }
 
+// Faixa de distância + taxa de entrega, usada quando Restaurant.deliveryPricingMode =
+// DISTANCE_BANDS. maxDistanceKm é o alcance máximo coberto por essa faixa (ex.: até 3km
+// -> R$5, até 6km -> R$8) — a primeira faixa (ordenada crescente) cuja maxDistanceKm cobre
+// a distância calculada é a taxa cobrada; nenhuma faixa cobrindo = fora da área de entrega.
+model DeliveryDistanceBand {
+  id            String     @id @default(uuid())
+  maxDistanceKm Decimal    @db.Decimal(6, 2)
+  fee           Decimal    @db.Decimal(10, 2)
+  active        Boolean    @default(true)
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([restaurantId, maxDistanceKm])
+  @@index([restaurantId, active])
+  @@map("delivery_distance_bands")
+}
+
 // ─────────────────────────────────────────────────────────────
 // CATÁLOGO: CATEGORIAS, PRODUTOS, ADICIONAIS
 // ─────────────────────────────────────────────────────────────
@@ -298,6 +334,7 @@ model Order {
   deliveryZoneId        String?
   deliveryZone          DeliveryZone?  @relation(fields: [deliveryZoneId], references: [id], onDelete: SetNull)
   deliveryFee           Decimal        @default(0) @db.Decimal(10, 2) // snapshot da taxa no momento do pedido
+  deliveryDistanceKm    Decimal?       @db.Decimal(6, 2) // snapshot da distância calculada (modo DISTANCE_BANDS)
   deliveryStreet        String?
   deliveryNumber        String?
   deliveryComplement    String?
