@@ -92,6 +92,27 @@ export interface DeliveryZone {
   active: boolean;
 }
 
+export type DeliveryPricingMode = 'ZONE' | 'DISTANCE_BANDS';
+
+export interface DeliveryDistanceBand {
+  id: string;
+  maxDistanceKm: number;
+  fee: number;
+  active: boolean;
+}
+
+export interface DeliveryPricingSettings {
+  mode: DeliveryPricingMode;
+  originAddress: string | null;
+  originLat: number | null;
+  originLng: number | null;
+}
+
+export interface DeliveryQuote {
+  fee: number;
+  distanceKm: number;
+}
+
 export interface OrderItemAdditional {
   id: string;
   name: string;

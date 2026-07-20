@@ -110,6 +110,32 @@ export const deliveryZoneUpdateSchema = z
   })
   .strict();
 
+export const deliveryDistanceBandSchema = z.object({
+  maxDistanceKm: z.number().positive().max(999),
+  fee: z.number().nonnegative(),
+  active: z.boolean().optional(),
+});
+
+export const deliveryDistanceBandUpdateSchema = z
+  .object({
+    maxDistanceKm: z.number().positive().max(999).optional(),
+    fee: z.number().nonnegative().optional(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+
+// A checagem "precisa ter origem pra ativar DISTANCE_BANDS" não dá pra fazer aqui: o PATCH
+// que só liga o modo normalmente não reenvia lat/lng (já estão salvos), então só o service
+// (que consulta o banco) sabe se a origem já existe — ver deliveryPricingSettingsService.update.
+export const deliveryPricingSettingsSchema = z
+  .object({
+    mode: z.enum(['ZONE', 'DISTANCE_BANDS']),
+    originAddress: z.string().min(2).max(200).optional(),
+    originLat: z.number().min(-90).max(90).optional(),
+    originLng: z.number().min(-180).max(180).optional(),
+  })
+  .strict();
+
 export const tableSchema = z.object({
   number: z.number().int().positive(),
   seats: z.number().int().positive().optional(),
