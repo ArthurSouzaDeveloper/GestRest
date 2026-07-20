@@ -122,7 +122,7 @@ export const superadminService = {
   async publicBySlug(slug: string) {
     const r = await prisma.restaurant.findUnique({
       where: { slug },
-      select: { name: true, slug: true, active: true },
+      select: { name: true, slug: true, active: true, deliveryPricingMode: true },
     });
     if (!r) throw new NotFoundError('Restaurante');
     return r;
