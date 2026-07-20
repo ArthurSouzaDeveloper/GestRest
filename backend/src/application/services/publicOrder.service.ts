@@ -2,6 +2,7 @@ import { prisma } from '../../config/prisma';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { additionalService, categoryService, deliveryZoneService, productService } from './catalog.service';
 import { etaService } from './eta.service';
+import { orderInclude, serializePublicStatus } from './order.helpers';
 import { orderService, type PublicOrderInput } from './order.service';
 
 /** Resolves a public :slug to a tenant id, rejecting unknown or inactive restaurants. */
@@ -46,5 +47,18 @@ export const publicOrderService = {
   async createOrder(slug: string, input: PublicOrderInput, ip?: string) {
     const tenantId = await resolveActiveTenant(slug);
     return orderService.openPublic(tenantId, input, ip);
+  },
+  /**
+   * Link de acompanhamento — o id do pedido (UUID, não-adivinhável) já autoriza o acesso,
+   * sem precisar de login. Escopado por slug+id juntos pra um id de outro tenant nunca vazar.
+   */
+  async orderStatus(slug: string, orderId: string) {
+    const tenantId = await resolveActiveTenant(slug);
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, restaurantId: tenantId },
+      include: orderInclude,
+    });
+    if (!order) throw new NotFoundError('Pedido');
+    return serializePublicStatus(order);
   },
 };
