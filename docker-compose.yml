@@ -28,7 +28,7 @@ services:
       DATABASE_URL: postgresql://gestrest:gestrest@db:5432/gestrest?schema=public
       JWT_ACCESS_SECRET: change-me-in-prod-access
       JWT_REFRESH_SECRET: change-me-in-prod-refresh
-      CORS_ORIGIN: http://localhost:8080
+      CORS_ORIGIN: http://localhost:8081
     ports:
       - '4000:4000'
 
@@ -38,7 +38,7 @@ services:
     depends_on:
       - backend
     ports:
-      - '8080:80'
+      - '8081:80'
 
 volumes:
   pgdata:
