@@ -58,6 +58,8 @@ export interface Product {
   available: boolean;
   categoryId: string;
   category?: Category;
+  /** Montável (Monte o Seu): exige escolher 1 adicional BASE, que carrega o preço. */
+  isCustom?: boolean;
 }
 
 export interface Additional {
@@ -66,6 +68,7 @@ export interface Additional {
   price: number;
   active: boolean;
   categoryId?: string;
+  kind?: 'ADDON' | 'BASE';
 }
 
 export interface TableComandaSummary {

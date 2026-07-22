@@ -9,7 +9,7 @@
  * Uso:
  *   node dist/scripts/import-menu-rei-do-suco.js --slug=rei-do-suco
  */
-import { PrismaClient, Station } from '@prisma/client';
+import { AdditionalKind, PrismaClient, Station } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -329,15 +329,48 @@ async function ensureProduct(
   return { created: true };
 }
 
+// A chave de idempotência inclui o kind de propósito: "Pepperoni" existe como sabor-base
+// (R$15, o pastel inteiro) E como adicional de cobertura (R$4) na mesma categoria — são
+// dois registros distintos e legítimos, não uma duplicata.
 async function ensureAdditional(
   restaurantId: string,
   categoryId: string,
   name: string,
   price: number,
+  kind: AdditionalKind = AdditionalKind.ADDON,
 ) {
-  const existing = await prisma.additional.findFirst({ where: { restaurantId, categoryId, name } });
+  const existing = await prisma.additional.findFirst({ where: { restaurantId, categoryId, name, kind } });
   if (existing) return { created: false };
-  await prisma.additional.create({ data: { restaurantId, categoryId, name, price } });
+  await prisma.additional.create({ data: { restaurantId, categoryId, name, price, kind } });
+  return { created: true };
+}
+
+/**
+ * Garante o produto "montável" (Monte o Seu / Monte a Sua) da categoria: preço R$0 (o
+ * valor vem inteiro do sabor-base escolhido) + isCustom. Se o produto já existia da
+ * versão antiga do script (preço fixo + "peça na observação"), atualiza no lugar.
+ */
+async function ensureCustomProduct(
+  restaurantId: string,
+  categoryId: string,
+  name: string,
+  avgPrepMin: number,
+  oldNames: string[] = [],
+) {
+  const description = 'Escolha o sabor-base e monte do seu jeito com os adicionais.';
+  const existing = await prisma.product.findFirst({
+    where: { restaurantId, categoryId, name: { in: [name, ...oldNames] } },
+  });
+  if (existing) {
+    await prisma.product.update({
+      where: { id: existing.id },
+      data: { name, price: 0, isCustom: true, description },
+    });
+    return { created: false };
+  }
+  await prisma.product.create({
+    data: { restaurantId, categoryId, name, price: 0, avgPrepMin, description, isCustom: true },
+  });
   return { created: true };
 }
 
@@ -372,20 +405,15 @@ async function main() {
     if ((await ensureProduct(rid, cat.porcoes, name, price, prep)).created) productsCreated++;
   }
 
-  // Pastéis salgados + "monte o seu"
+  // Pastéis salgados + "monte o seu" (montável: base obrigatória com o preço do sabor)
   for (const [name, price] of PASTEIS_SALGADOS) {
     if ((await ensureProduct(rid, cat.pasteis_salgados, name, price, 12)).created) productsCreated++;
   }
   if (
     (
-      await ensureProduct(
-        rid,
-        cat.pasteis_salgados,
+      await ensureCustomProduct(rid, cat.pasteis_salgados, 'Monte o Seu Pastel', 12, [
         'Monte o Seu (escolha os ingredientes)',
-        13.0,
-        12,
-        'Peça na observação os ingredientes desejados e use os adicionais da lista.',
-      )
+      ])
     ).created
   )
     productsCreated++;
@@ -401,14 +429,9 @@ async function main() {
   }
   if (
     (
-      await ensureProduct(
-        rid,
-        cat.pasteis_doces,
+      await ensureCustomProduct(rid, cat.pasteis_doces, 'Monte o Seu Pastel Doce', 12, [
         'Monte o Seu (escolha os ingredientes)',
-        15.0,
-        12,
-        'Peça na observação o sabor desejado e use os adicionais da lista.',
-      )
+      ])
     ).created
   )
     productsCreated++;
@@ -419,14 +442,9 @@ async function main() {
   }
   if (
     (
-      await ensureProduct(
-        rid,
-        cat.mini_pizza_salgada,
+      await ensureCustomProduct(rid, cat.mini_pizza_salgada, 'Monte a Sua Mini Pizza', 15, [
         'Monte a Sua (escolha os ingredientes)',
-        16.0,
-        15,
-        'Peça na observação os ingredientes desejados.',
-      )
+      ])
     ).created
   )
     productsCreated++;
@@ -437,14 +455,9 @@ async function main() {
   }
   if (
     (
-      await ensureProduct(
-        rid,
-        cat.mini_pizza_doce,
+      await ensureCustomProduct(rid, cat.mini_pizza_doce, 'Monte a Sua Mini Pizza Doce', 15, [
         'Monte a Sua (escolha os ingredientes)',
-        14.5,
-        15,
-        'Peça na observação o sabor desejado.',
-      )
+      ])
     ).created
   )
     productsCreated++;
@@ -472,6 +485,26 @@ async function main() {
   // Bebidas prontas
   for (const [name, price] of BEBIDAS) {
     if ((await ensureProduct(rid, cat.bebidas, name, price, 1)).created) productsCreated++;
+  }
+
+  // Bases dos montáveis: replicam os sabores simples da categoria com o preço normal do
+  // prato — no modal do "Monte o Seu", o cliente escolhe exatamente 1 base (que dá o
+  // preço) e complementa com os adicionais comuns abaixo.
+  for (const [name, price] of PASTEIS_SALGADOS) {
+    if ((await ensureAdditional(rid, cat.pasteis_salgados, name, price, AdditionalKind.BASE)).created)
+      additionalsCreated++;
+  }
+  for (const [name, , price] of PASTEIS_DOCES) {
+    if ((await ensureAdditional(rid, cat.pasteis_doces, name, price, AdditionalKind.BASE)).created)
+      additionalsCreated++;
+  }
+  for (const [name, price] of MINI_PIZZA_SALGADA) {
+    if ((await ensureAdditional(rid, cat.mini_pizza_salgada, name, price, AdditionalKind.BASE)).created)
+      additionalsCreated++;
+  }
+  for (const [name, price] of MINI_PIZZA_DOCE) {
+    if ((await ensureAdditional(rid, cat.mini_pizza_doce, name, price, AdditionalKind.BASE)).created)
+      additionalsCreated++;
   }
 
   // Adicionais: salgados aplicam-se a Pastéis Salgados E Sugestões da Casa

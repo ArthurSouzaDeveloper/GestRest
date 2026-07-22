@@ -101,7 +101,9 @@ export function OrderComposer({
   const [topGroup, setTopGroup] = useState<TopGroup>('COMIDAS');
   const [activeCat, setActiveCat] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [configuring, setConfiguring] = useState<Product | null>(null);
+  // index: qual linha do draft o modal edita; null = criar uma linha nova ao salvar
+  // (usado pelos montáveis, que podem ter várias linhas distintas do mesmo produto).
+  const [configuring, setConfiguring] = useState<{ product: Product; index: number | null } | null>(null);
 
   const { data: categories = [], isLoading: loadingCategories } = useQuery({
     queryKey: ['categories', basePath],
@@ -150,6 +152,13 @@ export function OrderComposer({
   const simpleQty = (productId: string) => draft[simpleIndex(productId)]?.quantity ?? 0;
 
   const addSimple = (product: Product) => {
+    // Montável não tem "adicionar direto": o preço vem do sabor-base, então o modal de
+    // configuração (com a escolha obrigatória da base) abre no lugar — sempre criando uma
+    // linha nova ao salvar (cada montagem é única, não colapsa com linhas existentes).
+    if (product.isCustom) {
+      setConfiguring({ product, index: null });
+      return;
+    }
     const idx = simpleIndex(product.id);
     if (idx >= 0) {
       const next = [...draft];
@@ -292,14 +301,16 @@ export function OrderComposer({
                     {p.description && (
                       <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-gray-500">{p.description}</div>
                     )}
-                    <div className="mt-0.5 text-sm font-bold text-brand">{brl(p.price)}</div>
+                    <div className="mt-0.5 text-sm font-bold text-brand">
+                      {p.isCustom ? 'Preço pela montagem' : brl(p.price)}
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {qty > 0 && (
                       <button
-                        onClick={() => setConfiguring(p)}
+                        onClick={() => setConfiguring({ product: p, index: draft.findIndex((d) => d.product.id === p.id) })}
                         className="text-gray-400 hover:text-brand"
-                        title="Observações / adicionais"
+                        title="Personalizar"
                       >
                         <Pencil size={14} />
                       </button>
@@ -365,7 +376,7 @@ export function OrderComposer({
                   }}>
                     <Plus size={14} />
                   </button>
-                  <button className="btn-secondary !px-2 !py-1" onClick={() => setConfiguring(item.product)}>
+                  <button className="btn-secondary !px-2 !py-1" onClick={() => setConfiguring({ product: item.product, index: i })}>
                     Personalizar
                   </button>
                   <button className="text-red-500" onClick={() => setDraft(draft.filter((_, j) => j !== i))}>
@@ -381,14 +392,17 @@ export function OrderComposer({
 
       {configuring && (
         <ItemConfigModal
-          product={configuring}
-          current={draft.find((d) => d.product.id === configuring.id)}
+          product={configuring.product}
+          current={configuring.index !== null ? draft[configuring.index] : undefined}
           basePath={basePath}
           onClose={() => setConfiguring(null)}
           onSave={(notes, additionalIds, additionalsTotal) => {
-            const idx = draft.findIndex((d) => d.product.id === configuring.id);
             const next = [...draft];
-            if (idx >= 0) next[idx] = { ...next[idx], notes, additionalIds, additionalsTotal };
+            if (configuring.index !== null) {
+              next[configuring.index] = { ...next[configuring.index], notes, additionalIds, additionalsTotal };
+            } else {
+              next.push({ product: configuring.product, quantity: 1, notes, additionalIds, additionalsTotal });
+            }
             setDraft(next);
             setConfiguring(null);
           }}
@@ -424,17 +438,49 @@ function ItemConfigModal({
       ).data,
   });
 
+  // Montável: as BASEs da categoria viram um grupo próprio de escolha única e obrigatória
+  // (o preço do prato vem inteiro dela); o resto continua como adicionais múltiplos.
+  // Produto comum nunca mostra bases — elas pertencem só ao fluxo de montagem.
+  const bases = product.isCustom ? additionals.filter((a) => a.kind === 'BASE') : [];
+  const addons = additionals.filter((a) => a.kind !== 'BASE');
+  const selectedBaseId = bases.find((b) => selected.includes(b.id))?.id ?? null;
+  const needsBase = product.isCustom && bases.length > 0 && !selectedBaseId;
+
   const selectedTotal = additionals.filter((a) => selected.includes(a.id)).reduce((sum, a) => sum + a.price, 0);
+
+  const pickBase = (id: string) => {
+    // Troca a base mantendo os adicionais: remove qualquer base anterior e põe a nova.
+    setSelected([id, ...selected.filter((x) => !bases.some((b) => b.id === x))]);
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 font-semibold">{product.name}</h3>
-        {additionals.length > 0 && (
+        {bases.length > 0 && (
+          <div className="mb-4">
+            <div className="label">Escolha a base (obrigatório)</div>
+            <div className="flex flex-wrap gap-2">
+              {bases.map((b) => {
+                const on = selectedBaseId === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => pickBase(b.id)}
+                    className={`rounded-md border px-3 py-1.5 text-xs ${on ? 'border-brand bg-brand text-white' : 'border-gray-300 dark:border-gray-700'}`}
+                  >
+                    {b.name} <span className="opacity-70">{brl(b.price)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {addons.length > 0 && (
           <div className="mb-4">
             <div className="label">Adicionais</div>
             <div className="flex flex-wrap gap-2">
-              {additionals.map((a) => {
+              {addons.map((a) => {
                 const on = selected.includes(a.id);
                 return (
                   <button
@@ -474,9 +520,19 @@ function ItemConfigModal({
             onChange={(e) => setNotes(e.target.value)}
           />
         </div>
-        <div className="flex justify-end gap-2">
+        <div className="flex items-center justify-end gap-2">
+          {selectedTotal > 0 && (
+            <span className="mr-auto text-sm font-semibold text-brand">{brl(product.price + selectedTotal)}</span>
+          )}
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" onClick={() => onSave(notes, selected, selectedTotal)}>Salvar</button>
+          <button
+            className="btn-primary"
+            disabled={needsBase}
+            title={needsBase ? 'Escolha a base primeiro' : undefined}
+            onClick={() => onSave(notes, selected, selectedTotal)}
+          >
+            Salvar
+          </button>
         </div>
       </div>
     </div>
