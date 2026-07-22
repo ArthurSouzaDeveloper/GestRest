@@ -1,4 +1,4 @@
-import { Prisma, Station } from '@prisma/client';
+import { AdditionalKind, Prisma, Station } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
 
@@ -56,7 +56,8 @@ export const productService = {
     const products = await prisma.product.findMany({
       where,
       include: { category: true },
-      orderBy: { name: 'asc' },
+      // Montáveis ("Monte o Seu") primeiro na categoria, resto alfabético.
+      orderBy: [{ isCustom: 'desc' }, { name: 'asc' }],
     });
     return products.map(serializeProduct);
   },
@@ -78,6 +79,7 @@ export const productService = {
       avgPrepMin?: number;
       imageUrl?: string;
       available?: boolean;
+      isCustom?: boolean;
     },
   ) {
     // Garante que a categoria pertence ao mesmo restaurante.
@@ -96,6 +98,7 @@ export const productService = {
       avgPrepMin: number;
       imageUrl: string;
       available: boolean;
+      isCustom: boolean;
     }>,
   ) {
     await productService.get(tenantId, id);
@@ -120,7 +123,7 @@ export const additionalService = {
   },
   async create(
     tenantId: string,
-    data: { name: string; price: number; categoryId?: string; active?: boolean },
+    data: { name: string; price: number; categoryId?: string; active?: boolean; kind?: AdditionalKind },
   ) {
     // Same guard as productService.create — without it, a category from another
     // tenant could be linked here (data-integrity leak across restaurants).
@@ -131,7 +134,7 @@ export const additionalService = {
   async update(
     tenantId: string,
     id: string,
-    data: Partial<{ name: string; price: number; categoryId: string; active: boolean }>,
+    data: Partial<{ name: string; price: number; categoryId: string; active: boolean; kind: AdditionalKind }>,
   ) {
     const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });
     if (!a) throw new NotFoundError('Adicional');

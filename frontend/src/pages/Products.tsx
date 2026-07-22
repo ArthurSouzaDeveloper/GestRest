@@ -120,6 +120,7 @@ function ProductForm({
     avgPrepMin: product?.avgPrepMin ?? 10,
     description: product?.description ?? '',
     available: product?.available ?? true,
+    isCustom: product?.isCustom ?? false,
   });
   const [error, setError] = useState('');
 
@@ -163,6 +164,20 @@ function ProductForm({
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.available} onChange={(e) => setForm({ ...form, available: e.target.checked })} />
           Disponível
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={form.isCustom}
+            onChange={(e) => setForm({ ...form, isCustom: e.target.checked })}
+          />
+          <span>
+            Produto montável (cliente escolhe a base)
+            <span className="block text-xs text-gray-500">
+              Exige um adicional do tipo "base" na categoria — a base dá o preço; deixe o preço do produto em R$ 0.
+            </span>
+          </span>
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-2 pt-2">

@@ -66,6 +66,7 @@ export const productSchema = z.object({
   avgPrepMin: z.number().int().positive().optional(),
   imageUrl: z.string().optional(),
   available: z.boolean().optional(),
+  isCustom: z.boolean().optional(),
 });
 
 export const productUpdateSchema = z
@@ -77,6 +78,7 @@ export const productUpdateSchema = z
     avgPrepMin: z.number().int().positive().optional(),
     imageUrl: z.string().optional(),
     available: z.boolean().optional(),
+    isCustom: z.boolean().optional(),
   })
   .strict();
 
@@ -85,6 +87,7 @@ export const additionalSchema = z.object({
   price: z.number().nonnegative(),
   categoryId: z.string().uuid().optional(),
   active: z.boolean().optional(),
+  kind: z.enum(['ADDON', 'BASE']).optional(),
 });
 
 export const additionalUpdateSchema = z
@@ -93,6 +96,7 @@ export const additionalUpdateSchema = z
     price: z.number().nonnegative().optional(),
     categoryId: z.string().uuid().optional(),
     active: z.boolean().optional(),
+    kind: z.enum(['ADDON', 'BASE']).optional(),
   })
   .strict();
 

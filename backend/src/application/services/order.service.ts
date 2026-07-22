@@ -15,7 +15,7 @@ import { emitTenant, ROOMS } from '../../socket';
 import { auditService } from './audit.service';
 import { deliveryPricingService } from './deliveryPricing.service';
 import { etaService } from './eta.service';
-import { orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
+import { assertCustomProductBase, orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
 
 interface Ctx {
   userId: string;
@@ -119,6 +119,8 @@ async function createOrderItems(
           where: { id: { in: item.additionalIds }, restaurantId: tenantId },
         })
       : [];
+
+    assertCustomProductBase(product, additionals);
 
     await tx.orderItem.create({
       data: {

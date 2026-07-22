@@ -1,4 +1,24 @@
-import { OrderStatus, Prisma, TableStatus } from '@prisma/client';
+import { AdditionalKind, OrderStatus, Prisma, TableStatus } from '@prisma/client';
+import { AppError } from '../../utils/errors';
+
+/**
+ * Regra do produto montável ("Monte o Seu"): o preço vem inteiro do sabor-base, então o
+ * item precisa de exatamente 1 adicional BASE — sem base seria um item de R$0, com 2+ o
+ * cliente pagaria dois pratos num só. Não-montáveis não podem receber BASE nenhuma (base
+ * de outro prato colada num pastel comum cobraria dois pratos também).
+ */
+export function assertCustomProductBase(
+  product: { isCustom: boolean; name: string },
+  additionals: { kind: AdditionalKind }[],
+): void {
+  const baseCount = additionals.filter((a) => a.kind === AdditionalKind.BASE).length;
+  if (product.isCustom && baseCount !== 1) {
+    throw new AppError(`Escolha o sabor-base de "${product.name}"`);
+  }
+  if (!product.isCustom && baseCount > 0) {
+    throw new AppError(`"${product.name}" não aceita sabor-base`);
+  }
+}
 
 /** Standard include used whenever we return a full order to clients. */
 export const orderInclude = {

@@ -71,6 +71,15 @@ enum PaymentMethod {
   MEAL_VOUCHER
 }
 
+// Papel de um adicional dentro do modal de montagem. ADDON é o adicional de sempre
+// (múltiplo, opcional). BASE só aparece em produtos "montáveis" (Product.isCustom):
+// é o sabor-base — obrigatório, único, e carrega o preço inteiro do prato (o produto
+// montável em si custa R$0).
+enum AdditionalKind {
+  ADDON
+  BASE
+}
+
 // Como o restaurante calcula a taxa de entrega. ZONE (bairro cadastrado com taxa fixa) é
 // o modo atual e o default — nenhum restaurante existente muda de comportamento até
 // alguém trocar explicitamente pelo admin. DISTANCE_BANDS calcula a distância via Google
@@ -274,6 +283,9 @@ model Product {
   imageUrl     String?
   avgPrepMin   Int        @default(10)
   available    Boolean    @default(true)
+  // "Montável" (ex.: Monte o Seu pastel): cliente escolhe obrigatoriamente 1 adicional
+  // BASE (que carrega o preço) + adicionais comuns. Também ordena primeiro no cardápio.
+  isCustom     Boolean    @default(false)
   categoryId   String
   category     Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   restaurantId String
@@ -289,10 +301,11 @@ model Product {
 }
 
 model Additional {
-  id           String     @id @default(uuid())
+  id           String         @id @default(uuid())
   name         String
-  price        Decimal    @default(0) @db.Decimal(10, 2)
-  active       Boolean    @default(true)
+  price        Decimal        @default(0) @db.Decimal(10, 2)
+  kind         AdditionalKind @default(ADDON)
+  active       Boolean        @default(true)
   categoryId   String?
   category     Category?  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   restaurantId String

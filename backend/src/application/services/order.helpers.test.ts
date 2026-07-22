@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeTotals, type OrderWithRelations } from './order.helpers';
+import { AdditionalKind } from '@prisma/client';
+import { assertCustomProductBase, computeTotals, type OrderWithRelations } from './order.helpers';
 
 function makeOrder(overrides: Partial<OrderWithRelations> = {}): OrderWithRelations {
   const base = {
@@ -64,5 +65,32 @@ describe('computeTotals', () => {
     // 40 subtotal + 4 service fee + 5 delivery fee
     expect(t.deliveryFee).toBe(5);
     expect(t.total).toBe(49);
+  });
+});
+
+describe('assertCustomProductBase', () => {
+  const BASE = { kind: AdditionalKind.BASE };
+  const ADDON = { kind: AdditionalKind.ADDON };
+  const custom = { isCustom: true, name: 'Monte o Seu Pastel' };
+  const regular = { isCustom: false, name: 'Pastel de Frango' };
+
+  it('accepts a custom product with exactly one base (plus any addons)', () => {
+    expect(() => assertCustomProductBase(custom, [BASE])).not.toThrow();
+    expect(() => assertCustomProductBase(custom, [BASE, ADDON, ADDON])).not.toThrow();
+  });
+
+  it('rejects a custom product without a base — would be a R$0 item', () => {
+    expect(() => assertCustomProductBase(custom, [])).toThrow(/sabor-base/);
+    expect(() => assertCustomProductBase(custom, [ADDON])).toThrow(/sabor-base/);
+  });
+
+  it('rejects a custom product with two bases — would charge two dishes in one', () => {
+    expect(() => assertCustomProductBase(custom, [BASE, BASE])).toThrow(/sabor-base/);
+  });
+
+  it('accepts a regular product with addons only, rejects it with a base attached', () => {
+    expect(() => assertCustomProductBase(regular, [ADDON, ADDON])).not.toThrow();
+    expect(() => assertCustomProductBase(regular, [])).not.toThrow();
+    expect(() => assertCustomProductBase(regular, [BASE])).toThrow(/não aceita/);
   });
 });
