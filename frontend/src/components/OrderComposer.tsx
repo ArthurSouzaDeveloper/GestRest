@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Minus, X, Search, Pencil } from 'lucide-react';
+import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda, GlassWater, Droplets } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { FRUIT_BASE_RE, JuiceBuilder } from './JuiceBuilder';
@@ -209,28 +209,28 @@ export function OrderComposer({
                 restaurante pediu acesso direto a elas, sem passar pela aba geral de bebidas. */}
             <div className="mb-2 grid grid-cols-2 gap-2">
               <button
-                className={`h-11 rounded-xl text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                 onClick={() => { setTopGroup('COMIDAS'); setActiveCat('all'); }}
               >
-                🍽️ Comidas
+                <Utensils size={15} className="shrink-0" /> Comidas
               </button>
               <button
-                className={`h-11 rounded-xl text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                 onClick={() => { setTopGroup('BEBIDAS'); setActiveCat('all'); }}
               >
-                🧃 Bebidas
+                <CupSoda size={15} className="shrink-0" /> Bebidas
               </button>
               <button
-                className={`h-11 rounded-xl text-[14px] font-bold transition ${topGroup === 'REFRIGERANTES' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'REFRIGERANTES' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                 onClick={() => { setTopGroup('REFRIGERANTES'); setActiveCat('all'); }}
               >
-                🥤 Refrigerantes
+                <GlassWater size={15} className="shrink-0" /> Refrigerantes
               </button>
               <button
-                className={`h-11 rounded-xl text-[14px] font-bold transition ${topGroup === 'AGUA' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'AGUA' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                 onClick={() => { setTopGroup('AGUA'); setActiveCat('all'); }}
               >
-                💧 Água
+                <Droplets size={15} className="shrink-0" /> Água
               </button>
             </div>
 
@@ -366,7 +366,7 @@ export function OrderComposer({
                     <Plus size={14} />
                   </button>
                   <button className="btn-secondary !px-2 !py-1" onClick={() => setConfiguring(item.product)}>
-                    Obs
+                    Personalizar
                   </button>
                   <button className="text-red-500" onClick={() => setDraft(draft.filter((_, j) => j !== i))}>
                     <X size={16} />

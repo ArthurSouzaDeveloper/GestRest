@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock, AlertTriangle } from 'lucide-react';
+import { Clock, AlertTriangle, Check } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
 import { PageHeader, Spinner, orderTypeLabels } from './ui';
@@ -38,7 +38,10 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
       <PageHeader title={title} subtitle={subtitle} action={<span className="text-sm text-gray-500">{tickets.length} em fila</span>} />
 
       {tickets.length === 0 ? (
-        <div className="card p-10 text-center text-gray-400">Nenhum item na fila 🎉</div>
+        <div className="card p-10 text-center text-gray-400">
+          <Check size={22} className="mx-auto mb-2 text-green-500" />
+          Nenhum item na fila
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {tickets.map((t) => (

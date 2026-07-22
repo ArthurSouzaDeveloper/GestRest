@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, ExternalLink, LogOut, Trash2 } from 'lucide-react';
+import { Plus, ExternalLink, LogOut, Trash2, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { apiError } from '../lib/api';
 import { Card, Modal, Spinner } from '../components/ui';
@@ -220,8 +220,11 @@ function CreateRestaurant({
 
   if (created) {
     return (
-      <Modal open onClose={onSaved} title="Restaurante criado 🎉">
+      <Modal open onClose={onSaved} title="Restaurante criado">
         <div className="space-y-3 text-sm">
+          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
+            <Check size={18} />
+          </div>
           <p>O restaurante foi criado. Compartilhe o link de acesso com a equipe:</p>
           <div className="rounded-md bg-gray-100 p-3 font-mono text-brand dark:bg-gray-800">
             {origin}/r/{created.slug}
