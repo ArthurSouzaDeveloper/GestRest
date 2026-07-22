@@ -46,8 +46,12 @@ export function Layout({ children }: { children: ReactNode }) {
   const items = NAV.filter((n) => hasRole(...n.roles));
 
   const handleLogout = async () => {
+    // Volta pro login com a marca do restaurante (/r/:slug), não pro genérico — sem isso,
+    // a equipe perde de vista qual restaurante é esse assim que a plataforma tiver mais de
+    // um tenant, já que o /login puro não mostra nome/identidade nenhuma.
+    const loginPath = user?.restaurant ? `/r/${user.restaurant.slug}` : '/login';
     await logout();
-    navigate('/login');
+    navigate(loginPath);
   };
 
   return (
