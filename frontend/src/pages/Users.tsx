@@ -80,7 +80,15 @@ export default function Users() {
                 <td className="p-3 font-medium">{u.name}</td>
                 <td className="p-3 text-gray-500">{u.email}</td>
                 <td className="p-3">{ROLE_LABELS[u.role]}</td>
-                <td className="p-3 text-center">{u.active ? '✅' : '—'}</td>
+                <td className="p-3 text-center">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      u.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {u.active ? 'Ativo' : 'Inativo'}
+                  </span>
+                </td>
                 <td className="p-3 text-right">
                   {u.id !== me?.id && (
                     <button
