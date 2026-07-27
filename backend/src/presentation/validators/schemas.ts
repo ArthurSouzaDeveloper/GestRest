@@ -236,3 +236,12 @@ export const publicOrderSchema = z
       path: ['deliveryZoneId'],
     },
   );
+
+// Login do site público (nome+telefone) pra reencontrar pedidos depois de fechar o
+// site — mesmas regras de tamanho do publicOrderSchema, já que é o mesmo par de campos.
+export const customerLoginSchema = z
+  .object({
+    name: z.string().min(2).max(80),
+    phone: z.string().min(8).max(20),
+  })
+  .strict();

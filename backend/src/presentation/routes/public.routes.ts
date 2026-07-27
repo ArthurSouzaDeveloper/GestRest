@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { asyncHandler } from '../../utils/http';
 import { publicOrderService } from '../../application/services/publicOrder.service';
 import { validateBody } from '../middlewares/validate.middleware';
-import { publicOrderLimiter, mapsLookupLimiter } from '../middlewares/rateLimit.middleware';
-import { publicOrderSchema } from '../validators/schemas';
+import { publicOrderLimiter, mapsLookupLimiter, customerLookupLimiter } from '../middlewares/rateLimit.middleware';
+import { publicOrderSchema, customerLoginSchema } from '../validators/schemas';
 import { AppError } from '../../utils/errors';
 
 /**
@@ -97,6 +97,15 @@ router.post(
 router.get(
   '/:slug/orders/:id',
   asyncHandler(async (req, res) => res.json(await publicOrderService.orderStatus(req.params.slug, req.params.id))),
+);
+
+router.post(
+  '/:slug/customers/login',
+  customerLookupLimiter,
+  validateBody(customerLoginSchema),
+  asyncHandler(async (req, res) =>
+    res.json(await publicOrderService.customerLogin(req.params.slug, req.body.name, req.body.phone)),
+  ),
 );
 
 export default router;

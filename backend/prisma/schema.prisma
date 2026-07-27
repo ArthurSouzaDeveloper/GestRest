@@ -186,16 +186,23 @@ model RefreshToken {
 // ─────────────────────────────────────────────────────────────
 
 model Customer {
-  id           String     @id @default(uuid())
-  name         String
-  phone        String?
-  restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now())
+  id              String     @id @default(uuid())
+  name            String
+  phone           String?
+  // Só dígitos de `phone` (ver order.helpers.normalizePhone) — permite achar o mesmo
+  // cliente em visitas diferentes mesmo com formatação diferente ("(19) 99999-8888" vs
+  // "19999998888"), sem precisar mudar o que fica salvo/exibido em `phone`. Usado pro
+  // site público reconhecer quem já pediu antes (login por nome+telefone) e pra
+  // openPublic() reaproveitar o mesmo Customer em vez de criar um novo a cada pedido.
+  phoneNormalized String?
+  restaurantId    String
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt       DateTime   @default(now())
 
   orders Order[]
 
   @@index([restaurantId])
+  @@index([restaurantId, phoneNormalized])
   @@map("customers")
 }
 
@@ -307,10 +314,10 @@ model Additional {
   kind         AdditionalKind @default(ADDON)
   active       Boolean        @default(true)
   categoryId   String?
-  category     Category?  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category     Category?      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now())
+  restaurant   Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
 
   orderItemAdditionals OrderItemAdditional[]
 

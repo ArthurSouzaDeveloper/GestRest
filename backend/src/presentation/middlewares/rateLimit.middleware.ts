@@ -36,3 +36,14 @@ export const mapsLookupLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: { code: 'RATE_LIMITED', message: 'Muitas buscas de endereço em pouco tempo. Tente novamente em alguns minutos.' } },
 });
+
+// Login do site público (nome+telefone) — sem senha, então o limite existe pra dificultar
+// alguém tentando adivinhar nome+telefone de outra pessoa por força bruta, não pra travar
+// um cliente de verdade (que erra o telefone no máximo umas duas vezes).
+export const customerLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 15,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: { code: 'RATE_LIMITED', message: 'Muitas tentativas. Tente novamente em alguns minutos.' } },
+});
