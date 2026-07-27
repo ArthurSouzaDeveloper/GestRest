@@ -436,31 +436,41 @@ async function main() {
   )
     productsCreated++;
 
-  // Mini pizza salgada + "monte a sua"
+  // Mini pizza salgada — sem "monte a sua" (só as já montadas, customizáveis por adicional)
   for (const [name, price] of MINI_PIZZA_SALGADA) {
     if ((await ensureProduct(rid, cat.mini_pizza_salgada, name, price, 15)).created) productsCreated++;
   }
-  if (
-    (
-      await ensureCustomProduct(rid, cat.mini_pizza_salgada, 'Monte a Sua Mini Pizza', 15, [
-        'Monte a Sua (escolha os ingredientes)',
-      ])
-    ).created
-  )
-    productsCreated++;
 
-  // Mini pizza doce + "monte a sua"
+  // Mini pizza doce — sem "monte a sua" (só as já montadas, customizáveis por adicional)
   for (const [name, price] of MINI_PIZZA_DOCE) {
     if ((await ensureProduct(rid, cat.mini_pizza_doce, name, price, 15)).created) productsCreated++;
   }
-  if (
-    (
-      await ensureCustomProduct(rid, cat.mini_pizza_doce, 'Monte a Sua Mini Pizza Doce', 15, [
-        'Monte a Sua (escolha os ingredientes)',
-      ])
-    ).created
-  )
-    productsCreated++;
+
+  // Retira o "Monte a Sua Mini Pizza" (salgada e doce) do cardápio do cliente — o
+  // restaurante decidiu manter só as mini pizzas já montadas, customizáveis por adicional
+  // em vez de montáveis do zero. Marca indisponível em vez de apagar, pra não perder
+  // histórico de pedidos antigos que já usaram esse produto.
+  const retiredCustomMiniPizza = await prisma.product.findMany({
+    where: {
+      restaurantId: rid,
+      categoryId: { in: [cat.mini_pizza_salgada, cat.mini_pizza_doce] },
+      isCustom: true,
+    },
+  });
+  for (const p of retiredCustomMiniPizza) {
+    if (p.available) await prisma.product.update({ where: { id: p.id }, data: { available: false } });
+  }
+  // As bases (sabores espelhados como adicional BASE) só existiam pro "Monte a Sua" —
+  // sem produto montável nenhum usando elas, ficam inativas também.
+  await prisma.additional.updateMany({
+    where: {
+      restaurantId: rid,
+      categoryId: { in: [cat.mini_pizza_salgada, cat.mini_pizza_doce] },
+      kind: AdditionalKind.BASE,
+      active: true,
+    },
+    data: { active: false },
+  });
 
   // Sucos: matriz fruta × base — um produto por combinação, nomeado "Fruta (Base)"
   // para o Montador de Suco do garçom localizar e agrupar automaticamente.
@@ -487,9 +497,10 @@ async function main() {
     if ((await ensureProduct(rid, cat.bebidas, name, price, 1)).created) productsCreated++;
   }
 
-  // Bases dos montáveis: replicam os sabores simples da categoria com o preço normal do
-  // prato — no modal do "Monte o Seu", o cliente escolhe exatamente 1 base (que dá o
-  // preço) e complementa com os adicionais comuns abaixo.
+  // Bases do "Monte o Seu Pastel": replicam os sabores simples de Pastéis com o preço
+  // normal do prato — no modal, o cliente escolhe exatamente 1 base (que dá o preço) e
+  // complementa com os adicionais comuns abaixo. Mini pizza não tem "monte a sua" (ver
+  // acima), então não tem base nenhuma — só as já montadas, com adicionais normais.
   for (const [name, price] of PASTEIS_SALGADOS) {
     if ((await ensureAdditional(rid, cat.pasteis_salgados, name, price, AdditionalKind.BASE)).created)
       additionalsCreated++;
@@ -498,24 +509,26 @@ async function main() {
     if ((await ensureAdditional(rid, cat.pasteis_doces, name, price, AdditionalKind.BASE)).created)
       additionalsCreated++;
   }
-  for (const [name, price] of MINI_PIZZA_SALGADA) {
-    if ((await ensureAdditional(rid, cat.mini_pizza_salgada, name, price, AdditionalKind.BASE)).created)
-      additionalsCreated++;
-  }
-  for (const [name, price] of MINI_PIZZA_DOCE) {
-    if ((await ensureAdditional(rid, cat.mini_pizza_doce, name, price, AdditionalKind.BASE)).created)
-      additionalsCreated++;
-  }
 
-  // Adicionais: salgados aplicam-se a Pastéis Salgados E Sugestões da Casa
+  // Adicionais: salgados aplicam-se a Pastéis Salgados, Sugestões da Casa E Mini Pizza
+  // Salgada — é como o cliente customiza a mini pizza já montada (acrescenta cobertura),
+  // já que não existe mais "monte a sua" pra ela.
   for (const [name, price] of ADICIONAIS_SALGADOS) {
     if ((await ensureAdditional(rid, cat.pasteis_salgados, name, price)).created) additionalsCreated++;
     if ((await ensureAdditional(rid, cat.sugestoes_casa, name, price)).created) additionalsCreated++;
+    if ((await ensureAdditional(rid, cat.mini_pizza_salgada, name, price)).created) additionalsCreated++;
   }
-  // Sorvete adicional (pastéis doces)
+  // Sorvete adicional — pastéis doces E mini pizza doce (mesma lógica: customiza a mini
+  // pizza doce já montada em vez de ter um "monte a sua" separado).
   if (
     (
       await ensureAdditional(rid, cat.pasteis_doces, 'Sorvete Adicional (2 bolas, creme ou napolitano)', 9.0)
+    ).created
+  )
+    additionalsCreated++;
+  if (
+    (
+      await ensureAdditional(rid, cat.mini_pizza_doce, 'Sorvete Adicional (2 bolas, creme ou napolitano)', 9.0)
     ).created
   )
     additionalsCreated++;
