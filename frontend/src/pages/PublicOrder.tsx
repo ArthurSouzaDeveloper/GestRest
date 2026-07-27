@@ -37,7 +37,7 @@ function formatClock(iso: string): string {
 function EtaNote({ eta }: { eta?: EtaEstimate }) {
   if (!eta) return null;
   return (
-    <div className="flex items-center gap-2 rounded-[11px] bg-[#F3E8FB] px-3 py-2 text-xs font-medium text-[#6D2E9E]">
+    <div className="flex items-center gap-2 rounded-[6px] bg-[#E9EEFB] px-3 py-2 text-xs font-medium text-[#1E3A8A]">
       <Clock size={14} className="shrink-0" />
       <span>
         Previsão agora: até {eta.minutes} min
@@ -47,15 +47,16 @@ function EtaNote({ eta }: { eta?: EtaEstimate }) {
   );
 }
 
-// ─── Tokens visuais do site público — espelham 1:1 as classes do preview
-// (.field/.primary-cta/.step-title/.card/.seg/.cart-bar etc.) ───────────────
-const FIELD_LABEL = 'mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#7c7086]';
+// ─── Tokens visuais do site público — direção "Modernist" azul aprovada na prévia:
+// cantos mais retos, divisórias grossas, tipografia pesada, azul do sistema principal
+// no lugar do roxo antigo. Espelham 1:1 as classes do preview. ───────────────
+const FIELD_LABEL = 'mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#5A6072]';
 const FIELD_INPUT =
-  'w-full rounded-[11px] border border-[#351C4D]/[0.15] bg-white px-3.5 py-2.5 text-[13.5px] text-[#351C4D] outline-none transition focus:border-[#6D2E9E] focus:ring-2 focus:ring-[#6D2E9E]/20';
+  'w-full rounded-[6px] border border-[#14161C]/[0.18] bg-white px-3.5 py-2.5 text-[13.5px] text-[#14161C] outline-none transition focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/20';
 const PRIMARY_CTA =
-  'block w-full rounded-[14px] bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72] px-4 py-3.5 text-center text-[13.5px] font-extrabold text-white shadow-[0_10px_20px_-8px_rgba(74,29,114,0.5)] transition disabled:cursor-not-allowed disabled:opacity-50';
-const STEP_TITLE = 'mb-[18px] text-[18px] font-extrabold tracking-tight text-[#351C4D]';
-const CARD = 'rounded-[14px] border border-[#351C4D]/[0.08] bg-white';
+  'block w-full rounded-[6px] bg-gradient-to-br from-[#1E3A8A] to-[#14295E] px-4 py-3.5 text-center text-[13.5px] font-extrabold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] transition disabled:cursor-not-allowed disabled:opacity-50';
+const STEP_TITLE = 'mb-[18px] text-[18px] font-extrabold tracking-tight text-[#14161C]';
+const CARD = 'rounded-[6px] border border-[#14161C]/[0.1] bg-white';
 
 /** Barra fixa no rodapé (Cardápio/Carrinho/Revisão) — igual ao .cart-bar do preview. */
 function CartBar({
@@ -70,9 +71,9 @@ function CartBar({
   disabled?: boolean;
 }) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 border-t border-[#351C4D]/10 bg-[#FBF7FC] p-3 pb-3.5">
+    <div className="fixed bottom-0 left-0 right-0 border-t-2 border-[#14161C]/10 bg-[#F4F6FA] p-3 pb-3.5">
       <button
-        className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-[14px] bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72] px-[18px] py-[13px] text-[13.5px] font-bold text-white shadow-[0_10px_20px_-8px_rgba(74,29,114,0.5)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-[6px] bg-gradient-to-br from-[#1E3A8A] to-[#14295E] px-[18px] py-[13px] text-[13.5px] font-bold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] disabled:cursor-not-allowed disabled:opacity-60"
         onClick={onClick}
         disabled={disabled}
       >
@@ -262,7 +263,7 @@ export default function PublicOrder() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FBF7FC]" style={publicBrandVars}>
+    <div className="min-h-screen bg-[#F4F6FA]" style={publicBrandVars}>
       {!introOrConfirmation && (
         <PublicHeader
           restaurantName={restaurant.name}
@@ -445,15 +446,15 @@ function PublicHeader({
   onBack: () => void;
 }) {
   return (
-    <div className="sticky top-0 z-10 bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72]">
+    <div className="sticky top-0 z-10 bg-gradient-to-br from-[#1E3A8A] to-[#14295E]">
       <div className={`mx-auto flex items-center gap-2.5 px-4 py-3 ${title === 'Cardápio' ? 'max-w-3xl' : 'max-w-md'}`}>
         <button onClick={onBack} className="flex text-white/85 hover:text-white" title="Voltar">
           <ChevronLeft size={20} strokeWidth={2.3} />
         </button>
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-white text-[10.5px] font-extrabold text-[#6D2E9E]">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-white text-[10.5px] font-extrabold text-[#1E3A8A]">
           {restaurantName.slice(0, 2).toUpperCase()}
         </div>
-        <span className="text-sm font-extrabold text-white">{title}</span>
+        <span className="text-sm font-extrabold uppercase tracking-wide text-white">{title}</span>
       </div>
     </div>
   );
@@ -473,12 +474,12 @@ function IntroStep({
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
   return (
-    <div className="flex min-h-screen flex-col items-center bg-[#FBF7FC] px-7 pt-12 dark:bg-[#FBF7FC]">
+    <div className="flex min-h-screen flex-col items-center bg-[#F4F6FA] px-7 pt-12 dark:bg-[#F4F6FA]">
       <svg width="122" height="122" viewBox="0 0 120 120" role="img" aria-label={restaurantName}>
         <defs>
           <radialGradient id="poBadgeFill" cx="50%" cy="38%" r="70%">
-            <stop offset="0%" stopColor="#7A369E" />
-            <stop offset="100%" stopColor="#4A1D72" />
+            <stop offset="0%" stopColor="#2C4E9E" />
+            <stop offset="100%" stopColor="#14295E" />
           </radialGradient>
         </defs>
         <circle cx="60" cy="60" r="58" fill="none" stroke="#D9A544" strokeWidth="2" />
@@ -491,10 +492,10 @@ function IntroStep({
           d="M60 18 C 57 22 57 27 60 30 C 63 27 63 22 60 18 Z M60 30 C 54 28 49 30 47 34 C 52 37 58 36 60 30 Z M60 30 C 66 28 71 30 73 34 C 68 37 62 36 60 30 Z"
           fill="#8BC53F"
         />
-        <text x="60" y="60" textAnchor="middle" fontFamily="Georgia,'Times New Roman',serif" fontStyle="italic" fontSize="24" fill="#FBF7FC">
+        <text x="60" y="60" textAnchor="middle" fontFamily="Georgia,'Times New Roman',serif" fontStyle="italic" fontSize="24" fill="#F4F6FA">
           o Rei
         </text>
-        <text x="60" y="82" textAnchor="middle" fontFamily="-apple-system,'Segoe UI',Arial,sans-serif" fontWeight="800" fontSize="17" letterSpacing="0.5" fill="#FBF7FC">
+        <text x="60" y="82" textAnchor="middle" fontFamily="-apple-system,'Segoe UI',Arial,sans-serif" fontWeight="800" fontSize="17" letterSpacing="0.5" fill="#F4F6FA">
           do Suco
         </text>
       </svg>
@@ -506,10 +507,10 @@ function IntroStep({
 
       <div className="mx-auto mt-16 flex w-full max-w-md flex-col gap-3">
         <button
-          className="flex w-full items-center gap-3.5 rounded-2xl bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72] px-4 py-4 text-left shadow-[0_12px_24px_-10px_rgba(74,29,114,0.55)] transition active:scale-[0.98]"
+          className="flex w-full items-center gap-3.5 rounded-[6px] bg-gradient-to-br from-[#1E3A8A] to-[#14295E] px-4 py-4 text-left shadow-[0_12px_24px_-10px_rgba(20,41,94,0.5)] transition active:scale-[0.98]"
           onClick={() => onPick('DELIVERY')}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-white/20 text-white">
             <Bike size={21} />
           </span>
           <span className="flex-1">
@@ -520,10 +521,10 @@ function IntroStep({
         </button>
 
         <button
-          className="flex w-full items-center gap-3.5 rounded-2xl bg-[#351C4D] px-4 py-4 text-left shadow-[0_12px_24px_-10px_rgba(36,16,48,0.5)] transition active:scale-[0.98]"
+          className="flex w-full items-center gap-3.5 rounded-[6px] bg-[#14161C] px-4 py-4 text-left shadow-[0_12px_24px_-10px_rgba(20,22,30,0.5)] transition active:scale-[0.98]"
           onClick={() => onPick('PICKUP')}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-white/15 text-white">
             <ShoppingBag size={21} />
           </span>
           <span className="flex-1">
@@ -534,14 +535,14 @@ function IntroStep({
         </button>
 
         <button
-          className="flex w-full items-center gap-3.5 rounded-2xl border-[1.5px] border-[#351C4D]/15 bg-white px-4 py-4 text-left transition active:scale-[0.98]"
+          className="flex w-full items-center gap-3.5 rounded-[6px] border-[1.5px] border-[#14161C]/15 bg-white px-4 py-4 text-left transition active:scale-[0.98]"
           onClick={() => onPick('MENU')}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F3E8FB] text-[#6D2E9E]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-[#E9EEFB] text-[#1E3A8A]">
             <BookOpen size={21} />
           </span>
-          <span className="flex-1 text-[15px] font-extrabold text-[#351C4D]">Cardápio</span>
-          <ChevronRight size={17} className="shrink-0 text-[#351C4D]" />
+          <span className="flex-1 text-[15px] font-extrabold text-[#14161C]">Cardápio</span>
+          <ChevronRight size={17} className="shrink-0 text-[#14161C]" />
         </button>
       </div>
 
@@ -553,7 +554,7 @@ function IntroStep({
             target="_blank"
             rel="noreferrer"
             title="Instagram"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#351C4D]/15 bg-white text-[#351C4D]"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#14161C]/15 bg-white text-[#14161C]"
           >
             <Instagram size={15} />
           </a>
@@ -562,7 +563,7 @@ function IntroStep({
             target="_blank"
             rel="noreferrer"
             title="WhatsApp"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#351C4D]/15 bg-white text-[#351C4D]"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#14161C]/15 bg-white text-[#14161C]"
           >
             <MessageCircle size={15} />
           </a>
@@ -571,7 +572,7 @@ function IntroStep({
             target="_blank"
             rel="noreferrer"
             title="Localização"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#351C4D]/15 bg-white text-[#351C4D]"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#14161C]/15 bg-white text-[#14161C]"
           >
             <MapPin size={15} />
           </a>
@@ -626,17 +627,17 @@ function ZoneAutocomplete({
         disabled={zones.length === 0}
       />
       {open && term.length > 0 && filtered.length > 0 && (
-        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[11px] border border-[#351C4D]/[0.15] bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[6px] border border-[#14161C]/[0.15] bg-white shadow-lg">
           {filtered.map((z) => (
             <button
               key={z.id}
               type="button"
-              className="flex w-full items-center justify-between border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#351C4D] last:border-b-0 hover:bg-gray-50"
+              className="flex w-full items-center justify-between border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#14161C] last:border-b-0 hover:bg-gray-50"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(z)}
             >
               <span>{z.name}</span>
-              <span className="text-[#7c7086]">{brl(z.fee)}</span>
+              <span className="text-[#5A6072]">{brl(z.fee)}</span>
             </button>
           ))}
         </div>
@@ -712,18 +713,18 @@ function DetailsStep({
     <div className="space-y-4">
       <h2 className={STEP_TITLE}>Pra onde vai o pedido?</h2>
 
-      <div className="mb-[18px] flex gap-1 rounded-[14px] border border-[#351C4D]/10 bg-white p-1">
+      <div className="mb-[18px] flex gap-1 rounded-[6px] border border-[#14161C]/10 bg-white p-1">
         <button
-          className={`flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition ${
-            orderKind === 'DELIVERY' ? 'bg-[#6D2E9E] text-white' : 'text-[#7c7086]'
+          className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
+            orderKind === 'DELIVERY' ? 'bg-[#1E3A8A] text-white' : 'text-[#5A6072]'
           }`}
           onClick={() => onChangeKind('DELIVERY')}
         >
           Entrega
         </button>
         <button
-          className={`flex-1 rounded-[10px] py-2 text-[12.5px] font-bold transition ${
-            orderKind === 'PICKUP' ? 'bg-[#6D2E9E] text-white' : 'text-[#7c7086]'
+          className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
+            orderKind === 'PICKUP' ? 'bg-[#1E3A8A] text-white' : 'text-[#5A6072]'
           }`}
           onClick={() => onChangeKind('PICKUP')}
         >
@@ -754,7 +755,7 @@ function DetailsStep({
             <label className={FIELD_LABEL}>Endereço</label>
             <AddressAutocomplete slug={slug} inputClassName={FIELD_INPUT} placeholder="Digite seu endereço" onSelect={onPickAddress} />
             {deliveryLat !== null && quotingDelivery && (
-              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#7c7086]">
+              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#5A6072]">
                 <Loader2 size={11} className="animate-spin" /> Calculando frete...
               </p>
             )}
@@ -762,7 +763,7 @@ function DetailsStep({
               <p className="mt-1 text-[11px] text-red-600">Esse endereço está fora da nossa área de entrega.</p>
             )}
             {deliveryQuote && !quotingDelivery && (
-              <p className="mt-1 text-[11px] text-[#7c7086]">
+              <p className="mt-1 text-[11px] text-[#5A6072]">
                 Taxa de entrega: {brl(deliveryQuote.fee)} ({deliveryQuote.distanceKm.toFixed(1)} km)
               </p>
             )}
@@ -788,7 +789,7 @@ function DetailsStep({
           <div>
             <label className={FIELD_LABEL}>Bairro</label>
             <ZoneAutocomplete zones={zones} selectedZoneId={deliveryZoneId} onSelect={setDeliveryZoneId} />
-            {selectedFee !== undefined && <p className="mt-1 text-[11px] text-[#7c7086]">Taxa de entrega: {brl(selectedFee)}</p>}
+            {selectedFee !== undefined && <p className="mt-1 text-[11px] text-[#5A6072]">Taxa de entrega: {brl(selectedFee)}</p>}
           </div>
           <div className="grid grid-cols-[1.4fr_1fr] gap-2.5">
             <div>
@@ -847,17 +848,17 @@ function CartStep({
       ) : (
         <div>
           {draft.map((item, i) => (
-            <div key={i} className="flex items-start justify-between gap-2.5 border-b border-[#351C4D]/[0.08] py-3 last:border-b-0">
-              <span className="w-6 shrink-0 text-[12.5px] font-extrabold text-[#6D2E9E]">{item.quantity}×</span>
+            <div key={i} className="flex items-start justify-between gap-2.5 border-b border-[#14161C]/[0.08] py-3 last:border-b-0">
+              <span className="w-6 shrink-0 text-[12.5px] font-extrabold text-[#1E3A8A]">{item.quantity}×</span>
               <div className="flex-1">
-                <div className="text-[13px] font-bold text-[#351C4D]">{item.product.name}</div>
-                {item.notes && <div className="mt-0.5 text-[10.5px] text-[#7c7086]">{item.notes}</div>}
+                <div className="text-[13px] font-bold text-[#14161C]">{item.product.name}</div>
+                {item.notes && <div className="mt-0.5 text-[10.5px] text-[#5A6072]">{item.notes}</div>}
                 {item.additionalIds.length > 0 && (
-                  <div className="mt-0.5 text-[10.5px] text-[#7c7086]">+ {item.additionalIds.length} adicional(is)</div>
+                  <div className="mt-0.5 text-[10.5px] text-[#5A6072]">+ {item.additionalIds.length} adicional(is)</div>
                 )}
                 <div className="mt-1.5 flex items-center gap-2">
                   <button
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[#351C4D]/15 text-[#351C4D]"
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[#14161C]/15 text-[#14161C]"
                     onClick={() => {
                       const next = [...draft];
                       if (next[i].quantity > 1) next[i] = { ...next[i], quantity: next[i].quantity - 1 };
@@ -868,7 +869,7 @@ function CartStep({
                     <Minus size={12} />
                   </button>
                   <button
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[#351C4D]/15 text-[#351C4D]"
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[#14161C]/15 text-[#14161C]"
                     onClick={() => {
                       const next = [...draft];
                       next[i] = { ...next[i], quantity: next[i].quantity + 1 };
@@ -882,7 +883,7 @@ function CartStep({
                   </button>
                 </div>
               </div>
-              <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-[#351C4D]">
+              <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-[#14161C]">
                 {brl(draftItemUnitPrice(item) * item.quantity)}
               </span>
             </div>
@@ -890,18 +891,18 @@ function CartStep({
         </div>
       )}
 
-      <div className="mt-2 border-t border-dashed border-[#351C4D]/[0.18] pt-3.5">
-        <div className="flex justify-between py-1 text-[12.5px] text-[#5B4A66]">
+      <div className="mt-2 border-t-2 border-[#14161C]/[0.12] pt-3.5">
+        <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
           <span>Subtotal</span>
           <span>{brl(subtotal)}</span>
         </div>
         {orderKind === 'DELIVERY' && (
-          <div className="flex justify-between py-1 text-[12.5px] text-[#5B4A66]">
+          <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
             <span>Taxa de entrega{deliveryZoneName ? ` · ${deliveryZoneName}` : ''}</span>
             <span>{brl(deliveryFee)}</span>
           </div>
         )}
-        <div className="flex justify-between pt-2 text-[15.5px] font-extrabold text-[#351C4D]">
+        <div className="flex justify-between pt-2 text-[15.5px] font-extrabold text-[#14161C]">
           <span>Total</span>
           <span>{brl(total)}</span>
         </div>
@@ -943,13 +944,13 @@ function PaymentStep({
         {PAYMENT_OPTIONS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
-            className={`flex flex-col items-center gap-2 rounded-[14px] border-2 p-4 text-center transition ${
-              paymentMethod === key ? 'border-[#6D2E9E] bg-[#F3E8FB]' : 'border-[#351C4D]/10 bg-white'
+            className={`flex flex-col items-center gap-2 rounded-[6px] border-2 p-4 text-center transition ${
+              paymentMethod === key ? 'border-[#1E3A8A] bg-[#E9EEFB]' : 'border-[#14161C]/10 bg-white'
             }`}
             onClick={() => setPaymentMethod(key)}
           >
-            <Icon className="text-[#6D2E9E]" size={21} />
-            <span className="text-xs font-bold text-[#351C4D]">{label}</span>
+            <Icon className="text-[#1E3A8A]" size={21} />
+            <span className="text-xs font-bold text-[#14161C]">{label}</span>
           </button>
         ))}
       </div>
@@ -966,7 +967,7 @@ function PaymentStep({
             value={changeFor}
             onChange={(e) => setChangeFor(e.target.value)}
           />
-          <div className="mt-[5px] text-[11px] text-[#7c7086]">Total do pedido: {brl(total)}</div>
+          <div className="mt-[5px] text-[11px] text-[#5A6072]">Total do pedido: {brl(total)}</div>
           {changeFor && Number(changeFor) < total && (
             <p className="mt-1 text-[11px] text-red-600">O valor precisa ser maior ou igual ao total ({brl(total)}).</p>
           )}
@@ -1023,49 +1024,49 @@ function ReviewStep({
       <EtaNote eta={eta} />
 
       <div className={`${CARD} p-3.5`}>
-        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#9B4FC7]">
+        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#1E3A8A]">
           {orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada'}
         </h3>
-        <div className="text-[12.5px] leading-[1.55] text-[#351C4D]">{customerName} · {customerPhone}</div>
+        <div className="text-[12.5px] leading-[1.55] text-[#14161C]">{customerName} · {customerPhone}</div>
         {orderKind === 'DELIVERY' && (
           <>
-            <div className="text-[12.5px] leading-[1.55] text-[#351C4D]">
+            <div className="text-[12.5px] leading-[1.55] text-[#14161C]">
               {deliveryStreet}, {deliveryNumber}{deliveryComplement ? ` — ${deliveryComplement}` : ''}
             </div>
-            {deliveryZoneName && <div className="text-[11.5px] text-[#7c7086]">{deliveryZoneName}</div>}
+            {deliveryZoneName && <div className="text-[11.5px] text-[#5A6072]">{deliveryZoneName}</div>}
           </>
         )}
       </div>
 
       <div className={`${CARD} p-3.5`}>
-        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#9B4FC7]">Itens</h3>
+        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#1E3A8A]">Itens</h3>
         {draft.map((item, i) => (
-          <div key={i} className="text-[12.5px] leading-[1.55] text-[#351C4D]">
+          <div key={i} className="text-[12.5px] leading-[1.55] text-[#14161C]">
             {item.quantity}× {item.product.name} — {brl(draftItemUnitPrice(item) * item.quantity)}
           </div>
         ))}
       </div>
 
       <div className={`${CARD} p-3.5`}>
-        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#9B4FC7]">Pagamento</h3>
-        <div className="text-[12.5px] leading-[1.55] text-[#351C4D]">
+        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#1E3A8A]">Pagamento</h3>
+        <div className="text-[12.5px] leading-[1.55] text-[#14161C]">
           {paymentLabel}
           {paymentMethod === 'CASH' && changeFor ? ` · troco pra ${brl(Number(changeFor))}` : ''}
         </div>
       </div>
 
-      <div className="border-t border-dashed border-[#351C4D]/[0.18] pt-3.5">
-        <div className="flex justify-between py-1 text-[12.5px] text-[#5B4A66]">
+      <div className="border-t-2 border-[#14161C]/[0.12] pt-3.5">
+        <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
           <span>Subtotal</span>
           <span>{brl(subtotal)}</span>
         </div>
         {orderKind === 'DELIVERY' && (
-          <div className="flex justify-between py-1 text-[12.5px] text-[#5B4A66]">
+          <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
             <span>Taxa de entrega</span>
             <span>{brl(deliveryFee)}</span>
           </div>
         )}
-        <div className="flex justify-between pt-2 text-[15.5px] font-extrabold text-[#351C4D]">
+        <div className="flex justify-between pt-2 text-[15.5px] font-extrabold text-[#14161C]">
           <span>Total</span>
           <span>{brl(total)}</span>
         </div>
@@ -1106,22 +1107,22 @@ function ConfirmationStep({
 }) {
   return (
     <div className="flex flex-col items-center gap-3 pt-[54px] text-center">
-      <div className="flex h-[66px] w-[66px] items-center justify-center rounded-full bg-[#F3E8FB] text-[#6D2E9E]">
-        <Check size={30} strokeWidth={2.4} />
+      <div className="flex h-[62px] w-[62px] items-center justify-center rounded-[6px] border-2 border-[#1E3A8A] text-[#1E3A8A]">
+        <Check size={28} strokeWidth={2.6} />
       </div>
-      <h1 className="mt-1 text-[18px] font-extrabold text-[#351C4D]">Pedido recebido!</h1>
+      <h1 className="mt-1 text-[18px] font-extrabold text-[#14161C]">Pedido recebido!</h1>
       {orderNumber && (
-        <div className="text-[12.5px] text-[#7c7086]">
-          Número do pedido <b className="text-[14.5px] text-[#351C4D]">#{orderNumber}</b>
+        <div className="text-[12.5px] text-[#5A6072]">
+          Número do pedido <b className="text-[14.5px] text-[#14161C]">#{orderNumber}</b>
         </div>
       )}
-      <p className="max-w-[26ch] text-[12.5px] leading-[1.5] text-[#5B4A66]">
+      <p className="max-w-[26ch] text-[12.5px] leading-[1.5] text-[#4A5068]">
         {orderKind === 'DELIVERY'
           ? 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo.'
           : 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo — vá até o balcão no horário combinado.'}
       </p>
       {estimatedReadyAt && (
-        <div className="mx-auto flex w-fit items-center gap-2 rounded-lg bg-[#F3E8FB] px-4 py-2 text-xs font-medium text-[#6D2E9E]">
+        <div className="mx-auto flex w-fit items-center gap-2 rounded-[6px] bg-[#E9EEFB] px-4 py-2 text-xs font-medium text-[#1E3A8A]">
           <Clock size={16} />
           {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
         </div>
@@ -1131,7 +1132,7 @@ function ConfirmationStep({
           Acompanhar pedido
         </Link>
       )}
-      <button className="mt-[18px] text-[12.5px] font-bold text-[#6D2E9E] underline decoration-[#6D2E9E]/35 underline-offset-2" onClick={onNewOrder}>
+      <button className="mt-[18px] text-[12.5px] font-bold text-[#1E3A8A] underline decoration-[#1E3A8A]/35 underline-offset-2" onClick={onNewOrder}>
         Fazer novo pedido
       </button>
     </div>

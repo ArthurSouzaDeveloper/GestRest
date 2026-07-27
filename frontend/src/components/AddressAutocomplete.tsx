@@ -70,7 +70,7 @@ export default function AddressAutocomplete({
         autoComplete="off"
       />
       {showDropdown && (
-        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[11px] border border-[#351C4D]/[0.15] bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[6px] border border-[#14161C]/[0.15] bg-white shadow-lg">
           {isFetching && suggestions.length === 0 && (
             <div className="flex items-center gap-2 p-3 text-xs text-gray-400">
               <Loader2 size={13} className="animate-spin" /> Buscando endereço...
@@ -81,11 +81,11 @@ export default function AddressAutocomplete({
               key={s.placeId}
               type="button"
               disabled={pickPlace.isPending}
-              className="flex w-full items-start gap-2 border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#351C4D] last:border-b-0 hover:bg-gray-50 disabled:opacity-50"
+              className="flex w-full items-start gap-2 border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#14161C] last:border-b-0 hover:bg-gray-50 disabled:opacity-50"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pickPlace.mutate(s.placeId)}
             >
-              <MapPin size={13} className="mt-0.5 shrink-0 text-[#6D2E9E]" />
+              <MapPin size={13} className="mt-0.5 shrink-0 text-[#1E3A8A]" />
               {s.description}
             </button>
           ))}

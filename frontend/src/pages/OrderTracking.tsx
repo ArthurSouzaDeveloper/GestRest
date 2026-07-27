@@ -75,8 +75,8 @@ export default function OrderTracking() {
   if (isError || !order) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 text-center dark:bg-gray-950">
-        <div className="max-w-sm rounded-2xl border border-[#351C4D]/10 bg-white p-8">
-          <h1 className="text-lg font-bold text-[#351C4D]">Pedido não encontrado</h1>
+        <div className="max-w-sm rounded-[6px] border border-[#14161C]/10 bg-white p-8">
+          <h1 className="text-lg font-bold text-[#14161C]">Pedido não encontrado</h1>
           <p className="mt-1 text-sm text-gray-500">Confira se o link de acompanhamento está certo.</p>
         </div>
       </div>
@@ -88,8 +88,8 @@ export default function OrderTracking() {
   const isPickup = order.orderType === 'PICKUP';
 
   return (
-    <div className="min-h-screen bg-[#FBF7FC] pb-10 dark:bg-[#FBF7FC]">
-      <div className="bg-gradient-to-br from-[#6D2E9E] to-[#4A1D72] px-4 py-5 text-center">
+    <div className="min-h-screen bg-[#F4F6FA] pb-10 dark:bg-[#F4F6FA]">
+      <div className="bg-gradient-to-br from-[#1E3A8A] to-[#14295E] px-4 py-5 text-center">
         <div className="mx-auto max-w-md">
           <span className="text-xs font-semibold text-white/75">{restaurant?.name ?? 'Acompanhar pedido'}</span>
           <h1 className="mt-0.5 text-xl font-extrabold text-white">Pedido #{order.number}</h1>
@@ -98,7 +98,7 @@ export default function OrderTracking() {
 
       <div className="mx-auto max-w-md px-4 pt-6">
         {cancelled ? (
-          <div className="flex flex-col items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900 dark:bg-red-900/20">
+          <div className="flex flex-col items-center gap-2 rounded-[6px] border border-red-200 bg-red-50 p-6 text-center dark:border-red-900 dark:bg-red-900/20">
             <XCircle className="text-red-500" size={32} />
             <p className="font-semibold text-red-700 dark:text-red-300">Este pedido foi cancelado.</p>
           </div>
@@ -111,19 +111,19 @@ export default function OrderTracking() {
                 return (
                   <div key={step.key} className="flex flex-1 flex-col items-center gap-1.5 text-center">
                     <div className="flex w-full items-center">
-                      {i > 0 && <span className={`h-0.5 flex-1 ${i <= current ? 'bg-[#6D2E9E]' : 'bg-gray-200'}`} />}
+                      {i > 0 && <span className={`h-0.5 flex-1 ${i <= current ? 'bg-[#1E3A8A]' : 'bg-gray-200'}`} />}
                       <span
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                          done ? 'bg-[#6D2E9E] text-white' : 'bg-gray-100 text-gray-400'
+                          done ? 'bg-[#1E3A8A] text-white' : 'bg-gray-100 text-gray-400'
                         }`}
                       >
                         <Icon size={16} />
                       </span>
                       {i < STEPS.length - 1 && (
-                        <span className={`h-0.5 flex-1 ${i < current ? 'bg-[#6D2E9E]' : 'bg-gray-200'}`} />
+                        <span className={`h-0.5 flex-1 ${i < current ? 'bg-[#1E3A8A]' : 'bg-gray-200'}`} />
                       )}
                     </div>
-                    <span className={`text-[11px] font-semibold ${done ? 'text-[#351C4D]' : 'text-gray-400'}`}>
+                    <span className={`text-[11px] font-semibold ${done ? 'text-[#14161C]' : 'text-gray-400'}`}>
                       {i === 2 && isPickup ? 'Pronto p/ retirar' : step.label}
                     </span>
                   </div>
@@ -143,13 +143,13 @@ export default function OrderTracking() {
               </p>
             )}
             {order.status === 'PAID' && (
-              <p className="mt-6 text-center text-sm font-medium text-[#6D2E9E]">
+              <p className="mt-6 text-center text-sm font-medium text-[#1E3A8A]">
                 {isPickup ? 'Retirado — obrigado pela preferência!' : 'Entregue — obrigado pela preferência!'}
               </p>
             )}
 
             {order.estimatedReadyAt && order.status !== 'PAID' && (
-              <div className="mx-auto mt-4 flex w-fit items-center gap-2 rounded-lg bg-[#F3E8FB] px-3 py-2 text-xs font-medium text-[#6D2E9E]">
+              <div className="mx-auto mt-4 flex w-fit items-center gap-2 rounded-[6px] bg-[#E9EEFB] px-3 py-2 text-xs font-medium text-[#1E3A8A]">
                 <Clock size={14} />
                 Previsão: até{' '}
                 {new Date(order.estimatedReadyAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -158,8 +158,8 @@ export default function OrderTracking() {
           </>
         )}
 
-        <div className="mt-6 rounded-2xl border border-[#351C4D]/10 bg-white p-4">
-          <div className="text-sm font-semibold text-[#351C4D]">Itens</div>
+        <div className="mt-6 rounded-[6px] border border-[#14161C]/10 bg-white p-4">
+          <div className="text-sm font-semibold text-[#14161C]">Itens</div>
           <div className="mt-2 space-y-1.5 text-sm">
             {order.items.map((item, i) => (
               <div key={i} className="flex justify-between text-gray-600">
@@ -167,7 +167,7 @@ export default function OrderTracking() {
               </div>
             ))}
           </div>
-          <div className="mt-3 flex justify-between border-t border-gray-100 pt-3 text-sm font-semibold text-[#351C4D] dark:border-gray-800">
+          <div className="mt-3 flex justify-between border-t border-gray-100 pt-3 text-sm font-semibold text-[#14161C] dark:border-gray-800">
             <span>Total</span>
             <span>{brl(order.total)}</span>
           </div>
