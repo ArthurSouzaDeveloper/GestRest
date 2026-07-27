@@ -3,11 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { publicBrandVars } from '../lib/publicBrand';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
-  Bike,
   ChevronLeft,
-  ChevronRight,
-  ShoppingBag,
-  BookOpen,
   Minus,
   Plus,
   X,
@@ -524,9 +520,17 @@ function IntroStep({
   restaurantName: string;
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
+  const [kind, setKind] = useState<OrderKind>('DELIVERY');
+
+  const { data: eta } = useQuery({
+    queryKey: ['public-eta', slug, kind],
+    queryFn: async () => (await api.get<EtaEstimate>(`/public/${slug}/eta`, { params: { orderType: kind } })).data,
+    enabled: !!slug,
+  });
+
   return (
     <div className="flex min-h-screen flex-col items-center bg-[#F4F6FA] px-7 pt-12 dark:bg-[#F4F6FA]">
-      <svg width="122" height="122" viewBox="0 0 120 120" role="img" aria-label={restaurantName}>
+      <svg width="104" height="104" viewBox="0 0 120 120" role="img" aria-label={restaurantName}>
         <defs>
           <radialGradient id="poBadgeFill" cx="50%" cy="38%" r="70%">
             <stop offset="0%" stopColor="#2C4E9E" />
@@ -551,56 +555,62 @@ function IntroStep({
         </text>
       </svg>
 
-      <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+      <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
         <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
         Aberto agora · delivery até 22:30
       </div>
 
       <CustomerLoginPanel slug={slug} />
 
-      <div className="mx-auto mt-16 flex w-full max-w-md flex-col gap-3">
-        <button
-          className="flex w-full items-center gap-3.5 rounded-[6px] bg-gradient-to-br from-[#1E3A8A] to-[#14295E] px-4 py-4 text-left shadow-[0_12px_24px_-10px_rgba(20,41,94,0.5)] transition active:scale-[0.98]"
-          onClick={() => onPick('DELIVERY')}
-        >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-white/20 text-white">
-            <Bike size={21} />
-          </span>
-          <span className="flex-1">
-            <span className="block text-[15px] font-extrabold text-white">Delivery</span>
-            <span className="block text-xs font-medium text-white/80">Entrega no seu endereço</span>
-          </span>
-          <ChevronRight size={17} className="shrink-0 text-white/70" />
-        </button>
+      <div className="mt-6 w-full max-w-md rounded-[6px] border border-[#14161C]/[0.08] bg-white p-4">
+        <h6 className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#1E3A8A]">Pastelaria &amp; Sucaria</h6>
+        <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight text-[#14161C]">{restaurantName}</h1>
+        <p className="mt-1.5 text-[12.5px] leading-[1.5] text-[#5A6072]">
+          Pastéis fritos na hora, mini pizzas e sucos naturais. Peça para retirar no balcão ou receber em casa.
+        </p>
 
-        <button
-          className="flex w-full items-center gap-3.5 rounded-[6px] bg-[#14161C] px-4 py-4 text-left shadow-[0_12px_24px_-10px_rgba(20,22,30,0.5)] transition active:scale-[0.98]"
-          onClick={() => onPick('PICKUP')}
-        >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-white/15 text-white">
-            <ShoppingBag size={21} />
-          </span>
-          <span className="flex-1">
-            <span className="block text-[15px] font-extrabold text-white">Retirada</span>
-            <span className="block text-xs font-medium text-white/75">Sem taxa de entrega</span>
-          </span>
-          <ChevronRight size={17} className="shrink-0 text-white/70" />
-        </button>
+        <div className="mt-4 border-t-2 border-[#14161C]/[0.08] pt-4">
+          <h6 className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#5A6072]">Como você quer receber?</h6>
+          <div className="flex gap-1 rounded-[6px] border border-[#14161C]/10 bg-[#F4F6FA] p-1">
+            <button
+              className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
+                kind === 'DELIVERY' ? 'bg-[#1E3A8A] text-white' : 'text-[#5A6072]'
+              }`}
+              onClick={() => setKind('DELIVERY')}
+            >
+              Entrega
+            </button>
+            <button
+              className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
+                kind === 'PICKUP' ? 'bg-[#1E3A8A] text-white' : 'text-[#5A6072]'
+              }`}
+              onClick={() => setKind('PICKUP')}
+            >
+              Retirada
+            </button>
+          </div>
 
-        <button
-          className="flex w-full items-center gap-3.5 rounded-[6px] border-[1.5px] border-[#14161C]/15 bg-white px-4 py-4 text-left transition active:scale-[0.98]"
-          onClick={() => onPick('MENU')}
-        >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-[#E9EEFB] text-[#1E3A8A]">
-            <BookOpen size={21} />
-          </span>
-          <span className="flex-1 text-[15px] font-extrabold text-[#14161C]">Cardápio</span>
-          <ChevronRight size={17} className="shrink-0 text-[#14161C]" />
-        </button>
+          <div className="mt-3">
+            <EtaNote eta={eta} />
+          </div>
+
+          <button className={`${PRIMARY_CTA} mt-4`} onClick={() => onPick(kind)}>
+            Ver cardápio completo
+          </button>
+          <button
+            className="mt-2.5 w-full text-center text-[11.5px] font-semibold text-[#5A6072] underline underline-offset-2"
+            onClick={() => onPick('MENU')}
+          >
+            Só quero ver o cardápio
+          </button>
+        </div>
       </div>
 
-      <div className="mx-auto mt-auto flex w-full max-w-md flex-col items-center gap-2.5 pb-6 pt-10">
-        <span className="text-[11px] font-semibold text-gray-500">Pastelaria e Sucaria desde 1996</span>
+      <div className="mx-auto mt-auto flex w-full max-w-md flex-col items-center gap-2.5 pb-6 pt-8">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
+          <MapPin size={12} className="shrink-0" />
+          Pastelaria e Sucaria desde 1996
+        </div>
         <div className="flex items-center gap-2.5">
           <a
             href="https://www.instagram.com/oreidosucoamericana"

@@ -8,8 +8,8 @@ import { prisma } from '../../config/prisma';
  * vira uma coluna em Restaurant.
  */
 const BASE_MINUTES: Record<'PICKUP' | 'DELIVERY', number> = {
-  PICKUP: 20,
-  DELIVERY: 40,
+  PICKUP: 30,
+  DELIVERY: 45,
 };
 
 /**
