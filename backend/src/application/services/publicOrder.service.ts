@@ -4,7 +4,7 @@ import { additionalService, categoryService, deliveryZoneService, productService
 import { deliveryPricingService } from './deliveryPricing.service';
 import { etaService } from './eta.service';
 import { googleMapsClient } from './googleMaps.client';
-import { orderInclude, serializePublicStatus } from './order.helpers';
+import { computeTotals, normalizePhone, orderInclude, serializePublicStatus } from './order.helpers';
 import { orderService, type PublicOrderInput } from './order.service';
 
 /** Resolves a public :slug to a tenant id, rejecting unknown or inactive restaurants. */
@@ -76,5 +76,42 @@ export const publicOrderService = {
     });
     if (!order) throw new NotFoundError('Pedido');
     return serializePublicStatus(order);
+  },
+  /**
+   * "Login" do site público por nome+telefone — sem senha, só serve pra um cliente que já
+   * pediu antes reencontrar os próprios pedidos depois de fechar o navegador (não tem link
+   * de rastreio salvo). Exige nome E telefone batendo (não só telefone) como uma barreira
+   * mínima contra alguém só adivinhando um número. Casa por telefone normalizado (só
+   * dígitos) pra não depender de como cada visita formatou o campo.
+   */
+  async customerLogin(slug: string, name: string, phone: string) {
+    const tenantId = await resolveActiveTenant(slug);
+    const phoneNormalized = normalizePhone(phone);
+    const candidates = await prisma.customer.findMany({
+      where: { restaurantId: tenantId, phoneNormalized },
+      select: { id: true, name: true },
+    });
+    const nameNormalized = name.trim().toLowerCase();
+    const recognized = candidates.some((c) => c.name.trim().toLowerCase() === nameNormalized);
+    if (!recognized) return { name: null, orders: [] };
+
+    const orders = await prisma.order.findMany({
+      where: { restaurantId: tenantId, customerId: { in: candidates.map((c) => c.id) } },
+      include: orderInclude,
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+    return {
+      name: candidates[0].name,
+      orders: orders.map((o) => ({
+        id: o.id,
+        number: o.number,
+        status: o.status,
+        orderType: o.orderType,
+        total: computeTotals(o).total,
+        estimatedReadyAt: o.estimatedReadyAt,
+        createdAt: o.createdAt,
+      })),
+    };
   },
 };

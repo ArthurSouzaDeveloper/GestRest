@@ -15,7 +15,7 @@ import { emitTenant, ROOMS } from '../../socket';
 import { auditService } from './audit.service';
 import { deliveryPricingService } from './deliveryPricing.service';
 import { etaService } from './eta.service';
-import { assertCustomProductBase, orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
+import { assertCustomProductBase, normalizePhone, orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
 
 interface Ctx {
   userId: string;
@@ -276,13 +276,27 @@ export const orderService = {
     const estimatedReadyAt = new Date(Date.now() + etaMinutes * 60_000);
 
     const orderId = await prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.create({
-        data: {
-          name: input.customerName.trim(),
-          phone: input.customerPhone.trim(),
-          restaurantId: tenantId,
-        },
+      // Reaproveita o mesmo Customer entre pedidos (pelo telefone) em vez de criar um
+      // novo a cada vez — é o que permite o cliente "logar" de novo (nome+telefone) e
+      // encontrar os pedidos anteriores depois de fechar o site. Atualiza o nome pro
+      // mais recente digitado, caso tenha mudado.
+      const phoneNormalized = normalizePhone(input.customerPhone);
+      const existing = await tx.customer.findFirst({
+        where: { restaurantId: tenantId, phoneNormalized },
       });
+      const customer = existing
+        ? await tx.customer.update({
+            where: { id: existing.id },
+            data: { name: input.customerName.trim() },
+          })
+        : await tx.customer.create({
+            data: {
+              name: input.customerName.trim(),
+              phone: input.customerPhone.trim(),
+              phoneNormalized,
+              restaurantId: tenantId,
+            },
+          });
       const order = await tx.order.create({
         data: {
           restaurantId: tenantId,

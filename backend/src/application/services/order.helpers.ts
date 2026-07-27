@@ -1,6 +1,11 @@
 import { AdditionalKind, OrderStatus, Prisma, TableStatus } from '@prisma/client';
 import { AppError } from '../../utils/errors';
 
+/** Só os dígitos de um telefone — pra achar o mesmo cliente independente de como ele formatou. */
+export function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '');
+}
+
 /**
  * Regra do produto montável ("Monte o Seu"): o preço vem inteiro do sabor-base, então o
  * item precisa de exatamente 1 adicional BASE — sem base seria um item de R$0, com 2+ o

@@ -26,7 +26,7 @@ import { brl } from '../lib/format';
 import { Spinner } from '../components/ui';
 import { OrderComposer, draftItemUnitPrice, type DraftItem } from '../components/OrderComposer';
 import AddressAutocomplete from '../components/AddressAutocomplete';
-import type { DeliveryZone, EtaEstimate, PaymentMethod, PlaceDetails } from '../types';
+import type { DeliveryZone, EtaEstimate, OrderStatus, OrderType, PaymentMethod, PlaceDetails } from '../types';
 
 /** "19:45" a partir de um ISO — usado pra mostrar a previsão travada na confirmação. */
 function formatClock(iso: string): string {
@@ -95,6 +95,51 @@ interface PublicRestaurant {
   active: boolean;
   deliveryPricingMode: 'ZONE' | 'DISTANCE_BANDS';
 }
+
+interface CustomerOrderSummary {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  orderType: OrderType;
+  total: number;
+  estimatedReadyAt: string | null;
+  createdAt: string;
+}
+
+interface SavedCustomer {
+  name: string;
+  phone: string;
+}
+
+/** Identidade salva no navegador (nome+telefone) — só pra reconhecer quem já pediu
+ * antes e oferecer "ver meu pedido" sem precisar redigitar. Escopada por restaurante. */
+function customerStorageKey(slug: string): string {
+  return `gr:${slug}:customer`;
+}
+function readSavedCustomer(slug: string): SavedCustomer | null {
+  try {
+    const raw = localStorage.getItem(customerStorageKey(slug));
+    return raw ? (JSON.parse(raw) as SavedCustomer) : null;
+  } catch {
+    return null;
+  }
+}
+function saveCustomer(slug: string, customer: SavedCustomer): void {
+  try {
+    localStorage.setItem(customerStorageKey(slug), JSON.stringify(customer));
+  } catch {
+    // localStorage indisponível (modo privado etc.) — não é crítico, só perde a conveniência.
+  }
+}
+
+const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
+  PENDING: 'Aguardando confirmação',
+  OPEN: 'Em preparo',
+  IN_PRODUCTION: 'Em preparo',
+  READY_FOR_PAYMENT: 'Pronto',
+  PAID: 'Concluído',
+  CANCELLED: 'Cancelado',
+};
 
 /**
  * Site público de pedidos (delivery/retirada) — sem login, alcançado por um link
@@ -217,6 +262,9 @@ export default function PublicOrder() {
       setConfirmedOrderId(order.id);
       setConfirmedEta(order.estimatedReadyAt);
       setStep('confirmation');
+      // Lembra nome+telefone nesse navegador — é o que deixa o cliente "entrar" de novo na
+      // Capa depois de fechar o site pra ver como o pedido está indo.
+      saveCustomer(slug, { name: customerName.trim(), phone: customerPhone.trim() });
     },
     onError: (e) => setSubmitError(apiError(e)),
   });
@@ -280,6 +328,7 @@ export default function PublicOrder() {
 
       {step === 'intro' && (
         <IntroStep
+          slug={slug}
           restaurantName={restaurant.name}
           onPick={(kind) => {
             if (kind === 'MENU') {
@@ -467,9 +516,11 @@ function PublicHeader({
  * fixo aqui.
  */
 function IntroStep({
+  slug,
   restaurantName,
   onPick,
 }: {
+  slug: string;
   restaurantName: string;
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
@@ -504,6 +555,8 @@ function IntroStep({
         <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
         Aberto agora · delivery até 22:30
       </div>
+
+      <CustomerLoginPanel slug={slug} />
 
       <div className="mx-auto mt-16 flex w-full max-w-md flex-col gap-3">
         <button
@@ -578,6 +631,115 @@ function IntroStep({
           </a>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * "Entrar" no site público por nome+telefone — não é autenticação de verdade (sem senha),
+ * é só o jeito do cliente reencontrar os próprios pedidos depois de fechar o navegador
+ * (sem o link de acompanhamento salvo). Se o navegador já tem uma identidade salva de um
+ * pedido anterior, mostra direto "bem-vindo de volta"; senão, oferece o link discreto que
+ * abre o formulário.
+ */
+function CustomerLoginPanel({ slug }: { slug: string }) {
+  const [saved] = useState(() => readSavedCustomer(slug));
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(saved?.name ?? '');
+  const [phone, setPhone] = useState(saved?.phone ?? '');
+  const [result, setResult] = useState<{ name: string | null; orders: CustomerOrderSummary[] } | null>(null);
+
+  const login = useMutation({
+    mutationFn: async () => {
+      const payload = { name: name.trim(), phone: phone.trim() };
+      const data = (await api.post<{ name: string | null; orders: CustomerOrderSummary[] }>(`/public/${slug}/customers/login`, payload)).data;
+      if (data.name) saveCustomer(slug, payload);
+      return data;
+    },
+    onSuccess: setResult,
+  });
+
+  if (!open && !saved) {
+    return (
+      <button
+        className="mt-3 text-[11.5px] font-semibold text-[#1E3A8A] underline decoration-[#1E3A8A]/35 underline-offset-2"
+        onClick={() => setOpen(true)}
+      >
+        Já pediu antes? Entrar
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 w-full max-w-md">
+      {!open && saved && !result && (
+        <div className="flex items-center justify-between rounded-[6px] border border-[#14161C]/10 bg-white px-3.5 py-2.5">
+          <span className="text-[12px] font-semibold text-[#14161C]">Bem-vindo de volta, {saved.name.split(' ')[0]}</span>
+          <button
+            className="text-[11.5px] font-bold text-[#1E3A8A] disabled:opacity-50"
+            disabled={login.isPending}
+            onClick={() => login.mutate()}
+          >
+            {login.isPending ? 'Buscando...' : 'Ver meu pedido'}
+          </button>
+        </div>
+      )}
+
+      {open && !result && (
+        <div className="rounded-[6px] border border-[#14161C]/10 bg-white p-3.5">
+          <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-[#5A6072]">Entrar</p>
+          <div className="flex flex-col gap-2">
+            <input className={FIELD_INPUT} value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" />
+            <input
+              className={FIELD_INPUT}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(21) 9 9999-9999"
+              inputMode="tel"
+            />
+            <button
+              className="rounded-[6px] bg-[#1E3A8A] py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
+              disabled={login.isPending || name.trim().length < 2 || phone.trim().length < 8}
+              onClick={() => login.mutate()}
+            >
+              {login.isPending ? 'Buscando...' : 'Entrar'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {result && (
+        <div className="rounded-[6px] border border-[#14161C]/10 bg-white p-3.5">
+          {result.name === null ? (
+            <p className="text-[12px] text-red-600">Nenhum pedido encontrado com esse nome e telefone.</p>
+          ) : result.orders.length === 0 ? (
+            <p className="text-[12px] text-[#5A6072]">Você ainda não tem pedidos por aqui.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-[11.5px] font-bold uppercase tracking-wide text-[#5A6072]">Seus pedidos</p>
+              {result.orders.map((o) => (
+                <Link
+                  key={o.id}
+                  to={`/pedido/${slug}/rastreio/${o.id}`}
+                  className="flex items-center justify-between rounded-[6px] border border-[#14161C]/10 px-3 py-2 text-[12.5px] hover:bg-[#E9EEFB]"
+                >
+                  <span className="font-bold text-[#14161C]">Pedido #{o.number}</span>
+                  <span className="text-[#1E3A8A]">{ORDER_STATUS_LABEL[o.status]}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+          <button
+            className="mt-2.5 text-[11px] font-semibold text-[#5A6072] underline underline-offset-2"
+            onClick={() => {
+              setResult(null);
+              setOpen(false);
+            }}
+          >
+            Fechar
+          </button>
+        </div>
+      )}
     </div>
   );
 }
