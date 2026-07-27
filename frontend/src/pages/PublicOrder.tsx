@@ -581,6 +581,79 @@ function IntroStep({
   );
 }
 
+/**
+ * Busca local do bairro entre os cadastrados — sem chamada nenhuma, a lista já veio
+ * carregada com a tela (reaproveita o mesmo GET /public/:slug/delivery-zones de sempre).
+ * Se o cliente digitar um bairro que não bate com nada cadastrado, mostra o aviso de fora
+ * da área com um contato — mesmo WhatsApp já usado no rodapé do Início.
+ */
+function ZoneAutocomplete({
+  zones,
+  selectedZoneId,
+  onSelect,
+}: {
+  zones: DeliveryZone[];
+  selectedZoneId: string;
+  onSelect: (zoneId: string) => void;
+}) {
+  const [query, setQuery] = useState(() => zones.find((z) => z.id === selectedZoneId)?.name ?? '');
+  const [open, setOpen] = useState(false);
+
+  const term = query.trim().toLowerCase();
+  const filtered = term ? zones.filter((z) => z.name.toLowerCase().includes(term)) : zones;
+  const notFound = zones.length === 0 || (term.length > 0 && !selectedZoneId && filtered.length === 0);
+
+  const pick = (zone: DeliveryZone) => {
+    setQuery(zone.name);
+    onSelect(zone.id);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <input
+        className={FIELD_INPUT}
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          if (selectedZoneId) onSelect('');
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Digite o nome do seu bairro"
+        autoComplete="off"
+        disabled={zones.length === 0}
+      />
+      {open && term.length > 0 && filtered.length > 0 && (
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[11px] border border-[#351C4D]/[0.15] bg-white shadow-lg">
+          {filtered.map((z) => (
+            <button
+              key={z.id}
+              type="button"
+              className="flex w-full items-center justify-between border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#351C4D] last:border-b-0 hover:bg-gray-50"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(z)}
+            >
+              <span>{z.name}</span>
+              <span className="text-[#7c7086]">{brl(z.fee)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {notFound && (
+        <p className="mt-1.5 text-[11px] text-red-600">
+          Bairro indisponível para entrega. Fale com a gente pelo{' '}
+          <a href="https://wa.me/551934054361" target="_blank" rel="noreferrer" className="font-semibold underline">
+            WhatsApp (19) 3405-4361
+          </a>
+          .
+        </p>
+      )}
+    </div>
+  );
+}
+
 function DetailsStep({
   slug,
   orderKind,
@@ -714,15 +787,7 @@ function DetailsStep({
         <>
           <div>
             <label className={FIELD_LABEL}>Bairro</label>
-            <select className={FIELD_INPUT} value={deliveryZoneId} onChange={(e) => setDeliveryZoneId(e.target.value)}>
-              <option value="">Selecione seu bairro</option>
-              {zones.map((z) => (
-                <option key={z.id} value={z.id}>{z.name} — taxa {brl(z.fee)}</option>
-              ))}
-            </select>
-            {zones.length === 0 && (
-              <p className="mt-1 text-[11px] text-amber-600">Nenhum bairro cadastrado ainda para entrega.</p>
-            )}
+            <ZoneAutocomplete zones={zones} selectedZoneId={deliveryZoneId} onSelect={setDeliveryZoneId} />
             {selectedFee !== undefined && <p className="mt-1 text-[11px] text-[#7c7086]">Taxa de entrega: {brl(selectedFee)}</p>}
           </div>
           <div className="grid grid-cols-[1.4fr_1fr] gap-2.5">
