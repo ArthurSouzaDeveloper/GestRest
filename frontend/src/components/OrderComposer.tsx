@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
-import { FRUIT_BASE_RE, JuiceBuilder } from './JuiceBuilder';
+import { JuiceBuilder } from './JuiceBuilder';
 import { Spinner } from './ui';
 import { DRINK_NOTE_PRESETS, FOOD_NOTE_PRESETS, toggleNotePreset } from '../lib/notePresets';
 import type { Additional, Category, Product } from '../types';
@@ -66,13 +66,18 @@ function isAguaProduct(p: Product): boolean {
  * Guaraná, H2O etc. todos numa categoria genérica "Bebidas" em vez de categorias próprias,
  * então confiar só na categoria deixaria esses itens fora da aba certa.
  *
- * Exceção: produtos do montador de suco (nome "Fruta (Base)", ex. "Morango (Água)") nunca
- * usam os hints de nome — a base "Água" de um suco não deve mandar o item pro sub-filtro
- * Água, que é só pra água mineral de verdade.
+ * Exceção: produtos da categoria Sucos (montador "Fruta (Base)", ex. "Morango (Água)")
+ * nunca usam os hints de nome — a base "Água" de um suco não deve mandar o item pro
+ * sub-filtro Água, que é só pra água mineral de verdade. Checa pela CATEGORIA real (não
+ * por regex no nome) porque produto de outra categoria pode coincidentemente ter um nome
+ * no formato "Palavra (palavra)" (ex. "H2O (sabores)") sem ser suco nenhum.
  */
+function isSucosCategoryProduct(p: Product, categoriesById: Map<string, Category>): boolean {
+  return categoriesById.get(p.categoryId)?.name.trim().toLowerCase() === 'sucos';
+}
+
 function productTopGroup(p: Product, categoriesById: Map<string, Category>): TopGroup {
-  const isJuiceBuilderItem = FRUIT_BASE_RE.test(p.name);
-  if (!isJuiceBuilderItem && (isAguaProduct(p) || isRefrigeranteProduct(p))) return 'BEBIDAS';
+  if (!isSucosCategoryProduct(p, categoriesById) && (isAguaProduct(p) || isRefrigeranteProduct(p))) return 'BEBIDAS';
   const cat = categoriesById.get(p.categoryId);
   if (cat && (isAguaCategory(cat) || isRefrigeranteCategory(cat) || cat.station === 'JUICE_BAR')) return 'BEBIDAS';
   return 'COMIDAS';
@@ -83,9 +88,8 @@ function productTopGroup(p: Product, categoriesById: Map<string, Category>): Top
  * sub-filtros virtuais (não são Category de verdade no banco, só um agrupamento por nome),
  * o resto usa a própria categoria (Sucos, Açaí e Cupuaçu, Bebidas...).
  */
-function productChipKey(p: Product): string {
-  const isJuiceBuilderItem = FRUIT_BASE_RE.test(p.name);
-  if (!isJuiceBuilderItem) {
+function productChipKey(p: Product, categoriesById: Map<string, Category>): string {
+  if (!isSucosCategoryProduct(p, categoriesById)) {
     if (isAguaProduct(p)) return 'AGUA';
     if (isRefrigeranteProduct(p)) return 'REFRIGERANTES';
   }
@@ -150,7 +154,7 @@ export function OrderComposer({
       const ids = new Set(groupProducts.map((p) => p.categoryId));
       return categories.filter((c) => ids.has(c.id)).map((c) => ({ key: c.id, label: categoryDisplayName(c.name) }));
     }
-    const keys = new Set(groupProducts.map((p) => productChipKey(p)));
+    const keys = new Set(groupProducts.map((p) => productChipKey(p, categoriesById)));
     const chips: { key: string; label: string }[] = [];
     if (sucosCategoryId && keys.has(sucosCategoryId)) chips.push({ key: sucosCategoryId, label: 'Sucos' });
     if (keys.has('REFRIGERANTES')) chips.push({ key: 'REFRIGERANTES', label: 'Refrigerantes' });
@@ -160,7 +164,7 @@ export function OrderComposer({
       chips.push({ key: c.id, label: categoryDisplayName(c.name) });
     }
     return chips;
-  }, [topGroup, groupProducts, categories, sucosCategoryId]);
+  }, [topGroup, groupProducts, categories, sucosCategoryId, categoriesById]);
   const showChipRow = topGroup === 'COMIDAS' ? groupChips.length > 1 : groupChips.length > 0;
 
   // Buscando: procura em TODOS os produtos (qualquer aba) por nome ou descrição.
@@ -176,8 +180,8 @@ export function OrderComposer({
     }
     if (activeCat === 'all') return groupProducts;
     if (topGroup === 'COMIDAS') return groupProducts.filter((p) => p.categoryId === activeCat);
-    return groupProducts.filter((p) => productChipKey(p) === activeCat);
-  }, [products, groupProducts, activeCat, term, searching, topGroup]);
+    return groupProducts.filter((p) => productChipKey(p, categoriesById) === activeCat);
+  }, [products, groupProducts, activeCat, term, searching, topGroup, categoriesById]);
 
   const simpleIndex = (productId: string) =>
     draft.findIndex((d) => d.product.id === productId && d.additionalIds.length === 0 && !d.notes);
@@ -217,7 +221,15 @@ export function OrderComposer({
   // combinações como botões separados.
   const activeCategory = categories.find((c) => c.id === activeCat);
   const useBuilder = activeCategory?.name.toLowerCase() === 'sucos' && !searching;
-  const categoryName = (id: string) => categoryDisplayName(categories.find((c) => c.id === id)?.name ?? '');
+  // Rótulo mostrado no resultado da busca — usa o mesmo agrupamento Água/Refrigerantes dos
+  // chips (não a categoria crua do banco), senão a busca mostraria ex. "Bebidas Alcoólicas"
+  // pro H2O só porque ele está cadastrado ali, contradizendo o chip onde ele realmente aparece.
+  const productBadgeLabel = (p: Product) => {
+    const key = productChipKey(p, categoriesById);
+    if (key === 'AGUA') return 'Água';
+    if (key === 'REFRIGERANTES') return 'Refrigerantes';
+    return categoryDisplayName(categories.find((c) => c.id === key)?.name ?? '');
+  };
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -318,7 +330,7 @@ export function OrderComposer({
                   <div className="min-w-0 flex-1">
                     {searching && (
                       <span className="mb-0.5 block w-fit rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800">
-                        {categoryName(p.categoryId)}
+                        {productBadgeLabel(p)}
                       </span>
                     )}
                     <div className="text-[15px] font-semibold leading-tight text-gray-900 dark:text-gray-50">{p.name}</div>
