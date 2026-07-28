@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda, GlassWater, Droplets } from 'lucide-react';
+import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { FRUIT_BASE_RE, JuiceBuilder } from './JuiceBuilder';
@@ -22,13 +22,13 @@ export function draftItemUnitPrice(item: DraftItem): number {
   return item.product.price + item.additionalsTotal;
 }
 
-type TopGroup = 'COMIDAS' | 'BEBIDAS' | 'REFRIGERANTES' | 'AGUA';
+// Só 2 abas no topo — Água e Refrigerantes viraram sub-filtro (chip) dentro de "Sucos e
+// Bebidas" em vez de aba própria, pra não competir por espaço com o que o cliente mais pede.
+type TopGroup = 'COMIDAS' | 'BEBIDAS';
 
 const TOP_GROUP_LABELS: Record<TopGroup, string> = {
-  COMIDAS: 'Comidas',
-  BEBIDAS: 'Bebidas',
-  REFRIGERANTES: 'Refrigerantes',
-  AGUA: 'Água',
+  COMIDAS: 'Pastéis e Mini Pizzas',
+  BEBIDAS: 'Sucos e Bebidas',
 };
 
 const isRefrigeranteCategory = (c: Category) => c.name.toLowerCase().includes('refrigerante');
@@ -39,12 +39,15 @@ const isAguaCategory = (c: Category) => {
 
 // Marcas/termos de refrigerante — usado pra classificar o produto mesmo quando ele está
 // cadastrado dentro de uma categoria genérica ("Bebidas") em vez de uma categoria própria.
+// Água tônica e H2O contam como refrigerante aqui, não como água mineral nem bebida
+// alcoólica — é assim que o cardápio físico os trata.
 const REFRIGERANTE_NAME_HINTS = [
   'coca-cola', 'coca cola', 'coca', 'guaraná', 'guarana', 'fanta', 'sprite', 'pepsi',
   'kuat', 'soda', 'itubaína', 'itubaina', 'dolly', 'sukita', 'tônica', 'tonica',
   'schweppes', 'h2o', 'refrigerante', 'refri',
 ];
-// "Água de coco"/"água aromatizada" também contam como água pra este agrupamento.
+// "Água de coco"/"água mineral/com gás" contam como água pra este agrupamento — água
+// tônica NÃO entra aqui (é refrigerante, ver hint acima, checado antes deste).
 const AGUA_NAME_HINTS = ['água', 'agua'];
 
 function isRefrigeranteProduct(p: Product): boolean {
@@ -53,32 +56,40 @@ function isRefrigeranteProduct(p: Product): boolean {
 }
 function isAguaProduct(p: Product): boolean {
   const n = p.name.toLowerCase();
+  if (isRefrigeranteProduct(p)) return false; // água tônica etc. já viraram refrigerante acima
   return AGUA_NAME_HINTS.some((hint) => n.includes(hint));
 }
 
 /**
- * Classifica um produto pelo GRUPO de aba a que pertence. O nome do produto tem prioridade
- * sobre a categoria cadastrada — várias casas colocam Coca-Cola, Guaraná, H2O etc. todos numa
- * categoria genérica "Bebidas" em vez de categorias próprias, então confiar só na categoria
- * deixaria esses itens fora da aba certa.
+ * Classifica um produto pela ABA a que pertence: Comidas ou Sucos e Bebidas. O nome do
+ * produto tem prioridade sobre a categoria cadastrada — várias casas colocam Coca-Cola,
+ * Guaraná, H2O etc. todos numa categoria genérica "Bebidas" em vez de categorias próprias,
+ * então confiar só na categoria deixaria esses itens fora da aba certa.
  *
  * Exceção: produtos do montador de suco (nome "Fruta (Base)", ex. "Morango (Água)") nunca
- * usam os hints de nome — a base "Água" de um suco não deve mandar o item pra aba Água, que é
- * só pra água mineral de verdade. Esses produtos ficam na aba Bebidas/Sucos pela categoria.
+ * usam os hints de nome — a base "Água" de um suco não deve mandar o item pro sub-filtro
+ * Água, que é só pra água mineral de verdade.
  */
 function productTopGroup(p: Product, categoriesById: Map<string, Category>): TopGroup {
+  const isJuiceBuilderItem = FRUIT_BASE_RE.test(p.name);
+  if (!isJuiceBuilderItem && (isAguaProduct(p) || isRefrigeranteProduct(p))) return 'BEBIDAS';
+  const cat = categoriesById.get(p.categoryId);
+  if (cat && (isAguaCategory(cat) || isRefrigeranteCategory(cat) || cat.station === 'JUICE_BAR')) return 'BEBIDAS';
+  return 'COMIDAS';
+}
+
+/**
+ * Chave do sub-filtro (chip) dentro de "Sucos e Bebidas": água e refrigerante são
+ * sub-filtros virtuais (não são Category de verdade no banco, só um agrupamento por nome),
+ * o resto usa a própria categoria (Sucos, Açaí e Cupuaçu, Bebidas...).
+ */
+function productChipKey(p: Product): string {
   const isJuiceBuilderItem = FRUIT_BASE_RE.test(p.name);
   if (!isJuiceBuilderItem) {
     if (isAguaProduct(p)) return 'AGUA';
     if (isRefrigeranteProduct(p)) return 'REFRIGERANTES';
   }
-  const cat = categoriesById.get(p.categoryId);
-  if (cat) {
-    if (isAguaCategory(cat)) return 'AGUA';
-    if (isRefrigeranteCategory(cat)) return 'REFRIGERANTES';
-    if (cat.station === 'JUICE_BAR') return 'BEBIDAS';
-  }
-  return 'COMIDAS';
+  return p.categoryId;
 }
 
 /** A categoria genérica "Bebidas" (o que sobra depois de separar sucos/refrigerante/água) é onde ficam as bebidas alcoólicas — o rótulo do subfiltro reflete isso. */
@@ -118,7 +129,7 @@ export function OrderComposer({
   const term = search.trim().toLowerCase();
   const searching = term.length > 0;
 
-  // Divide o cardápio em 4 abas pequenas em vez de uma parede única de ~15 categorias.
+  // Divide o cardápio em 2 abas grandes em vez de uma parede única de ~15 categorias.
   // Cada PRODUTO (não a categoria) é classificado — ver productTopGroup — porque o
   // restaurante mistura vários tipos de bebida dentro de uma categoria genérica "Bebidas"
   // em vez de ter categorias próprias para cada tipo.
@@ -127,14 +138,34 @@ export function OrderComposer({
     () => products.filter((p) => productTopGroup(p, categoriesById) === topGroup),
     [products, categoriesById, topGroup],
   );
-  // Só mostra como pill de sub-categoria as categorias que de fato têm produto neste grupo.
-  const groupCategories = useMemo(() => {
-    const ids = new Set(groupProducts.map((p) => p.categoryId));
-    return categories.filter((c) => ids.has(c.id));
-  }, [categories, groupProducts]);
+  const sucosCategoryId = useMemo(
+    () => categories.find((c) => c.name.trim().toLowerCase() === 'sucos')?.id,
+    [categories],
+  );
+  // Chips de sub-filtro dentro da aba: em Comidas são só as categorias com produto ali;
+  // em Sucos e Bebidas, Água/Refrigerantes entram como chips virtuais (não são Category de
+  // verdade) na frente, com Sucos primeiro por ser o mais pedido.
+  const groupChips = useMemo(() => {
+    if (topGroup === 'COMIDAS') {
+      const ids = new Set(groupProducts.map((p) => p.categoryId));
+      return categories.filter((c) => ids.has(c.id)).map((c) => ({ key: c.id, label: categoryDisplayName(c.name) }));
+    }
+    const keys = new Set(groupProducts.map((p) => productChipKey(p)));
+    const chips: { key: string; label: string }[] = [];
+    if (sucosCategoryId && keys.has(sucosCategoryId)) chips.push({ key: sucosCategoryId, label: 'Sucos' });
+    if (keys.has('REFRIGERANTES')) chips.push({ key: 'REFRIGERANTES', label: 'Refrigerantes' });
+    if (keys.has('AGUA')) chips.push({ key: 'AGUA', label: 'Água' });
+    for (const c of categories) {
+      if (c.id === sucosCategoryId || !keys.has(c.id)) continue;
+      chips.push({ key: c.id, label: categoryDisplayName(c.name) });
+    }
+    return chips;
+  }, [topGroup, groupProducts, categories, sucosCategoryId]);
+  const showChipRow = topGroup === 'COMIDAS' ? groupChips.length > 1 : groupChips.length > 0;
 
   // Buscando: procura em TODOS os produtos (qualquer aba) por nome ou descrição.
-  // Sem busca: filtra pela aba selecionada e, dentro dela, pela categoria (se escolhida).
+  // Sem busca: filtra pela aba selecionada e, dentro dela, pelo chip escolhido (categoria
+  // de verdade em Comidas; categoria OU sub-filtro virtual Água/Refrigerantes em Bebidas).
   const filtered = useMemo(() => {
     if (searching) {
       return products.filter(
@@ -144,8 +175,9 @@ export function OrderComposer({
       );
     }
     if (activeCat === 'all') return groupProducts;
-    return groupProducts.filter((p) => p.categoryId === activeCat);
-  }, [products, groupProducts, activeCat, term, searching]);
+    if (topGroup === 'COMIDAS') return groupProducts.filter((p) => p.categoryId === activeCat);
+    return groupProducts.filter((p) => productChipKey(p) === activeCat);
+  }, [products, groupProducts, activeCat, term, searching, topGroup]);
 
   const simpleIndex = (productId: string) =>
     draft.findIndex((d) => d.product.id === productId && d.additionalIds.length === 0 && !d.notes);
@@ -213,52 +245,44 @@ export function OrderComposer({
 
         {!searching && (
           <>
-            {/* Grupo principal: comidas / bebidas / refrigerantes / água — reduz a lista de
-                categorias visíveis de uma vez. Refrigerantes e água têm aba própria porque o
-                restaurante pediu acesso direto a elas, sem passar pela aba geral de bebidas. */}
+            {/* Grupo principal: só 2 blocos — Pastéis e Mini Pizzas / Sucos e Bebidas. Água
+                e Refrigerantes viraram chip dentro do segundo bloco (ver abaixo) em vez de
+                aba própria. */}
             <div className="mb-2 grid grid-cols-2 gap-2">
               <button
                 className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                 onClick={() => { setTopGroup('COMIDAS'); setActiveCat('all'); }}
               >
-                <Utensils size={15} className="shrink-0" /> Comidas
+                <Utensils size={15} className="shrink-0" /> Pastéis e Mini Pizzas
               </button>
               <button
                 className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
-                onClick={() => { setTopGroup('BEBIDAS'); setActiveCat('all'); }}
+                onClick={() => { setTopGroup('BEBIDAS'); setActiveCat(sucosCategoryId ?? 'all'); }}
               >
-                <CupSoda size={15} className="shrink-0" /> Bebidas
-              </button>
-              <button
-                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'REFRIGERANTES' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
-                onClick={() => { setTopGroup('REFRIGERANTES'); setActiveCat('all'); }}
-              >
-                <GlassWater size={15} className="shrink-0" /> Refrigerantes
-              </button>
-              <button
-                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'AGUA' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
-                onClick={() => { setTopGroup('AGUA'); setActiveCat('all'); }}
-              >
-                <Droplets size={15} className="shrink-0" /> Água
+                <CupSoda size={15} className="shrink-0" /> Sucos e Bebidas
               </button>
             </div>
 
-            {/* Sub-categorias dentro do grupo — só faz sentido quando há mais de uma pra escolher. */}
-            {groupCategories.length > 1 && (
+            {/* Sub-filtro dentro do grupo. Em Comidas tem "Todos" (categorias pequenas, faz
+                sentido ver junto); em Sucos e Bebidas não tem "Todos" — Sucos já domina o
+                grupo, então misturar tudo só deixa a lista maior sem ajudar. */}
+            {showChipRow && (
               <div className="mb-2 flex flex-wrap gap-2">
-                <button
-                  className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === 'all' ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
-                  onClick={() => setActiveCat('all')}
-                >
-                  Todos
-                </button>
-                {groupCategories.map((c) => (
+                {topGroup === 'COMIDAS' && (
                   <button
-                    key={c.id}
-                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === c.id ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
-                    onClick={() => setActiveCat(c.id)}
+                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === 'all' ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
+                    onClick={() => setActiveCat('all')}
                   >
-                    {categoryDisplayName(c.name)}
+                    Todos
+                  </button>
+                )}
+                {groupChips.map((chip) => (
+                  <button
+                    key={chip.key}
+                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
+                    onClick={() => setActiveCat(chip.key)}
+                  >
+                    {chip.label}
                   </button>
                 ))}
               </div>
@@ -344,10 +368,11 @@ export function OrderComposer({
         )}
       </div>
 
-      {/* Draft cart */}
+      {/* Draft cart — só ocupa espaço quando tem algo, pra não atrapalhar a visualização do
+          cardápio antes do cliente escolher o primeiro item. */}
+      {draft.length > 0 && (
       <div>
         <h4 className="mb-2 text-sm font-medium text-gray-600 dark:text-gray-300">Itens do pedido</h4>
-        {draft.length === 0 && <p className="text-sm text-gray-400">Toque em um produto para adicionar.</p>}
         <div className="space-y-2">
           {draft.map((item, i) => (
             <div key={i} className="card p-3">
@@ -389,6 +414,7 @@ export function OrderComposer({
           ))}
         </div>
       </div>
+      )}
 
       {configuring && (
         <ItemConfigModal
