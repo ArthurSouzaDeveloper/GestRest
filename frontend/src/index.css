@@ -12,6 +12,13 @@
   --brand-700: #172c66;
 }
 
+html, body {
+  /* Trava o "arrastar pros lados" do navegador (voltar/avançar por gesto, balanço de
+     borda) e qualquer overflow horizontal acidental — a página só rola pra cima/baixo. */
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
 body {
   @apply bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
   font-family: 'Inter', system-ui, sans-serif;
