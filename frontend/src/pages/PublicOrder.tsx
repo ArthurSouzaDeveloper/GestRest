@@ -557,7 +557,7 @@ function IntroStep({
 
       <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
         <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
-        Aberto agora · delivery até 22:30
+        Aberto de quarta a domingo até 23h
       </div>
 
       <CustomerLoginPanel slug={slug} />
