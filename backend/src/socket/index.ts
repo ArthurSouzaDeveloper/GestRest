@@ -24,7 +24,7 @@ let io: SocketServer | null = null;
 
 export function initSocket(httpServer: HttpServer): SocketServer {
   io = new SocketServer(httpServer, {
-    cors: { origin: env.corsOrigin, credentials: true },
+    cors: { origin: env.corsOrigins, credentials: true },
   });
 
   // Optional JWT handshake auth (token via auth payload)

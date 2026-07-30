@@ -20,7 +20,10 @@ export const env = {
   nodeEnv,
   isProd,
   port: Number(process.env.PORT ?? 4000),
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  // Aceita uma lista separada por vírgula — permite o site responder por mais de um
+  // endereço ao mesmo tempo (ex.: domínio novo com HTTPS + o link antigo por IP:porta
+  // continuando a funcionar durante a transição), sem quebrar nenhum link já distribuído.
+  corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173').split(',').map((o) => o.trim()),
   databaseUrl: required('DATABASE_URL', 'postgresql://gestrest:gestrest@localhost:5432/gestrest'),
   jwt: {
     accessSecret: required('JWT_ACCESS_SECRET', 'dev-access-secret'),

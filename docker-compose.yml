@@ -28,7 +28,9 @@ services:
       DATABASE_URL: postgresql://gestrest:gestrest@db:5432/gestrest?schema=public
       JWT_ACCESS_SECRET: change-me-in-prod-access
       JWT_REFRESH_SECRET: change-me-in-prod-refresh
-      CORS_ORIGIN: http://localhost:8081
+      # Lista separada por vírgula — mantém o link antigo por IP funcionando junto com o
+      # domínio novo (http e https, até o certificado SSL estar configurado no servidor).
+      CORS_ORIGIN: http://178.105.238.245:8081,http://gestrest.app.br,https://gestrest.app.br,http://www.gestrest.app.br,https://www.gestrest.app.br
     ports:
       - '4000:4000'
 
