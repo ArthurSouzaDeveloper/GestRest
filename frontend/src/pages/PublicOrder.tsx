@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { publicBrandVars } from '../lib/publicBrand';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -154,6 +154,7 @@ export default function PublicOrder() {
   const [deliveryLng, setDeliveryLng] = useState<number | null>(null);
   const [deliveryStreet, setDeliveryStreet] = useState('');
   const [deliveryNumber, setDeliveryNumber] = useState('');
+  const [deliveryCep, setDeliveryCep] = useState('');
   const [deliveryComplement, setDeliveryComplement] = useState('');
   const [draft, setDraft] = useState<DraftItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PublicPaymentMethod | ''>('');
@@ -237,6 +238,7 @@ export default function PublicOrder() {
                 : { deliveryZoneId }),
               deliveryStreet: deliveryStreet.trim(),
               deliveryNumber: deliveryNumber.trim(),
+              deliveryCep: deliveryCep.trim() || undefined,
               deliveryComplement: deliveryComplement.trim() || undefined,
             }
           : {}),
@@ -366,6 +368,8 @@ export default function PublicOrder() {
             setDeliveryStreet={setDeliveryStreet}
             deliveryNumber={deliveryNumber}
             setDeliveryNumber={setDeliveryNumber}
+            deliveryCep={deliveryCep}
+            setDeliveryCep={setDeliveryCep}
             deliveryComplement={deliveryComplement}
             setDeliveryComplement={setDeliveryComplement}
             canContinue={!!canContinueDetails}
@@ -408,6 +412,7 @@ export default function PublicOrder() {
             deliveryZoneName={deliveryFeeLabel}
             deliveryStreet={deliveryStreet}
             deliveryNumber={deliveryNumber}
+            deliveryCep={deliveryCep}
             deliveryComplement={deliveryComplement}
             draft={draft}
             subtotal={subtotal}
@@ -440,6 +445,7 @@ export default function PublicOrder() {
               setDeliveryLng(null);
               setDeliveryStreet('');
               setDeliveryNumber('');
+              setDeliveryCep('');
               setDeliveryComplement('');
               setPaymentMethod('');
               setChangeFor('');
@@ -755,6 +761,16 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
 }
 
 /**
+ * Bairros são salvos como "Bairro (Cidade)" pra não colidir entre cidades diferentes que
+ * têm rua com o mesmo nome (ver script de importação) — aqui separa os dois só pra exibir
+ * organizado: a cidade vira cabeçalho de bloco, o nome do bairro fica limpo.
+ */
+function splitZoneName(fullName: string): { bairro: string; city: string | null } {
+  const m = fullName.match(/^(.+) \(([^)]+)\)$/);
+  return m ? { bairro: m[1], city: m[2] } : { bairro: fullName, city: null };
+}
+
+/**
  * Busca local do bairro entre os cadastrados — sem chamada nenhuma, a lista já veio
  * carregada com a tela (reaproveita o mesmo GET /public/:slug/delivery-zones de sempre).
  * Se o cliente digitar um bairro que não bate com nada cadastrado, mostra o aviso de fora
@@ -769,15 +785,30 @@ function ZoneAutocomplete({
   selectedZoneId: string;
   onSelect: (zoneId: string) => void;
 }) {
-  const [query, setQuery] = useState(() => zones.find((z) => z.id === selectedZoneId)?.name ?? '');
+  const [query, setQuery] = useState(() => {
+    const selected = zones.find((z) => z.id === selectedZoneId);
+    return selected ? splitZoneName(selected.name).bairro : '';
+  });
   const [open, setOpen] = useState(false);
 
   const term = query.trim().toLowerCase();
   const filtered = term ? zones.filter((z) => z.name.toLowerCase().includes(term)) : zones;
   const notFound = zones.length === 0 || (term.length > 0 && !selectedZoneId && filtered.length === 0);
 
+  // Agrupa por cidade (bloco/cabeçalho) — a maioria dos tenants tem só uma cidade, então o
+  // grupo sem nome (bairro sem "(Cidade)" no nome) não ganha cabeçalho nenhum.
+  const groups = useMemo(() => {
+    const map = new Map<string, DeliveryZone[]>();
+    for (const z of filtered) {
+      const city = splitZoneName(z.name).city ?? '';
+      if (!map.has(city)) map.set(city, []);
+      map.get(city)!.push(z);
+    }
+    return [...map.entries()];
+  }, [filtered]);
+
   const pick = (zone: DeliveryZone) => {
-    setQuery(zone.name);
+    setQuery(splitZoneName(zone.name).bairro);
     onSelect(zone.id);
     setOpen(false);
   };
@@ -800,17 +831,26 @@ function ZoneAutocomplete({
       />
       {open && term.length > 0 && filtered.length > 0 && (
         <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[6px] border border-[#14161C]/[0.15] bg-white shadow-lg">
-          {filtered.map((z) => (
-            <button
-              key={z.id}
-              type="button"
-              className="flex w-full items-center justify-between border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#14161C] last:border-b-0 hover:bg-gray-50"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => pick(z)}
-            >
-              <span>{z.name}</span>
-              <span className="text-[#5A6072]">{brl(z.fee)}</span>
-            </button>
+          {groups.map(([city, zonesInCity]) => (
+            <div key={city || '_'}>
+              {city && (
+                <div className="sticky top-0 bg-[#F4F6FA] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#5A6072]">
+                  {city}
+                </div>
+              )}
+              {zonesInCity.map((z) => (
+                <button
+                  key={z.id}
+                  type="button"
+                  className="flex w-full items-center justify-between border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#14161C] last:border-b-0 hover:bg-gray-50"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pick(z)}
+                >
+                  <span>{splitZoneName(z.name).bairro}</span>
+                  <span className="text-[#5A6072]">{brl(z.fee)}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -848,6 +888,8 @@ function DetailsStep({
   setDeliveryStreet,
   deliveryNumber,
   setDeliveryNumber,
+  deliveryCep,
+  setDeliveryCep,
   deliveryComplement,
   setDeliveryComplement,
   canContinue,
@@ -874,13 +916,17 @@ function DetailsStep({
   setDeliveryStreet: (v: string) => void;
   deliveryNumber: string;
   setDeliveryNumber: (v: string) => void;
+  deliveryCep: string;
+  setDeliveryCep: (v: string) => void;
   deliveryComplement: string;
   setDeliveryComplement: (v: string) => void;
   canContinue: boolean;
   onContinue: () => void;
   eta?: EtaEstimate;
 }) {
-  const selectedFee = zones.find((z) => z.id === deliveryZoneId)?.fee;
+  const selectedZone = zones.find((z) => z.id === deliveryZoneId);
+  const selectedFee = selectedZone?.fee;
+  const selectedCity = selectedZone ? splitZoneName(selectedZone.name).city : null;
   return (
     <div className="space-y-4">
       <h2 className={STEP_TITLE}>Pra onde vai o pedido?</h2>
@@ -945,6 +991,16 @@ function DetailsStep({
             <input className={FIELD_INPUT} value={deliveryNumber} onChange={(e) => setDeliveryNumber(e.target.value)} placeholder="123" />
           </div>
           <div>
+            <label className={FIELD_LABEL}>CEP (opcional)</label>
+            <input
+              className={FIELD_INPUT}
+              value={deliveryCep}
+              onChange={(e) => setDeliveryCep(e.target.value)}
+              placeholder="13480-000"
+              inputMode="numeric"
+            />
+          </div>
+          <div>
             <label className={FIELD_LABEL}>Complemento (opcional)</label>
             <input
               className={FIELD_INPUT}
@@ -961,7 +1017,12 @@ function DetailsStep({
           <div>
             <label className={FIELD_LABEL}>Bairro</label>
             <ZoneAutocomplete zones={zones} selectedZoneId={deliveryZoneId} onSelect={setDeliveryZoneId} />
-            {selectedFee !== undefined && <p className="mt-1 text-[11px] text-[#5A6072]">Taxa de entrega: {brl(selectedFee)}</p>}
+            {selectedFee !== undefined && (
+              <p className="mt-1 text-[11px] text-[#5A6072]">
+                Taxa de entrega: {brl(selectedFee)}
+                {selectedCity ? ` · ${selectedCity}` : ''}
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-[1.4fr_1fr] gap-2.5">
             <div>
@@ -972,6 +1033,16 @@ function DetailsStep({
               <label className={FIELD_LABEL}>Número</label>
               <input className={FIELD_INPUT} value={deliveryNumber} onChange={(e) => setDeliveryNumber(e.target.value)} placeholder="123" />
             </div>
+          </div>
+          <div>
+            <label className={FIELD_LABEL}>CEP (opcional)</label>
+            <input
+              className={FIELD_INPUT}
+              value={deliveryCep}
+              onChange={(e) => setDeliveryCep(e.target.value)}
+              placeholder="13480-000"
+              inputMode="numeric"
+            />
           </div>
           <div>
             <label className={FIELD_LABEL}>Complemento (opcional)</label>
@@ -1160,6 +1231,7 @@ function ReviewStep({
   deliveryZoneName,
   deliveryStreet,
   deliveryNumber,
+  deliveryCep,
   deliveryComplement,
   draft,
   subtotal,
@@ -1178,6 +1250,7 @@ function ReviewStep({
   deliveryZoneName?: string;
   deliveryStreet: string;
   deliveryNumber: string;
+  deliveryCep: string;
   deliveryComplement: string;
   draft: DraftItem[];
   subtotal: number;
@@ -1205,6 +1278,7 @@ function ReviewStep({
             <div className="text-[12.5px] leading-[1.55] text-[#14161C]">
               {deliveryStreet}, {deliveryNumber}{deliveryComplement ? ` — ${deliveryComplement}` : ''}
             </div>
+            {deliveryCep && <div className="text-[11.5px] text-[#5A6072]">CEP: {deliveryCep}</div>}
             {deliveryZoneName && <div className="text-[11.5px] text-[#5A6072]">{deliveryZoneName}</div>}
           </>
         )}

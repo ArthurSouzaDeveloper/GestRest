@@ -46,6 +46,7 @@ export interface PublicOrderInput {
   deliveryLng?: number;
   deliveryStreet?: string;
   deliveryNumber?: string;
+  deliveryCep?: string;
   deliveryComplement?: string;
   declaredPaymentMethod: PaymentMethod;
   changeFor?: number;
@@ -311,6 +312,7 @@ export const orderService = {
           deliveryDistanceKm,
           deliveryStreet: input.deliveryStreet,
           deliveryNumber: input.deliveryNumber,
+          deliveryCep: input.deliveryCep,
           deliveryComplement: input.deliveryComplement,
           declaredPaymentMethod: input.declaredPaymentMethod,
           changeFor: input.changeFor,
