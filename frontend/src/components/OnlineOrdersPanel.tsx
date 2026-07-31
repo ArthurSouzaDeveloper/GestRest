@@ -116,6 +116,7 @@ function OnlineOrderCard({
           <div className="mt-0.5 text-xs text-gray-500">
             {order.deliveryStreet}, {order.deliveryNumber}
             {order.deliveryComplement ? ` — ${order.deliveryComplement}` : ''} · {order.deliveryZone?.name}
+            {order.deliveryCep ? ` · CEP ${order.deliveryCep}` : ''}
           </div>
         )}
       </div>

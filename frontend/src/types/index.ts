@@ -179,6 +179,7 @@ export interface Order {
   deliveryFee: number;
   deliveryStreet?: string;
   deliveryNumber?: string;
+  deliveryCep?: string;
   deliveryComplement?: string;
   declaredPaymentMethod?: PaymentMethod;
   changeFor?: number | null;

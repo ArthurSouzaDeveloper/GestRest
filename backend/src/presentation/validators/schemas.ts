@@ -205,6 +205,7 @@ export const publicOrderSchema = z
     deliveryLng: z.number().min(-180).max(180).optional(),
     deliveryStreet: z.string().min(2).max(200).optional(),
     deliveryNumber: z.string().min(1).max(20).optional(),
+    deliveryCep: z.string().max(12).optional(),
     deliveryComplement: z.string().max(200).optional(),
     declaredPaymentMethod: z.enum(['PIX', 'CASH', 'CREDIT', 'DEBIT']),
     changeFor: z.number().positive().optional(),

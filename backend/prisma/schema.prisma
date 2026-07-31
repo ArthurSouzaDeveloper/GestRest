@@ -357,6 +357,7 @@ model Order {
   deliveryDistanceKm    Decimal?       @db.Decimal(6, 2) // snapshot da distância calculada (modo DISTANCE_BANDS)
   deliveryStreet        String?
   deliveryNumber        String?
+  deliveryCep           String?
   deliveryComplement    String?
   declaredPaymentMethod PaymentMethod? // forma escolhida pelo cliente no site (cobrada na entrega/retirada)
   changeFor             Decimal?       @db.Decimal(10, 2) // "troco pra quanto", se Dinheiro

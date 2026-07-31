@@ -27,6 +27,23 @@ function parseArgs(argv: string[]): Record<string, string> {
   return out;
 }
 
+// As listas do cliente escrevem "Nome, Tipo" (ex.: "Universitário, Parque") — provavelmente
+// pra ordenar alfabeticamente pelo nome, ignorando o tipo. O nome de verdade do bairro é o
+// contrário ("Parque Universitário"), então corrige aqui antes de gravar. "Parque
+// Residencial" entra como composto (checado antes de "Parque" sozinho) por causa de
+// "Jacyra, Parque Residencial" -> "Parque Residencial Jacyra".
+const ZONE_TYPE_WORDS = ['Parque Residencial', 'Jardim', 'Vila', 'Parque', 'Residencial', 'Loteamento'];
+
+function normalizeZoneName(raw: string): string {
+  for (const type of ZONE_TYPE_WORDS) {
+    const suffix = `, ${type}`;
+    if (raw.endsWith(suffix)) {
+      return `${type} ${raw.slice(0, -suffix.length)}`;
+    }
+  }
+  return raw;
+}
+
 // ─────────────────────────────────────────────────────────────
 // BAIRROS (transcritos e conferidos das listas do cliente)
 // ─────────────────────────────────────────────────────────────
@@ -306,13 +323,13 @@ async function main() {
   let unchanged = 0;
 
   for (const [name, fee] of AMERICANA) {
-    const result = await ensureZone(rid, `${name} (Americana)`, fee);
+    const result = await ensureZone(rid, `${normalizeZoneName(name)} (Americana)`, fee);
     if (result === 'created') created++;
     else if (result === 'updated') updated++;
     else unchanged++;
   }
   for (const [name, fee] of SANTA_BARBARA) {
-    const result = await ensureZone(rid, `${name} (Santa Bárbara d'Oeste)`, fee);
+    const result = await ensureZone(rid, `${normalizeZoneName(name)} (Santa Bárbara d'Oeste)`, fee);
     if (result === 'created') created++;
     else if (result === 'updated') updated++;
     else unchanged++;
