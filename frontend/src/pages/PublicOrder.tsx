@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { publicBrandVars } from '../lib/publicBrand';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -218,12 +218,22 @@ export default function PublicOrder() {
   const total = subtotal + deliveryFee;
 
   const canContinueDetails =
+    !!orderKind &&
     customerName.trim().length >= 2 &&
     customerPhone.trim().length >= 8 &&
     (orderKind === 'PICKUP' ||
       (distanceMode
         ? deliveryLat !== null && deliveryLng !== null && !!deliveryQuote && !quoteOutOfRange && deliveryNumber.trim()
         : deliveryZoneId && deliveryStreet.trim() && deliveryNumber.trim()));
+
+  // Quem clicou em "Só quero ver o cardápio" na Capa pula a escolha de Entrega/Retirada —
+  // se tentar avançar pro Carrinho/Pagamento/Revisão sem isso definido, manda de volta pra
+  // Dados pra escolher (sem isso, a Revisão ficava em branco e dava pra finalizar sem endereço).
+  useEffect(() => {
+    if ((step === 'cart' || step === 'payment' || step === 'review') && !orderKind) {
+      setStep('details');
+    }
+  }, [step, orderKind]);
 
   const submitOrder = useMutation({
     mutationFn: async () => {
@@ -342,7 +352,7 @@ export default function PublicOrder() {
 
       {step !== 'intro' && (
       <div className={`mx-auto px-4 pb-28 pt-4 ${step === 'menu' ? 'max-w-3xl' : 'max-w-md'}`}>
-        {step === 'details' && orderKind && (
+        {step === 'details' && (
           <DetailsStep
             slug={slug}
             orderKind={orderKind}
@@ -373,7 +383,8 @@ export default function PublicOrder() {
             deliveryComplement={deliveryComplement}
             setDeliveryComplement={setDeliveryComplement}
             canContinue={!!canContinueDetails}
-            onContinue={() => setStep('menu')}
+            onContinue={() => setStep(draft.length > 0 ? 'cart' : 'menu')}
+            continueLabel={draft.length > 0 ? 'Continuar para o carrinho' : 'Continuar para o cardápio'}
             eta={eta}
           />
         )}
@@ -400,7 +411,7 @@ export default function PublicOrder() {
             changeFor={changeFor}
             setChangeFor={setChangeFor}
             total={total}
-            onContinue={() => setStep('review')}
+            onContinue={() => setStep(orderKind ? 'review' : 'details')}
           />
         )}
 
@@ -471,7 +482,7 @@ export default function PublicOrder() {
           left={`${itemCount} ${itemCount === 1 ? 'item' : 'itens'}`}
           right={`Continuar · ${brl(total)}`}
           disabled={draft.length === 0}
-          onClick={() => setStep('payment')}
+          onClick={() => setStep(orderKind ? 'payment' : 'details')}
         />
       )}
 
@@ -479,7 +490,7 @@ export default function PublicOrder() {
         <CartBar
           left={submitOrder.isPending ? 'Enviando...' : 'Confirmar'}
           right={`Fazer Pedido · ${brl(total)}`}
-          disabled={submitOrder.isPending}
+          disabled={submitOrder.isPending || !orderKind}
           onClick={() => submitOrder.mutate()}
         />
       )}
@@ -894,10 +905,11 @@ function DetailsStep({
   setDeliveryComplement,
   canContinue,
   onContinue,
+  continueLabel,
   eta,
 }: {
   slug: string;
-  orderKind: OrderKind;
+  orderKind: OrderKind | null;
   onChangeKind: (kind: OrderKind) => void;
   customerName: string;
   setCustomerName: (v: string) => void;
@@ -922,6 +934,7 @@ function DetailsStep({
   setDeliveryComplement: (v: string) => void;
   canContinue: boolean;
   onContinue: () => void;
+  continueLabel: string;
   eta?: EtaEstimate;
 }) {
   const selectedZone = zones.find((z) => z.id === deliveryZoneId);
@@ -949,6 +962,10 @@ function DetailsStep({
           Retirada
         </button>
       </div>
+
+      {!orderKind && (
+        <p className="-mt-3 text-[11.5px] text-[#5A6072]">Escolha Entrega ou Retirada pra continuar.</p>
+      )}
 
       <EtaNote eta={eta} />
 
@@ -1057,7 +1074,7 @@ function DetailsStep({
       )}
 
       <button className={PRIMARY_CTA} disabled={!canContinue} onClick={onContinue}>
-        Continuar para o cardápio
+        {continueLabel}
       </button>
     </div>
   );
