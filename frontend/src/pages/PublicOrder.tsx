@@ -358,6 +358,7 @@ export default function PublicOrder() {
         <IntroStep
           slug={slug}
           restaurantName={restaurant.name}
+          logoUrl={restaurant.logoUrl}
           onPick={(kind) => {
             if (kind === 'MENU') {
               setOrderKind(null);
@@ -558,10 +559,12 @@ function PublicHeader({
 function IntroStep({
   slug,
   restaurantName,
+  logoUrl,
   onPick,
 }: {
   slug: string;
   restaurantName: string;
+  logoUrl: string | null;
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
   const [kind, setKind] = useState<OrderKind>('DELIVERY');
@@ -582,19 +585,26 @@ function IntroStep({
       <CustomerLoginPanel slug={slug} />
 
       <div className="mt-6 w-full max-w-md overflow-hidden rounded-[6px] border border-[#14161C]/[0.08] bg-white">
-        {/* Foto do restaurante (balcão/loja) — ainda não existe um jeito de subir essa foto
-            de verdade (é um campo novo, separado da logo), então por enquanto mostra esse
-            placeholder no mesmo estilo da prévia aprovada. */}
-        <div
-          className="flex h-40 w-full items-center justify-center text-center text-[10.5px] font-bold uppercase tracking-wide text-gray-400"
-          style={{
-            backgroundColor: '#E7E5E4',
-            backgroundImage:
-              'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255,255,255,0.6) 10px, rgba(255,255,255,0.6) 20px)',
-          }}
-        >
-          Foto: balcão de pastéis e sucos
-        </div>
+        {/* Topo do card: a logo do restaurante (subida pela tela de Identidade Visual, ver
+            branding.service.ts), centralizada num fundo levemente tingido da cor da marca.
+            Sem logo configurada ainda, cai no mesmo placeholder de "foto do restaurante" de
+            antes — pensado pra virar uma foto de verdade do balcão quando existir esse campo. */}
+        {logoUrl ? (
+          <div className="flex h-40 w-full items-center justify-center bg-brand-50">
+            <img src={logoUrl} alt={restaurantName} className="h-32 w-32 object-contain" />
+          </div>
+        ) : (
+          <div
+            className="flex h-40 w-full items-center justify-center text-center text-[10.5px] font-bold uppercase tracking-wide text-gray-400"
+            style={{
+              backgroundColor: '#E7E5E4',
+              backgroundImage:
+                'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255,255,255,0.6) 10px, rgba(255,255,255,0.6) 20px)',
+            }}
+          >
+            Foto: balcão de pastéis e sucos
+          </div>
+        )}
 
         <div className="p-4">
           <h6 className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">Pastelaria &amp; Sucaria</h6>
