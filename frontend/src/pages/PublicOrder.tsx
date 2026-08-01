@@ -577,14 +577,7 @@ function IntroStep({
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-[#F4F6FA] px-7 pt-12 dark:bg-[#F4F6FA]">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-        <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
-        Aberto de quarta a domingo até 23h
-      </div>
-
-      <CustomerLoginPanel slug={slug} />
-
-      <div className="mt-6 w-full max-w-md overflow-hidden rounded-[6px] border border-[#14161C]/[0.08] bg-white">
+      <div className="w-full max-w-md overflow-hidden rounded-[6px] border border-[#14161C]/[0.08] bg-white">
         {/* Topo do card: a logo do restaurante (subida pela tela de Identidade Visual, ver
             branding.service.ts), centralizada num fundo levemente tingido da cor da marca.
             Sem logo configurada ainda, cai no mesmo placeholder de "foto do restaurante" de
@@ -649,10 +642,13 @@ function IntroStep({
       </div>
 
       <div className="mx-auto mt-auto flex w-full max-w-md flex-col items-center gap-2.5 pb-6 pt-8">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
-          <MapPin size={12} className="shrink-0" />
-          Pastelaria e Sucaria desde 1996
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
+          Aberto de quarta a domingo até 23h
         </div>
+
+        <CustomerLoginPanel slug={slug} />
+
         <div className="flex items-center gap-2.5">
           <a
             href="https://www.instagram.com/oreidosucoamericana"
