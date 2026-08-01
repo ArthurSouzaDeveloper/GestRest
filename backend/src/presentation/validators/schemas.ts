@@ -140,6 +140,17 @@ export const deliveryPricingSettingsSchema = z
   })
   .strict();
 
+// Mesma lógica do frete por distância acima: ligar o modo MANUAL é separado de preencher os
+// minutos, então o "precisa ter os dois tempos" só é checado no service (etaSettingsService.update),
+// que sabe o que já está salvo.
+export const etaSettingsSchema = z
+  .object({
+    mode: z.enum(['AUTO', 'MANUAL']),
+    pickupMinutes: z.number().int().min(1).max(240).optional(),
+    deliveryMinutes: z.number().int().min(1).max(240).optional(),
+  })
+  .strict();
+
 export const tableSchema = z.object({
   number: z.number().int().positive(),
   seats: z.number().int().positive().optional(),

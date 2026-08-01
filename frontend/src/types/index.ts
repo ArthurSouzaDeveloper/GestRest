@@ -188,9 +188,18 @@ export interface Order {
   estimatedReadyAt?: string | null;
 }
 
+export type EtaMode = 'AUTO' | 'MANUAL';
+
 export interface EtaEstimate {
   minutes: number;
   activeOrders: number;
+  mode: EtaMode;
+}
+
+export interface EtaSettings {
+  mode: EtaMode;
+  pickupMinutes: number | null;
+  deliveryMinutes: number | null;
 }
 
 export interface ProductionTicket {

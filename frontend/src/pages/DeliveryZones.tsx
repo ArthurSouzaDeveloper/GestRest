@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
-import type { DeliveryDistanceBand, DeliveryPricingMode, DeliveryPricingSettings, DeliveryZone } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import type { DeliveryDistanceBand, DeliveryPricingMode, DeliveryPricingSettings, DeliveryZone, EtaSettings } from '../types';
 
 export default function DeliveryZones() {
   // A aba visitada é um estado local, separado do modo de fato ativo (settings.mode) —
@@ -29,6 +30,8 @@ export default function DeliveryZones() {
         subtitle="Como o sistema calcula a taxa de entrega no site de pedidos online"
       />
 
+      <EtaSettingsCard />
+
       <div className="mb-6 flex gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
         <button
           className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
@@ -50,6 +53,136 @@ export default function DeliveryZones() {
 
       {activeTab === 'ZONE' ? <ZonesPanel active={settings.mode === 'ZONE'} /> : <DistanceBandsPanel settings={settings} />}
     </div>
+  );
+}
+
+/**
+ * Tempo estimado de preparo (retirada/entrega) mostrado ao cliente no site — automático por
+ * fila (padrão) ou fixado pelo admin. Escrita restrita a ADMIN (ver catalog.routes.ts): o
+ * cliente pediu explicitamente que só ele e outros administradores decidam esse horário,
+ * olhando o fluxo real da cozinha, sem depender do ajuste automático.
+ */
+function EtaSettingsCard() {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('ADMIN');
+  const qc = useQueryClient();
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['eta-settings'],
+    queryFn: async () => (await api.get<EtaSettings>('/catalog/eta-settings')).data,
+  });
+
+  const [mode, setMode] = useState<EtaSettings['mode']>('AUTO');
+  const [pickupMinutes, setPickupMinutes] = useState('30');
+  const [deliveryMinutes, setDeliveryMinutes] = useState('45');
+  const [error, setError] = useState('');
+
+  // Sincroniza o formulário com o que veio do servidor só quando os dados chegam/mudam de
+  // fora (primeira carga, ou outro admin salvando em outra aba) — não a cada render, senão
+  // digitar no campo de minutos seria sobrescrito pelo valor antigo ainda em cache.
+  useEffect(() => {
+    if (!settings) return;
+    setMode(settings.mode);
+    if (settings.pickupMinutes !== null) setPickupMinutes(String(settings.pickupMinutes));
+    if (settings.deliveryMinutes !== null) setDeliveryMinutes(String(settings.deliveryMinutes));
+  }, [settings]);
+
+  const save = useMutation({
+    mutationFn: async () =>
+      api.patch('/catalog/eta-settings', {
+        mode,
+        pickupMinutes: Number(pickupMinutes),
+        deliveryMinutes: Number(deliveryMinutes),
+      }),
+    onSuccess: () => {
+      setError('');
+      qc.invalidateQueries({ queryKey: ['eta-settings'] });
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+
+  if (isLoading || !settings) return null;
+
+  return (
+    <Card className="mb-6">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Tempo estimado de preparo</h3>
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+            settings.mode === 'MANUAL' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+          }`}
+        >
+          {settings.mode === 'MANUAL' ? 'Manual' : 'Automático (fila da cozinha)'}
+        </span>
+      </div>
+
+      {!isAdmin ? (
+        <p className="text-sm text-gray-500">
+          {settings.mode === 'MANUAL'
+            ? `Fixado por um administrador: ${settings.pickupMinutes} min (retirada) / ${settings.deliveryMinutes} min (entrega). Só administradores podem alterar.`
+            : 'Calculado automaticamente conforme o fluxo de pedidos da cozinha. Só administradores podem alterar.'}
+        </p>
+      ) : (
+        <>
+          <p className="mb-3 text-sm text-gray-500">
+            Automático ajusta a previsão sozinho conforme a fila de pedidos. Manual trava um tempo fixo, pra você
+            decidir olhando o fluxo real da cozinha.
+          </p>
+          <div className="mb-3 flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-950">
+            <button
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+                mode === 'AUTO' ? 'bg-brand text-white' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setMode('AUTO')}
+            >
+              Automático
+            </button>
+            <button
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+                mode === 'MANUAL' ? 'bg-brand text-white' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setMode('MANUAL')}
+            >
+              Manual
+            </button>
+          </div>
+
+          {mode === 'MANUAL' && (
+            <div className="mb-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Retirada (min)</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={240}
+                  value={pickupMinutes}
+                  onChange={(e) => setPickupMinutes(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label">Entrega (min)</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={240}
+                  value={deliveryMinutes}
+                  onChange={(e) => setDeliveryMinutes(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end">
+            <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>
+              Salvar
+            </button>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 

@@ -37,7 +37,7 @@ function EtaNote({ eta }: { eta?: EtaEstimate }) {
       <Clock size={14} className="shrink-0" />
       <span>
         Previsão agora: até {eta.minutes} min
-        {eta.activeOrders > 5 ? ' — cozinha com fluxo alto no momento' : ''}
+        {eta.mode === 'AUTO' && eta.activeOrders > 5 ? ' — cozinha com fluxo alto no momento' : ''}
       </span>
     </div>
   );
