@@ -116,6 +116,11 @@ export interface DeliveryQuote {
   distanceKm: number;
 }
 
+export interface BrandingSettings {
+  brandColor: string | null;
+  logoUrl: string | null;
+}
+
 export interface PlaceSuggestion {
   placeId: string;
   description: string;

@@ -118,11 +118,22 @@ export const superadminService = {
     });
   },
 
-  /** Público: usado pela tela de login "com marca" do restaurante (por slug). */
+  /**
+   * Público: usado pela tela de login "com marca" do restaurante (por slug) e pelo site
+   * de pedidos, que lê brandColor/logoUrl daqui pra retemar a própria cor (ver
+   * branding.service.ts e lib/publicBrand.ts no front).
+   */
   async publicBySlug(slug: string) {
     const r = await prisma.restaurant.findUnique({
       where: { slug },
-      select: { name: true, slug: true, active: true, deliveryPricingMode: true },
+      select: {
+        name: true,
+        slug: true,
+        active: true,
+        deliveryPricingMode: true,
+        brandColor: true,
+        logoUrl: true,
+      },
     });
     if (!r) throw new NotFoundError('Restaurante');
     return r;

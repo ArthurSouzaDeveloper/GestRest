@@ -156,6 +156,13 @@ model Restaurant {
   etaPickupMinutes   Int?
   etaDeliveryMinutes Int?
 
+  // Identidade visual do site público de pedidos — cada restaurante escolhe a própria cor
+  // e sobe a própria logo (ver branding.service.ts), em vez de ficar fixo pro Rei do Suco
+  // no código do front. Sem brandColor definido, o front cai num roxo padrão; sem logoUrl,
+  // cai num distintivo com as iniciais do nome.
+  brandColor String?
+  logoUrl    String?
+
   @@map("restaurants")
 }
 

@@ -33,6 +33,11 @@ services:
       CORS_ORIGIN: http://178.105.238.245:8081,http://gestrest.app.br,https://gestrest.app.br,http://www.gestrest.app.br,https://www.gestrest.app.br
     ports:
       - '4000:4000'
+    volumes:
+      # Logos enviadas pela tela de Identidade Visual (branding.service.ts) — sem isso, um
+      # `docker compose up --build` apaga o container antigo e leva junto qualquer logo que
+      # os restaurantes tiverem subido.
+      - uploads:/app/uploads
 
   frontend:
     build: ./frontend
@@ -44,3 +49,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

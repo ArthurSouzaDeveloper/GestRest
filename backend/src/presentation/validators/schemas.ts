@@ -151,6 +151,12 @@ export const etaSettingsSchema = z
   })
   .strict();
 
+export const brandingColorSchema = z
+  .object({
+    brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use o formato #RRGGBB'),
+  })
+  .strict();
+
 export const tableSchema = z.object({
   number: z.number().int().positive(),
   seats: z.number().int().positive().optional(),

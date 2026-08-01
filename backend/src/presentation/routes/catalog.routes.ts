@@ -14,9 +14,11 @@ import {
   deliveryPricingSettingsService,
 } from '../../application/services/deliveryPricing.service';
 import { etaSettingsService } from '../../application/services/eta.service';
+import { brandingService } from '../../application/services/branding.service';
 import {
   additionalSchema,
   additionalUpdateSchema,
+  brandingColorSchema,
   categorySchema,
   categoryUpdateSchema,
   deliveryDistanceBandSchema,
@@ -28,6 +30,8 @@ import {
   productSchema,
   productUpdateSchema,
 } from '../validators/schemas';
+import { logoUpload } from '../middlewares/upload.middleware';
+import { AppError } from '../../utils/errors';
 import { ctx } from './context';
 
 const router = Router();
@@ -225,6 +229,27 @@ router.patch(
   admin,
   validateBody(etaSettingsSchema),
   asyncHandler(async (req, res) => res.json(await etaSettingsService.update(tid(req), req.body))),
+);
+
+// ── Identidade visual do site público (cor + logo) — cada restaurante configura a própria ──
+router.get(
+  '/branding',
+  asyncHandler(async (req, res) => res.json(await brandingService.get(tid(req)))),
+);
+router.patch(
+  '/branding',
+  manager,
+  validateBody(brandingColorSchema),
+  asyncHandler(async (req, res) => res.json(await brandingService.updateColor(tid(req), req.body.brandColor))),
+);
+router.post(
+  '/branding/logo',
+  manager,
+  logoUpload,
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new AppError('Envie um arquivo de imagem');
+    res.json(await brandingService.updateLogo(tid(req), req.file.filename));
+  }),
 );
 
 export default router;

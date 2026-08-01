@@ -15,6 +15,7 @@ import UsersPage from './pages/Users';
 import Reports from './pages/Reports';
 import Audit from './pages/Audit';
 import DeliveryZones from './pages/DeliveryZones';
+import Branding from './pages/Branding';
 import PublicOrder from './pages/PublicOrder';
 import OrderTracking from './pages/OrderTracking';
 
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="/caixa" element={<Protected roles={['ADMIN', 'MANAGER', 'CASHIER']}><Cashier /></Protected>} />
       <Route path="/produtos" element={<Protected roles={['ADMIN', 'MANAGER']}><Products /></Protected>} />
       <Route path="/entregas" element={<Protected roles={['ADMIN', 'MANAGER']}><DeliveryZones /></Protected>} />
+      <Route path="/identidade-visual" element={<Protected roles={['ADMIN', 'MANAGER']}><Branding /></Protected>} />
       <Route path="/relatorios" element={<Protected roles={['ADMIN', 'MANAGER']}><Reports /></Protected>} />
       <Route path="/usuarios" element={<Protected roles={['ADMIN', 'MANAGER']}><UsersPage /></Protected>} />
       <Route path="/auditoria" element={<Protected roles={['ADMIN', 'MANAGER']}><Audit /></Protected>} />
