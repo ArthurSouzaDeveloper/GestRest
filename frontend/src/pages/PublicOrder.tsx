@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { publicBrandVars } from '../lib/publicBrand';
+import logoReiDoSuco from '../assets/logo-rei-do-suco.png';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -33,7 +34,7 @@ function formatClock(iso: string): string {
 function EtaNote({ eta }: { eta?: EtaEstimate }) {
   if (!eta) return null;
   return (
-    <div className="flex items-center gap-2 rounded-[6px] bg-[#E9EEFB] px-3 py-2 text-xs font-medium text-[#1E3A8A]">
+    <div className="flex items-center gap-2 rounded-[6px] bg-[#F3E7FA] px-3 py-2 text-xs font-medium text-[#9D1CC4]">
       <Clock size={14} className="shrink-0" />
       <span>
         Previsão agora: até {eta.minutes} min
@@ -48,9 +49,9 @@ function EtaNote({ eta }: { eta?: EtaEstimate }) {
 // no lugar do roxo antigo. Espelham 1:1 as classes do preview. ───────────────
 const FIELD_LABEL = 'mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#5A6072]';
 const FIELD_INPUT =
-  'w-full rounded-[6px] border border-[#14161C]/[0.18] bg-white px-3.5 py-2.5 text-[13.5px] text-[#14161C] outline-none transition focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/20';
+  'w-full rounded-[6px] border border-[#14161C]/[0.18] bg-white px-3.5 py-2.5 text-[13.5px] text-[#14161C] outline-none transition focus:border-[#9D1CC4] focus:ring-2 focus:ring-[#9D1CC4]/20';
 const PRIMARY_CTA =
-  'block w-full rounded-[6px] bg-gradient-to-br from-[#1E3A8A] to-[#14295E] px-4 py-3.5 text-center text-[13.5px] font-extrabold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] transition disabled:cursor-not-allowed disabled:opacity-50';
+  'block w-full rounded-[6px] bg-gradient-to-br from-[#9D1CC4] to-[#5B0F73] px-4 py-3.5 text-center text-[13.5px] font-extrabold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] transition disabled:cursor-not-allowed disabled:opacity-50';
 const STEP_TITLE = 'mb-[18px] text-[18px] font-extrabold tracking-tight text-[#14161C]';
 const CARD = 'rounded-[6px] border border-[#14161C]/[0.1] bg-white';
 
@@ -69,7 +70,7 @@ function CartBar({
   return (
     <div className="fixed bottom-0 left-0 right-0 border-t-2 border-[#14161C]/10 bg-[#F4F6FA] p-3 pb-3.5">
       <button
-        className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-[6px] bg-gradient-to-br from-[#1E3A8A] to-[#14295E] px-[18px] py-[13px] text-[13.5px] font-bold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-[6px] bg-gradient-to-br from-[#9D1CC4] to-[#5B0F73] px-[18px] py-[13px] text-[13.5px] font-bold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] disabled:cursor-not-allowed disabled:opacity-60"
         onClick={onClick}
         disabled={disabled}
       >
@@ -508,12 +509,12 @@ function PublicHeader({
   onBack: () => void;
 }) {
   return (
-    <div className="sticky top-0 z-10 bg-gradient-to-br from-[#1E3A8A] to-[#14295E]">
+    <div className="sticky top-0 z-10 bg-gradient-to-br from-[#9D1CC4] to-[#5B0F73]">
       <div className={`mx-auto flex items-center gap-2.5 px-4 py-3 ${title === 'Cardápio' ? 'max-w-3xl' : 'max-w-md'}`}>
         <button onClick={onBack} className="flex text-white/85 hover:text-white" title="Voltar">
           <ChevronLeft size={20} strokeWidth={2.3} />
         </button>
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-white text-[10.5px] font-extrabold text-[#1E3A8A]">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-white text-[10.5px] font-extrabold text-[#9D1CC4]">
           {restaurantName.slice(0, 2).toUpperCase()}
         </div>
         <span className="text-sm font-extrabold uppercase tracking-wide text-white">{title}</span>
@@ -547,30 +548,16 @@ function IntroStep({
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-[#F4F6FA] px-7 pt-12 dark:bg-[#F4F6FA]">
-      <svg width="104" height="104" viewBox="0 0 120 120" role="img" aria-label={restaurantName}>
-        <defs>
-          <radialGradient id="poBadgeFill" cx="50%" cy="38%" r="70%">
-            <stop offset="0%" stopColor="#2C4E9E" />
-            <stop offset="100%" stopColor="#14295E" />
-          </radialGradient>
-        </defs>
-        <circle cx="60" cy="60" r="58" fill="none" stroke="#D9A544" strokeWidth="2" />
-        <circle cx="60" cy="60" r="53" fill="url(#poBadgeFill)" />
-        <g fill="#D9A544" opacity="0.45">
-          <circle cx="27" cy="34" r="1.5" /><circle cx="95" cy="30" r="1.3" /><circle cx="100" cy="62" r="1.4" />
-          <circle cx="92" cy="92" r="1.3" /><circle cx="24" cy="88" r="1.3" /><circle cx="18" cy="58" r="1.5" />
-        </g>
-        <path
-          d="M60 18 C 57 22 57 27 60 30 C 63 27 63 22 60 18 Z M60 30 C 54 28 49 30 47 34 C 52 37 58 36 60 30 Z M60 30 C 66 28 71 30 73 34 C 68 37 62 36 60 30 Z"
-          fill="#8BC53F"
-        />
-        <text x="60" y="60" textAnchor="middle" fontFamily="Georgia,'Times New Roman',serif" fontStyle="italic" fontSize="24" fill="#F4F6FA">
-          o Rei
-        </text>
-        <text x="60" y="82" textAnchor="middle" fontFamily="-apple-system,'Segoe UI',Arial,sans-serif" fontWeight="800" fontSize="17" letterSpacing="0.5" fill="#F4F6FA">
-          do Suco
-        </text>
-      </svg>
+      {/* Logo suspensa — a arte real do cliente (assets/logo-rei-do-suco.png) já é um
+          distintivo redondo pronto, então flutua solta no topo da tela sem nenhuma moldura
+          desenhada em volta (antes era um círculo de SVG aproximando a marca). */}
+      <img
+        src={logoReiDoSuco}
+        alt={restaurantName}
+        width={112}
+        height={112}
+        className="h-[112px] w-[112px] drop-shadow-[0_10px_18px_rgba(91,15,115,0.35)]"
+      />
 
       <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
         <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
@@ -580,7 +567,7 @@ function IntroStep({
       <CustomerLoginPanel slug={slug} />
 
       <div className="mt-6 w-full max-w-md rounded-[6px] border border-[#14161C]/[0.08] bg-white p-4">
-        <h6 className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#1E3A8A]">Pastelaria &amp; Sucaria</h6>
+        <h6 className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#9D1CC4]">Pastelaria &amp; Sucaria</h6>
         <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight text-[#14161C]">{restaurantName}</h1>
         <p className="mt-1.5 text-[12.5px] leading-[1.5] text-[#5A6072]">
           Pastéis fritos na hora, mini pizzas e sucos naturais. Peça para retirar no balcão ou receber em casa.
@@ -591,7 +578,7 @@ function IntroStep({
           <div className="flex gap-1 rounded-[6px] border border-[#14161C]/10 bg-[#F4F6FA] p-1">
             <button
               className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-                kind === 'DELIVERY' ? 'bg-[#1E3A8A] text-white' : 'text-[#5A6072]'
+                kind === 'DELIVERY' ? 'bg-[#9D1CC4] text-white' : 'text-[#5A6072]'
               }`}
               onClick={() => setKind('DELIVERY')}
             >
@@ -599,7 +586,7 @@ function IntroStep({
             </button>
             <button
               className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-                kind === 'PICKUP' ? 'bg-[#1E3A8A] text-white' : 'text-[#5A6072]'
+                kind === 'PICKUP' ? 'bg-[#9D1CC4] text-white' : 'text-[#5A6072]'
               }`}
               onClick={() => setKind('PICKUP')}
             >
@@ -689,7 +676,7 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
   if (!open && !saved) {
     return (
       <button
-        className="mt-3 text-[11.5px] font-semibold text-[#1E3A8A] underline decoration-[#1E3A8A]/35 underline-offset-2"
+        className="mt-3 text-[11.5px] font-semibold text-[#9D1CC4] underline decoration-[#9D1CC4]/35 underline-offset-2"
         onClick={() => setOpen(true)}
       >
         Já pediu antes? Entrar
@@ -703,7 +690,7 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
         <div className="flex items-center justify-between rounded-[6px] border border-[#14161C]/10 bg-white px-3.5 py-2.5">
           <span className="text-[12px] font-semibold text-[#14161C]">Bem-vindo de volta, {saved.name.split(' ')[0]}</span>
           <button
-            className="text-[11.5px] font-bold text-[#1E3A8A] disabled:opacity-50"
+            className="text-[11.5px] font-bold text-[#9D1CC4] disabled:opacity-50"
             disabled={login.isPending}
             onClick={() => login.mutate()}
           >
@@ -725,7 +712,7 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
               inputMode="tel"
             />
             <button
-              className="rounded-[6px] bg-[#1E3A8A] py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
+              className="rounded-[6px] bg-[#9D1CC4] py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
               disabled={login.isPending || name.trim().length < 2 || phone.trim().length < 8}
               onClick={() => login.mutate()}
             >
@@ -748,10 +735,10 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
                 <Link
                   key={o.id}
                   to={`/pedido/${slug}/rastreio/${o.id}`}
-                  className="flex items-center justify-between rounded-[6px] border border-[#14161C]/10 px-3 py-2 text-[12.5px] hover:bg-[#E9EEFB]"
+                  className="flex items-center justify-between rounded-[6px] border border-[#14161C]/10 px-3 py-2 text-[12.5px] hover:bg-[#F3E7FA]"
                 >
                   <span className="font-bold text-[#14161C]">Pedido #{o.number}</span>
-                  <span className="text-[#1E3A8A]">{ORDER_STATUS_LABEL[o.status]}</span>
+                  <span className="text-[#9D1CC4]">{ORDER_STATUS_LABEL[o.status]}</span>
                 </Link>
               ))}
             </div>
@@ -947,7 +934,7 @@ function DetailsStep({
       <div className="mb-[18px] flex gap-1 rounded-[6px] border border-[#14161C]/10 bg-white p-1">
         <button
           className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-            orderKind === 'DELIVERY' ? 'bg-[#1E3A8A] text-white' : 'text-[#5A6072]'
+            orderKind === 'DELIVERY' ? 'bg-[#9D1CC4] text-white' : 'text-[#5A6072]'
           }`}
           onClick={() => onChangeKind('DELIVERY')}
         >
@@ -955,7 +942,7 @@ function DetailsStep({
         </button>
         <button
           className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-            orderKind === 'PICKUP' ? 'bg-[#1E3A8A] text-white' : 'text-[#5A6072]'
+            orderKind === 'PICKUP' ? 'bg-[#9D1CC4] text-white' : 'text-[#5A6072]'
           }`}
           onClick={() => onChangeKind('PICKUP')}
         >
@@ -1109,7 +1096,7 @@ function CartStep({
         <div>
           {draft.map((item, i) => (
             <div key={i} className="flex items-start justify-between gap-2.5 border-b border-[#14161C]/[0.08] py-3 last:border-b-0">
-              <span className="w-6 shrink-0 text-[12.5px] font-extrabold text-[#1E3A8A]">{item.quantity}×</span>
+              <span className="w-6 shrink-0 text-[12.5px] font-extrabold text-[#9D1CC4]">{item.quantity}×</span>
               <div className="flex-1">
                 <div className="text-[13px] font-bold text-[#14161C]">{item.product.name}</div>
                 {item.notes && <div className="mt-0.5 text-[10.5px] text-[#5A6072]">{item.notes}</div>}
@@ -1205,11 +1192,11 @@ function PaymentStep({
           <button
             key={key}
             className={`flex flex-col items-center gap-2 rounded-[6px] border-2 p-4 text-center transition ${
-              paymentMethod === key ? 'border-[#1E3A8A] bg-[#E9EEFB]' : 'border-[#14161C]/10 bg-white'
+              paymentMethod === key ? 'border-[#9D1CC4] bg-[#F3E7FA]' : 'border-[#14161C]/10 bg-white'
             }`}
             onClick={() => setPaymentMethod(key)}
           >
-            <Icon className="text-[#1E3A8A]" size={21} />
+            <Icon className="text-[#9D1CC4]" size={21} />
             <span className="text-xs font-bold text-[#14161C]">{label}</span>
           </button>
         ))}
@@ -1286,7 +1273,7 @@ function ReviewStep({
       <EtaNote eta={eta} />
 
       <div className={`${CARD} p-3.5`}>
-        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#1E3A8A]">
+        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#9D1CC4]">
           {orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada'}
         </h3>
         <div className="text-[12.5px] leading-[1.55] text-[#14161C]">{customerName} · {customerPhone}</div>
@@ -1302,7 +1289,7 @@ function ReviewStep({
       </div>
 
       <div className={`${CARD} p-3.5`}>
-        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#1E3A8A]">Itens</h3>
+        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#9D1CC4]">Itens</h3>
         {draft.map((item, i) => (
           <div key={i} className="text-[12.5px] leading-[1.55] text-[#14161C]">
             {item.quantity}× {item.product.name} — {brl(draftItemUnitPrice(item) * item.quantity)}
@@ -1311,7 +1298,7 @@ function ReviewStep({
       </div>
 
       <div className={`${CARD} p-3.5`}>
-        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#1E3A8A]">Pagamento</h3>
+        <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-[#9D1CC4]">Pagamento</h3>
         <div className="text-[12.5px] leading-[1.55] text-[#14161C]">
           {paymentLabel}
           {paymentMethod === 'CASH' && changeFor ? ` · troco pra ${brl(Number(changeFor))}` : ''}
@@ -1370,7 +1357,7 @@ function ConfirmationStep({
 }) {
   return (
     <div className="flex flex-col items-center gap-3 pt-[54px] text-center">
-      <div className="flex h-[62px] w-[62px] items-center justify-center rounded-[6px] border-2 border-[#1E3A8A] text-[#1E3A8A]">
+      <div className="flex h-[62px] w-[62px] items-center justify-center rounded-[6px] border-2 border-[#9D1CC4] text-[#9D1CC4]">
         <Check size={28} strokeWidth={2.6} />
       </div>
       <h1 className="mt-1 text-[18px] font-extrabold text-[#14161C]">Pedido recebido!</h1>
@@ -1385,7 +1372,7 @@ function ConfirmationStep({
           : 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo — vá até o balcão no horário combinado.'}
       </p>
       {estimatedReadyAt && (
-        <div className="mx-auto flex w-fit items-center gap-2 rounded-[6px] bg-[#E9EEFB] px-4 py-2 text-xs font-medium text-[#1E3A8A]">
+        <div className="mx-auto flex w-fit items-center gap-2 rounded-[6px] bg-[#F3E7FA] px-4 py-2 text-xs font-medium text-[#9D1CC4]">
           <Clock size={16} />
           {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
         </div>
@@ -1395,7 +1382,7 @@ function ConfirmationStep({
           Acompanhar pedido
         </Link>
       )}
-      <button className="mt-[18px] text-[12.5px] font-bold text-[#1E3A8A] underline decoration-[#1E3A8A]/35 underline-offset-2" onClick={onNewOrder}>
+      <button className="mt-[18px] text-[12.5px] font-bold text-[#9D1CC4] underline decoration-[#9D1CC4]/35 underline-offset-2" onClick={onNewOrder}>
         Fazer novo pedido
       </button>
     </div>

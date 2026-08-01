@@ -89,7 +89,7 @@ export default function OrderTracking() {
 
   return (
     <div className="min-h-screen bg-[#F4F6FA] pb-10 dark:bg-[#F4F6FA]">
-      <div className="bg-gradient-to-br from-[#1E3A8A] to-[#14295E] px-4 py-5 text-center">
+      <div className="bg-gradient-to-br from-[#9D1CC4] to-[#5B0F73] px-4 py-5 text-center">
         <div className="mx-auto max-w-md">
           <span className="text-xs font-semibold text-white/75">{restaurant?.name ?? 'Acompanhar pedido'}</span>
           <h1 className="mt-0.5 text-xl font-extrabold text-white">Pedido #{order.number}</h1>
@@ -111,16 +111,16 @@ export default function OrderTracking() {
                 return (
                   <div key={step.key} className="flex flex-1 flex-col items-center gap-1.5 text-center">
                     <div className="flex w-full items-center">
-                      {i > 0 && <span className={`h-0.5 flex-1 ${i <= current ? 'bg-[#1E3A8A]' : 'bg-gray-200'}`} />}
+                      {i > 0 && <span className={`h-0.5 flex-1 ${i <= current ? 'bg-[#9D1CC4]' : 'bg-gray-200'}`} />}
                       <span
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                          done ? 'bg-[#1E3A8A] text-white' : 'bg-gray-100 text-gray-400'
+                          done ? 'bg-[#9D1CC4] text-white' : 'bg-gray-100 text-gray-400'
                         }`}
                       >
                         <Icon size={16} />
                       </span>
                       {i < STEPS.length - 1 && (
-                        <span className={`h-0.5 flex-1 ${i < current ? 'bg-[#1E3A8A]' : 'bg-gray-200'}`} />
+                        <span className={`h-0.5 flex-1 ${i < current ? 'bg-[#9D1CC4]' : 'bg-gray-200'}`} />
                       )}
                     </div>
                     <span className={`text-[11px] font-semibold ${done ? 'text-[#14161C]' : 'text-gray-400'}`}>
@@ -143,13 +143,13 @@ export default function OrderTracking() {
               </p>
             )}
             {order.status === 'PAID' && (
-              <p className="mt-6 text-center text-sm font-medium text-[#1E3A8A]">
+              <p className="mt-6 text-center text-sm font-medium text-[#9D1CC4]">
                 {isPickup ? 'Retirado — obrigado pela preferência!' : 'Entregue — obrigado pela preferência!'}
               </p>
             )}
 
             {order.estimatedReadyAt && order.status !== 'PAID' && (
-              <div className="mx-auto mt-4 flex w-fit items-center gap-2 rounded-[6px] bg-[#E9EEFB] px-3 py-2 text-xs font-medium text-[#1E3A8A]">
+              <div className="mx-auto mt-4 flex w-fit items-center gap-2 rounded-[6px] bg-[#F3E7FA] px-3 py-2 text-xs font-medium text-[#9D1CC4]">
                 <Clock size={14} />
                 Previsão: até{' '}
                 {new Date(order.estimatedReadyAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
