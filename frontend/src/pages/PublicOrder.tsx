@@ -825,7 +825,10 @@ function ZoneAutocomplete({
 
   const term = query.trim().toLowerCase();
   const filtered = term ? zones.filter((z) => z.name.toLowerCase().includes(term)) : zones;
-  const notFound = zones.length === 0 || (term.length > 0 && !selectedZoneId && filtered.length === 0);
+  // Só avisa "indisponível" depois que o cliente de fato procurou um bairro e não achou —
+  // antes disso (campo vazio, lista ainda carregando) não é o caso de fora da área, é só
+  // ainda não ter pesquisado nada.
+  const notFound = term.length > 0 && !selectedZoneId && filtered.length === 0;
 
   const pick = (zone: DeliveryZone) => {
     setQuery(splitZoneName(zone.name).bairro);
