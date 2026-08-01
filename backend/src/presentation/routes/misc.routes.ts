@@ -3,11 +3,15 @@ import { Role } from '@prisma/client';
 import { asyncHandler } from '../../utils/http';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validateBody } from '../middlewares/validate.middleware';
+import { logoUpload } from '../middlewares/upload.middleware';
 import { dashboardService } from '../../application/services/dashboard.service';
 import { userService } from '../../application/services/user.service';
 import { auditService } from '../../application/services/audit.service';
 import { superadminService } from '../../application/services/superadmin.service';
+import { brandingService } from '../../application/services/branding.service';
+import { AppError } from '../../utils/errors';
 import {
+  brandingColorSchema,
   createRestaurantSchema,
   createUserSchema,
   updateUserSchema,
@@ -91,6 +95,26 @@ superadminRouter.delete(
   asyncHandler(async (req, res) => {
     await superadminService.removeRestaurant(req.params.id);
     res.status(204).end();
+  }),
+);
+
+// ── Identidade visual (cor + logo) do site público — só o superadmin mexe aqui, pedido
+// explícito do cliente: quem administra o restaurante não deve poder trocar isso sozinho. ──
+superadminRouter.get(
+  '/restaurants/:id/branding',
+  asyncHandler(async (req, res) => res.json(await brandingService.get(req.params.id))),
+);
+superadminRouter.patch(
+  '/restaurants/:id/branding',
+  validateBody(brandingColorSchema),
+  asyncHandler(async (req, res) => res.json(await brandingService.updateColor(req.params.id, req.body.brandColor))),
+);
+superadminRouter.post(
+  '/restaurants/:id/branding/logo',
+  logoUpload,
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new AppError('Envie um arquivo de imagem');
+    res.json(await brandingService.updateLogo(req.params.id, req.file.filename));
   }),
 );
 

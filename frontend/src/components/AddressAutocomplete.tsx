@@ -85,7 +85,7 @@ export default function AddressAutocomplete({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pickPlace.mutate(s.placeId)}
             >
-              <MapPin size={13} className="mt-0.5 shrink-0 text-[#9D1CC4]" />
+              <MapPin size={13} className="mt-0.5 shrink-0 text-brand" />
               {s.description}
             </button>
           ))}

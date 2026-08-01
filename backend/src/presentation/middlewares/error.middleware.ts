@@ -1,11 +1,19 @@
 import { NextFunction, Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
+import { MulterError } from 'multer';
 import { AppError } from '../../utils/errors';
 import { logger } from '../../config/logger';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
+  if (err instanceof MulterError) {
+    const message = err.code === 'LIMIT_FILE_SIZE' ? 'Arquivo muito grande (máximo 3 MB)' : 'Falha no upload do arquivo';
+    logger.warn('upload_error', { path: req.originalUrl, code: err.code });
+    res.status(400).json({ error: { code: 'UPLOAD_ERROR', message } });
+    return;
+  }
+
   if (err instanceof ZodError) {
     logger.warn('validation_error', { path: req.originalUrl, details: err.flatten() });
     res.status(422).json({
