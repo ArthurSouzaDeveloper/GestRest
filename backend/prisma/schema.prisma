@@ -89,6 +89,16 @@ enum DeliveryPricingMode {
   DISTANCE_BANDS
 }
 
+// Como o tempo estimado de preparo (retirada/entrega) mostrado ao cliente é calculado.
+// AUTO é o cálculo automático de sempre (tempo-base + fila de pedidos ativos, ver
+// eta.service.ts). MANUAL deixa o admin travar um número fixo pra cada tipo — pedido do
+// cliente Rei do Suco, que ainda ajusta o horário "no olho" olhando o fluxo da cozinha e
+// prefere decidir ele mesmo por enquanto, em vez de confiar no ajuste automático.
+enum EtaMode {
+  AUTO
+  MANUAL
+}
+
 enum AuditAction {
   ORDER_CREATED
   ORDER_UPDATED
@@ -138,6 +148,13 @@ model Restaurant {
   deliveryOriginLat     Decimal?               @db.Decimal(9, 6)
   deliveryOriginLng     Decimal?               @db.Decimal(9, 6)
   deliveryDistanceBands DeliveryDistanceBand[]
+
+  // Modo do tempo estimado de preparo mostrado ao cliente (ver eta.service.ts). Os minutos
+  // manuais só são usados quando etaMode = MANUAL — ficam gravados mesmo trocando de volta
+  // pra AUTO, pra não perder o valor configurado se o restaurante quiser ligar de novo.
+  etaMode            EtaMode @default(AUTO)
+  etaPickupMinutes   Int?
+  etaDeliveryMinutes Int?
 
   @@map("restaurants")
 }

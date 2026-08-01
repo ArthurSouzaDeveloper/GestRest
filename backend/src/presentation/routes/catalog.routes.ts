@@ -13,6 +13,7 @@ import {
   deliveryPricingBandService,
   deliveryPricingSettingsService,
 } from '../../application/services/deliveryPricing.service';
+import { etaSettingsService } from '../../application/services/eta.service';
 import {
   additionalSchema,
   additionalUpdateSchema,
@@ -23,6 +24,7 @@ import {
   deliveryPricingSettingsSchema,
   deliveryZoneSchema,
   deliveryZoneUpdateSchema,
+  etaSettingsSchema,
   productSchema,
   productUpdateSchema,
 } from '../validators/schemas';
@@ -32,6 +34,9 @@ const router = Router();
 router.use(authenticate);
 
 const manager = authorize(Role.ADMIN, Role.MANAGER);
+// Configuração do tempo estimado (manual vs. automático) fica restrita a ADMIN — pedido
+// explícito do cliente, que não quer nem os gerentes mexendo nesse horário.
+const admin = authorize(Role.ADMIN);
 const tid = (req: Parameters<typeof ctx>[0]) => ctx(req).tenantId;
 
 // ── Categories ──
@@ -208,6 +213,18 @@ router.delete(
     await deliveryPricingBandService.remove(tid(req), req.params.id);
     res.status(204).end();
   }),
+);
+
+// ── Tempo estimado de preparo (retirada/entrega) — automático por fila ou fixo pelo admin ──
+router.get(
+  '/eta-settings',
+  asyncHandler(async (req, res) => res.json(await etaSettingsService.get(tid(req)))),
+);
+router.patch(
+  '/eta-settings',
+  admin,
+  validateBody(etaSettingsSchema),
+  asyncHandler(async (req, res) => res.json(await etaSettingsService.update(tid(req), req.body))),
 );
 
 export default router;
