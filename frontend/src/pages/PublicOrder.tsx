@@ -358,7 +358,6 @@ export default function PublicOrder() {
         <IntroStep
           slug={slug}
           restaurantName={restaurant.name}
-          logoUrl={restaurant.logoUrl}
           onPick={(kind) => {
             if (kind === 'MENU') {
               setOrderKind(null);
@@ -559,12 +558,10 @@ function PublicHeader({
 function IntroStep({
   slug,
   restaurantName,
-  logoUrl,
   onPick,
 }: {
   slug: string;
   restaurantName: string;
-  logoUrl: string | null;
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
   const [kind, setKind] = useState<OrderKind>('DELIVERY');
@@ -577,71 +574,67 @@ function IntroStep({
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-[#F4F6FA] px-7 pt-12 dark:bg-[#F4F6FA]">
-      {/* Logo suspensa — flutua solta no topo da tela sem nenhuma moldura desenhada em
-          volta. Cada restaurante sobe a própria arte (ver tela de Identidade Visual); sem
-          logo configurada ainda, cai pras iniciais num distintivo redondo na cor da marca. */}
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt={restaurantName}
-          width={112}
-          height={112}
-          className="h-[112px] w-[112px] rounded-full object-cover drop-shadow-[0_10px_18px_rgba(91,15,115,0.35)]"
-        />
-      ) : (
-        <div className="flex h-[112px] w-[112px] items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-700 text-[32px] font-extrabold text-white drop-shadow-[0_10px_18px_rgba(91,15,115,0.35)]">
-          {restaurantName.slice(0, 2).toUpperCase()}
-        </div>
-      )}
-
-      <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
         <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
         Aberto de quarta a domingo até 23h
       </div>
 
       <CustomerLoginPanel slug={slug} />
 
-      <div className="mt-6 w-full max-w-md rounded-[6px] border border-[#14161C]/[0.08] bg-white p-4">
-        <h6 className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">Pastelaria &amp; Sucaria</h6>
-        <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight text-[#14161C]">{restaurantName}</h1>
-        <p className="mt-1.5 text-[12.5px] leading-[1.5] text-[#5A6072]">
-          Pastéis fritos na hora, mini pizzas e sucos naturais. Peça para retirar no balcão ou receber em casa.
-        </p>
+      <div className="mt-6 w-full max-w-md overflow-hidden rounded-[6px] border border-[#14161C]/[0.08] bg-white">
+        {/* Foto do restaurante (balcão/loja) — ainda não existe um jeito de subir essa foto
+            de verdade (é um campo novo, separado da logo), então por enquanto mostra esse
+            placeholder no mesmo estilo da prévia aprovada. */}
+        <div
+          className="flex h-40 w-full items-center justify-center text-center text-[10.5px] font-bold uppercase tracking-wide text-gray-400"
+          style={{
+            backgroundColor: '#E7E5E4',
+            backgroundImage:
+              'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255,255,255,0.6) 10px, rgba(255,255,255,0.6) 20px)',
+          }}
+        >
+          Foto: balcão de pastéis e sucos
+        </div>
 
-        <div className="mt-4 border-t-2 border-[#14161C]/[0.08] pt-4">
-          <h6 className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#5A6072]">Como você quer receber?</h6>
-          <div className="flex gap-1 rounded-[6px] border border-[#14161C]/10 bg-[#F4F6FA] p-1">
-            <button
-              className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-                kind === 'DELIVERY' ? 'bg-brand text-white' : 'text-[#5A6072]'
-              }`}
-              onClick={() => setKind('DELIVERY')}
-            >
-              Entrega
+        <div className="p-4">
+          <h6 className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">Pastelaria &amp; Sucaria</h6>
+          <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight text-[#14161C]">{restaurantName}</h1>
+
+          <div className="mt-4 border-t-2 border-[#14161C]/[0.08] pt-4">
+            <h6 className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#5A6072]">Como você quer receber?</h6>
+            <div className="flex gap-1 rounded-[6px] border border-[#14161C]/10 bg-[#F4F6FA] p-1">
+              <button
+                className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
+                  kind === 'DELIVERY' ? 'bg-brand text-white' : 'text-[#5A6072]'
+                }`}
+                onClick={() => setKind('DELIVERY')}
+              >
+                Entrega
+              </button>
+              <button
+                className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
+                  kind === 'PICKUP' ? 'bg-brand text-white' : 'text-[#5A6072]'
+                }`}
+                onClick={() => setKind('PICKUP')}
+              >
+                Retirada
+              </button>
+            </div>
+
+            <div className="mt-3">
+              <EtaNote eta={eta} />
+            </div>
+
+            <button className={`${PRIMARY_CTA} mt-4`} onClick={() => onPick(kind)}>
+              Ver cardápio completo
             </button>
             <button
-              className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-                kind === 'PICKUP' ? 'bg-brand text-white' : 'text-[#5A6072]'
-              }`}
-              onClick={() => setKind('PICKUP')}
+              className="mt-2.5 w-full text-center text-[11.5px] font-semibold text-[#5A6072] underline underline-offset-2"
+              onClick={() => onPick('MENU')}
             >
-              Retirada
+              Só quero ver o cardápio
             </button>
           </div>
-
-          <div className="mt-3">
-            <EtaNote eta={eta} />
-          </div>
-
-          <button className={`${PRIMARY_CTA} mt-4`} onClick={() => onPick(kind)}>
-            Ver cardápio completo
-          </button>
-          <button
-            className="mt-2.5 w-full text-center text-[11.5px] font-semibold text-[#5A6072] underline underline-offset-2"
-            onClick={() => onPick('MENU')}
-          >
-            Só quero ver o cardápio
-          </button>
         </div>
       </div>
 
