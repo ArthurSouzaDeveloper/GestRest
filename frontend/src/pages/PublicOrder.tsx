@@ -152,6 +152,7 @@ export default function PublicOrder() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryZoneId, setDeliveryZoneId] = useState('');
+  const [deliveryCity, setDeliveryCity] = useState<string | null>(null);
   const [deliveryLat, setDeliveryLat] = useState<number | null>(null);
   const [deliveryLng, setDeliveryLng] = useState<number | null>(null);
   const [deliveryStreet, setDeliveryStreet] = useState('');
@@ -193,6 +194,23 @@ export default function PublicOrder() {
     queryFn: async () => (await api.get<DeliveryZone[]>(`/public/${slug}/delivery-zones`)).data,
     enabled: !!slug && orderKind === 'DELIVERY' && !distanceMode,
   });
+
+  // Cidades distintas entre os bairros cadastrados (bairro salvo como "Bairro (Cidade)" —
+  // ver script de importação). A maioria dos tenants atende só uma cidade e nem grava esse
+  // sufixo, então o bloco de cidade só aparece quando faz sentido (mais de uma cidade
+  // cadastrada) — pra não confundir quem só usa uma.
+  const zoneCities = useMemo(() => {
+    const set = new Set<string>();
+    for (const z of zones) {
+      const city = splitZoneName(z.name).city;
+      if (city) set.add(city);
+    }
+    return [...set];
+  }, [zones]);
+  const needsCityFirst = zoneCities.length > 1;
+  // Sem escolher a cidade ainda (tenant multi-cidade), não mostra bairro nenhum — evita o
+  // cliente escolher um "Centro" errado antes de dizer qual cidade é a dele.
+  const zonesForBairro = needsCityFirst ? zones.filter((z) => splitZoneName(z.name).city === deliveryCity) : zones;
 
   // Cotação do frete por distância — dispara quando o cliente escolhe um endereço no
   // autocomplete (não a cada tecla). Reconferida de novo pelo back no momento de confirmar
@@ -365,7 +383,13 @@ export default function PublicOrder() {
             customerPhone={customerPhone}
             setCustomerPhone={setCustomerPhone}
             distanceMode={distanceMode}
-            zones={zones}
+            zones={zonesForBairro}
+            zoneCities={zoneCities}
+            deliveryCity={deliveryCity}
+            setDeliveryCity={(city) => {
+              setDeliveryCity(city);
+              setDeliveryZoneId(''); // bairro escolhido antes pode ser de outra cidade
+            }}
             deliveryZoneId={deliveryZoneId}
             setDeliveryZoneId={setDeliveryZoneId}
             deliveryLat={deliveryLat}
@@ -455,6 +479,7 @@ export default function PublicOrder() {
               setCustomerName('');
               setCustomerPhone('');
               setDeliveryZoneId('');
+              setDeliveryCity(null);
               setDeliveryLat(null);
               setDeliveryLng(null);
               setDeliveryStreet('');
@@ -803,18 +828,6 @@ function ZoneAutocomplete({
   const filtered = term ? zones.filter((z) => z.name.toLowerCase().includes(term)) : zones;
   const notFound = zones.length === 0 || (term.length > 0 && !selectedZoneId && filtered.length === 0);
 
-  // Agrupa por cidade (bloco/cabeçalho) — a maioria dos tenants tem só uma cidade, então o
-  // grupo sem nome (bairro sem "(Cidade)" no nome) não ganha cabeçalho nenhum.
-  const groups = useMemo(() => {
-    const map = new Map<string, DeliveryZone[]>();
-    for (const z of filtered) {
-      const city = splitZoneName(z.name).city ?? '';
-      if (!map.has(city)) map.set(city, []);
-      map.get(city)!.push(z);
-    }
-    return [...map.entries()];
-  }, [filtered]);
-
   const pick = (zone: DeliveryZone) => {
     setQuery(splitZoneName(zone.name).bairro);
     onSelect(zone.id);
@@ -839,26 +852,17 @@ function ZoneAutocomplete({
       />
       {open && term.length > 0 && filtered.length > 0 && (
         <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[6px] border border-[#14161C]/[0.15] bg-white shadow-lg">
-          {groups.map(([city, zonesInCity]) => (
-            <div key={city || '_'}>
-              {city && (
-                <div className="sticky top-0 bg-[#F4F6FA] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#5A6072]">
-                  {city}
-                </div>
-              )}
-              {zonesInCity.map((z) => (
-                <button
-                  key={z.id}
-                  type="button"
-                  className="flex w-full items-center justify-between border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#14161C] last:border-b-0 hover:bg-gray-50"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => pick(z)}
-                >
-                  <span>{splitZoneName(z.name).bairro}</span>
-                  <span className="text-[#5A6072]">{brl(z.fee)}</span>
-                </button>
-              ))}
-            </div>
+          {filtered.map((z) => (
+            <button
+              key={z.id}
+              type="button"
+              className="flex w-full items-center justify-between border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#14161C] last:border-b-0 hover:bg-gray-50"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(z)}
+            >
+              <span>{splitZoneName(z.name).bairro}</span>
+              <span className="text-[#5A6072]">{brl(z.fee)}</span>
+            </button>
           ))}
         </div>
       )}
@@ -885,6 +889,9 @@ function DetailsStep({
   setCustomerPhone,
   distanceMode,
   zones,
+  zoneCities,
+  deliveryCity,
+  setDeliveryCity,
   deliveryZoneId,
   setDeliveryZoneId,
   deliveryLat,
@@ -914,6 +921,9 @@ function DetailsStep({
   setCustomerPhone: (v: string) => void;
   distanceMode: boolean;
   zones: DeliveryZone[];
+  zoneCities: string[];
+  deliveryCity: string | null;
+  setDeliveryCity: (v: string | null) => void;
   deliveryZoneId: string;
   setDeliveryZoneId: (v: string) => void;
   deliveryLat: number | null;
@@ -936,7 +946,6 @@ function DetailsStep({
 }) {
   const selectedZone = zones.find((z) => z.id === deliveryZoneId);
   const selectedFee = selectedZone?.fee;
-  const selectedCity = selectedZone ? splitZoneName(selectedZone.name).city : null;
   return (
     <div className="space-y-4">
       <h2 className={STEP_TITLE}>Pra onde vai o pedido?</h2>
@@ -1028,15 +1037,38 @@ function DetailsStep({
 
       {orderKind === 'DELIVERY' && !distanceMode && (
         <>
+          {zoneCities.length > 1 && (
+            <div>
+              <label className={FIELD_LABEL}>Cidade</label>
+              <div className="flex flex-wrap gap-1.5">
+                {zoneCities.map((city) => (
+                  <button
+                    key={city}
+                    type="button"
+                    className={`rounded-[4px] px-3 py-2 text-[12.5px] font-bold transition ${
+                      deliveryCity === city ? 'bg-brand text-white' : 'border border-[#14161C]/10 text-[#5A6072]'
+                    }`}
+                    onClick={() => setDeliveryCity(city)}
+                  >
+                    {city}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <label className={FIELD_LABEL}>Bairro</label>
-            <ZoneAutocomplete zones={zones} selectedZoneId={deliveryZoneId} onSelect={setDeliveryZoneId} />
-            {selectedFee !== undefined && (
-              <p className="mt-1 text-[11px] text-[#5A6072]">
-                Taxa de entrega: {brl(selectedFee)}
-                {selectedCity ? ` · ${selectedCity}` : ''}
-              </p>
+            {zoneCities.length > 1 && !deliveryCity ? (
+              <p className={`${FIELD_INPUT} flex items-center text-[#5A6072]`}>Escolha a cidade acima primeiro</p>
+            ) : (
+              <ZoneAutocomplete
+                key={deliveryCity ?? 'sem-cidade'}
+                zones={zones}
+                selectedZoneId={deliveryZoneId}
+                onSelect={setDeliveryZoneId}
+              />
             )}
+            {selectedFee !== undefined && <p className="mt-1 text-[11px] text-[#5A6072]">Taxa de entrega: {brl(selectedFee)}</p>}
           </div>
           <div className="grid grid-cols-[1.4fr_1fr] gap-2.5">
             <div>

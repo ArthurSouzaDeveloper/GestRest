@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, ExternalLink, LogOut, Trash2, Check } from 'lucide-react';
+import { Plus, ExternalLink, LogOut, Trash2, Check, Palette, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api, { apiError } from '../lib/api';
 import { Card, Modal, Spinner } from '../components/ui';
-import type { RestaurantSummary } from '../types';
+import { DEFAULT_BRAND_COLOR } from '../lib/publicBrand';
+import type { BrandingSettings, RestaurantSummary } from '../types';
 
 export default function SuperAdmin() {
   const { user, login, logout } = useAuth();
@@ -73,6 +74,7 @@ function SuperLogin({ login }: { login: (e: string, p: string) => Promise<void> 
 function Console({ onLogout, name }: { onLogout: () => void; name: string }) {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
+  const [editingBranding, setEditingBranding] = useState<RestaurantSummary | null>(null);
 
   const { data: restaurants = [], isLoading } = useQuery({
     queryKey: ['restaurants'],
@@ -157,6 +159,13 @@ function Console({ onLogout, name }: { onLogout: () => void; name: string }) {
                     {r.active ? 'Desativar' : 'Ativar'}
                   </button>
                   <button
+                    className="btn-secondary !py-1.5 !px-2.5"
+                    title="Identidade visual (cor e logo)"
+                    onClick={() => setEditingBranding(r)}
+                  >
+                    <Palette size={14} />
+                  </button>
+                  <button
                     className="btn-secondary !py-1.5 !px-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                     title="Excluir restaurante"
                     onClick={() => handleRemove(r)}
@@ -180,7 +189,139 @@ function Console({ onLogout, name }: { onLogout: () => void; name: string }) {
           }}
         />
       )}
+
+      {editingBranding && (
+        <EditBranding restaurant={editingBranding} onClose={() => setEditingBranding(null)} />
+      )}
     </div>
+  );
+}
+
+/**
+ * Cor e logo do site público de pedidos daquele restaurante — só o superadmin mexe aqui
+ * (pedido explícito do cliente: quem administra o restaurante não deve poder trocar
+ * sozinho), então mora no console da plataforma, não na tela do restaurante.
+ */
+function EditBranding({ restaurant, onClose }: { restaurant: RestaurantSummary; onClose: () => void }) {
+  const qc = useQueryClient();
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['branding', restaurant.id],
+    queryFn: async () => (await api.get<BrandingSettings>(`/superadmin/restaurants/${restaurant.id}/branding`)).data,
+  });
+
+  const [color, setColor] = useState(DEFAULT_BRAND_COLOR);
+  const [colorError, setColorError] = useState('');
+  const [logoError, setLogoError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (settings?.brandColor) setColor(settings.brandColor);
+  }, [settings?.brandColor]);
+
+  const refresh = () => qc.invalidateQueries({ queryKey: ['branding', restaurant.id] });
+
+  const saveColor = useMutation({
+    mutationFn: async () => api.patch(`/superadmin/restaurants/${restaurant.id}/branding`, { brandColor: color }),
+    onSuccess: () => {
+      setColorError('');
+      refresh();
+    },
+    onError: (e) => setColorError(apiError(e)),
+  });
+
+  const uploadLogo = useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append('logo', file);
+      return api.post(`/superadmin/restaurants/${restaurant.id}/branding/logo`, form);
+    },
+    onSuccess: () => {
+      setLogoError('');
+      refresh();
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    },
+    onError: (e) => setLogoError(apiError(e)),
+  });
+
+  return (
+    <Modal open onClose={onClose} title={`Identidade Visual — ${restaurant.name}`}>
+      {isLoading || !settings ? (
+        <Spinner />
+      ) : (
+        <div className="space-y-5">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Cor da marca</h3>
+            <p className="mb-3 text-xs text-gray-500">
+              Os tons claros/escuros usados no site (fundo de painel, gradiente de botão) são calculados
+              automaticamente a partir dessa cor só.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="color"
+                className="h-10 w-12 cursor-pointer rounded-lg border border-gray-200 dark:border-gray-800"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+              />
+              <input
+                className="input w-28 font-mono uppercase"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                placeholder="#9D1CC4"
+                maxLength={7}
+              />
+              <button className="btn-primary !py-1.5 text-xs" disabled={saveColor.isPending} onClick={() => saveColor.mutate()}>
+                Salvar
+              </button>
+            </div>
+            {colorError && <p className="mt-2 text-xs text-red-600">{colorError}</p>}
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Logo</h3>
+            <p className="mb-3 text-xs text-gray-500">
+              Sem logo enviada, o site mostra as iniciais do restaurante num distintivo na cor da marca. PNG,
+              JPEG ou WebP, até 3 MB.
+            </p>
+            <div className="flex items-center gap-3">
+              {settings.logoUrl ? (
+                <img src={settings.logoUrl} alt="Logo atual" className="h-16 w-16 rounded-full object-cover" />
+              ) : (
+                <div
+                  className="flex h-16 w-16 items-center justify-center rounded-full text-lg font-extrabold text-white"
+                  style={{ backgroundColor: color }}
+                >
+                  {restaurant.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadLogo.mutate(file);
+                  }}
+                />
+                <button
+                  className="btn-secondary !py-1.5 text-xs"
+                  disabled={uploadLogo.isPending}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload size={14} /> {uploadLogo.isPending ? 'Enviando...' : 'Enviar logo'}
+                </button>
+                {logoError && <p className="mt-2 text-xs text-red-600">{logoError}</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button className="btn-secondary" onClick={onClose}>Fechar</button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

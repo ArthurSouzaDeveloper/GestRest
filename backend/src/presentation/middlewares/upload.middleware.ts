@@ -4,7 +4,6 @@ import multer, { FileFilterCallback } from 'multer';
 import { Request } from 'express';
 import { env } from '../../config/env';
 import { AppError } from '../../utils/errors';
-import { ctx } from '../routes/context';
 
 const ALLOWED_MIME: Record<string, string> = {
   'image/png': '.png',
@@ -17,11 +16,13 @@ fs.mkdirSync(brandingDir, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, brandingDir),
-  // Nome gerado a partir do tenant (não do nome original do arquivo) — evita path
-  // traversal/colisão e já identifica de qual restaurante é cada logo na pasta.
+  // Nome gerado a partir do :id na rota (não do nome original do arquivo) — evita path
+  // traversal/colisão e já identifica de qual restaurante é cada logo na pasta. Rota é
+  // exclusiva do superadmin (ver misc.routes.ts), então usa req.params.id em vez do
+  // tenant do próprio token — quem chama não tem (nem deveria ter) restaurantId no JWT.
   filename: (req: Request, file, cb) => {
     const ext = ALLOWED_MIME[file.mimetype] ?? (path.extname(file.originalname).toLowerCase() || '.png');
-    cb(null, `${ctx(req).tenantId}-${Date.now()}${ext}`);
+    cb(null, `${req.params.id}-${Date.now()}${ext}`);
   },
 });
 
