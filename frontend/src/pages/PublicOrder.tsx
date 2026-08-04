@@ -660,7 +660,7 @@ function IntroStep({
             <Instagram size={15} />
           </a>
           <a
-            href="https://wa.me/551934054361"
+            href="https://wa.me/5519997461854"
             target="_blank"
             rel="noreferrer"
             title="WhatsApp"
@@ -871,8 +871,8 @@ function ZoneAutocomplete({
       {notFound && (
         <p className="mt-1.5 text-[11px] text-red-600">
           Bairro indisponível para entrega. Fale com a gente pelo{' '}
-          <a href="https://wa.me/551934054361" target="_blank" rel="noreferrer" className="font-semibold underline">
-            WhatsApp (19) 3405-4361
+          <a href="https://wa.me/5519997461854" target="_blank" rel="noreferrer" className="font-semibold underline">
+            WhatsApp (19) 99746-1854
           </a>
           .
         </p>
