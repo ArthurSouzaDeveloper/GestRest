@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronLeft } from 'lucide-react';
+import { Check, ChevronLeft, Plus, X } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { DRINK_NOTE_PRESETS, toggleNotePreset } from '../lib/notePresets';
@@ -38,16 +38,18 @@ function groupByFruit(products: Product[]): { fruits: FruitEntry[]; standalone: 
 }
 
 /**
- * Guided "monte seu suco" flow: fruta(s) -> base -> adicionais, em vez de uma
- * grade enorme com uma combinação por botão. Usado para categorias cujos
- * produtos seguem a convenção de nome "Fruta (Base)" (ex.: importador do
- * cardápio de sucos). Categorias sem esse padrão devem usar a grade normal.
+ * Guided "monte seu suco" flow: fruta -> base -> adicionais (2 toques), em vez de uma
+ * grade enorme com uma combinação por botão. Usado para categorias cujos produtos seguem
+ * a convenção de nome "Fruta (Base)" (ex.: importador do cardápio de sucos). Categorias
+ * sem esse padrão devem usar a grade normal.
  *
- * O cliente pode combinar mais de 1 fruta no mesmo copo — regra do dono do
- * restaurante: preço = o da combinação fruta+base mais cara entre as
- * escolhidas + R$1,00 por fruta adicional (a partir da 2ª). O preço mostrado
- * aqui é só uma prévia; o valor cobrado de verdade é sempre recalculado no
- * backend a partir dos productId reais (nunca confiado do cliente).
+ * Combinar mais de 1 fruta é uma ação opcional ("+ Adicionar outra fruta" na revisão) em
+ * vez do fluxo padrão — a maioria dos pedidos é de 1 fruta só, então o caminho rápido
+ * (toque na fruta, toque na base, revisar) fica intacto pra esse caso comum. Regra do
+ * dono do restaurante ao combinar: preço = o da combinação fruta+base mais cara entre as
+ * escolhidas + R$1,00 por fruta adicional (a partir da 2ª). O preço mostrado aqui é só
+ * uma prévia; o valor cobrado de verdade é sempre recalculado no backend a partir dos
+ * productId reais (nunca confiado do cliente).
  */
 export function JuiceBuilder({
   products,
@@ -63,8 +65,8 @@ export function JuiceBuilder({
 }) {
   const { fruits, standalone } = useMemo(() => groupByFruit(products), [products]);
   const [selectedFruits, setSelectedFruits] = useState<FruitEntry[]>([]);
-  const [pickingBase, setPickingBase] = useState(false);
   const [base, setBase] = useState<string | null>(null);
+  const [addingFruit, setAddingFruit] = useState(false);
   const [standaloneChosen, setStandaloneChosen] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
@@ -97,6 +99,13 @@ export function JuiceBuilder({
   const comboExtra = isCombo ? EXTRA_FRUIT_PRICE * (effectiveProducts.length - 1) : 0;
   const totalUnitPrice = (primary?.price ?? 0) + comboExtra;
 
+  // Outras frutas que dá pra somar ao combo atual: têm a mesma base já escolhida e ainda
+  // não foram adicionadas — a base não muda ao combinar, só o preço.
+  const candidatesToAdd = useMemo(() => {
+    if (!base || standaloneChosen) return [];
+    return fruits.filter((f) => !selectedFruits.some((sf) => sf.fruit === f.fruit) && f.bases.some((b) => b.base === base));
+  }, [fruits, selectedFruits, base, standaloneChosen]);
+
   const { data: additionals = [] } = useQuery({
     queryKey: ['additionals', categoryId, basePath],
     queryFn: async () =>
@@ -106,22 +115,17 @@ export function JuiceBuilder({
 
   const reset = () => {
     setSelectedFruits([]);
-    setPickingBase(false);
     setBase(null);
+    setAddingFruit(false);
     setStandaloneChosen(null);
     setQuantity(1);
     setNotes('');
     setSelectedAdditionals([]);
   };
 
-  const toggleFruit = (f: FruitEntry) => {
-    const already = selectedFruits.some((sf) => sf.fruit === f.fruit);
-    if (already) {
-      setSelectedFruits(selectedFruits.filter((sf) => sf.fruit !== f.fruit));
-      return;
-    }
-    if (selectedFruits.length >= MAX_FRUITS) return;
-    setSelectedFruits([...selectedFruits, f]);
+  const removeFruit = (fruitName: string) => {
+    if (selectedFruits.length <= 1) return;
+    setSelectedFruits(selectedFruits.filter((f) => f.fruit !== fruitName));
   };
 
   const confirm = () => {
@@ -143,7 +147,39 @@ export function JuiceBuilder({
     reset();
   };
 
-  // Etapa 3: fruta(s) + base escolhidas — quantidade, adicionais, observações.
+  // Sub-tela: adicionar mais uma fruta ao combo (só as que têm a base já escolhida).
+  if (addingFruit) {
+    return (
+      <div className="space-y-4">
+        <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700" onClick={() => setAddingFruit(false)}>
+          <ChevronLeft size={16} /> Voltar
+        </button>
+        <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
+          Adicionar fruta ({base}) — soma {brl(EXTRA_FRUIT_PRICE)}
+        </div>
+        {candidatesToAdd.length === 0 ? (
+          <p className="text-sm text-gray-500">Nenhuma outra fruta disponível nessa base.</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {candidatesToAdd.map((f) => (
+              <button
+                key={f.fruit}
+                onClick={() => {
+                  setSelectedFruits([...selectedFruits, f]);
+                  setAddingFruit(false);
+                }}
+                className="card p-2.5 text-center text-sm font-medium transition hover:border-brand hover:shadow"
+              >
+                {f.fruit}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Etapa 3: fruta + base escolhidas — quantidade, adicionais, observações.
   if (effectiveProducts.length > 0 && primary) {
     return (
       <div className="space-y-4">
@@ -160,12 +196,20 @@ export function JuiceBuilder({
                 {selectedFruits.map((f) => f.fruit).join(' + ')} <span className="font-normal text-gray-500">({base})</span>
               </div>
               <ul className="mt-1.5 space-y-0.5 text-xs text-gray-500">
-                {effectiveProducts.map((p) => (
-                  <li key={p.id}>
-                    {p.name.match(FRUIT_BASE_RE)?.[1] ?? p.name} — {brl(p.price)}
-                    {p.id === primary.id && <span className="text-brand"> (preço base)</span>}
-                  </li>
-                ))}
+                {effectiveProducts.map((p) => {
+                  const fruitName = p.name.match(FRUIT_BASE_RE)?.[1] ?? p.name;
+                  return (
+                    <li key={p.id} className="flex items-center gap-1.5">
+                      <span>
+                        {fruitName} — {brl(p.price)}
+                        {p.id === primary.id && <span className="text-brand"> (preço base)</span>}
+                      </span>
+                      <button onClick={() => removeFruit(fruitName)} className="text-gray-400 hover:text-red-500" title="Remover fruta">
+                        <X size={12} />
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
               <div className="mt-1.5 text-sm text-brand">
                 {brl(primary.price)} + {brl(comboExtra)} fruta extra = <strong>{brl(totalUnitPrice)}</strong>
@@ -178,6 +222,15 @@ export function JuiceBuilder({
             </>
           )}
         </div>
+
+        {!standaloneChosen && candidatesToAdd.length > 0 && selectedFruits.length < MAX_FRUITS && (
+          <button
+            className="flex items-center gap-1.5 text-sm font-medium text-brand"
+            onClick={() => setAddingFruit(true)}
+          >
+            <Plus size={14} /> Adicionar outra fruta (+{brl(EXTRA_FRUIT_PRICE)})
+          </button>
+        )}
 
         <div>
           <div className="label">Quantidade</div>
@@ -243,12 +296,12 @@ export function JuiceBuilder({
     );
   }
 
-  // Etapa 2: fruta(s) escolhidas — selecionar a base (comum a todas elas).
-  if (pickingBase) {
+  // Etapa 2: fruta(s) escolhida(s) — selecionar a base (comum a todas elas).
+  if (selectedFruits.length > 0) {
     return (
       <div className="space-y-4">
-        <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700" onClick={() => setPickingBase(false)}>
-          <ChevronLeft size={16} /> Trocar fruta(s)
+        <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700" onClick={() => setSelectedFruits([])}>
+          <ChevronLeft size={16} /> Trocar fruta
         </button>
         <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
           {selectedFruits.map((f) => f.fruit).join(' + ')} — escolha a base
@@ -279,36 +332,23 @@ export function JuiceBuilder({
     );
   }
 
-  // Etapa 1: escolher a(s) fruta(s) — seleção múltipla, até MAX_FRUITS.
+  // Etapa 1: escolher a fruta — um toque já avança pra escolha da base (fluxo rápido).
+  // Combinar com outra fruta é oferecido depois, na revisão (etapa 3).
   return (
     <div className="space-y-4">
       <div>
-        <div className="mb-2 flex items-center justify-between text-sm font-medium text-gray-600 dark:text-gray-300">
-          <span>1. Escolha a(s) fruta(s)</span>
-          {selectedFruits.length > 0 && <span className="text-xs font-normal text-gray-400">{selectedFruits.length}/{MAX_FRUITS}</span>}
-        </div>
-        <p className="mb-2 text-xs text-gray-400">Pode combinar mais de uma — cada fruta a partir da 2ª soma {brl(EXTRA_FRUIT_PRICE)}.</p>
+        <div className="mb-2 text-sm font-medium text-gray-600 dark:text-gray-300">1. Escolha a fruta</div>
         <div className="grid max-h-[38vh] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4">
-          {fruits.map((f) => {
-            const on = selectedFruits.some((sf) => sf.fruit === f.fruit);
-            const disabled = !on && selectedFruits.length >= MAX_FRUITS;
-            return (
-              <button
-                key={f.fruit}
-                onClick={() => toggleFruit(f)}
-                disabled={disabled}
-                className={`card p-2.5 text-center text-sm font-medium transition ${disabled ? 'opacity-40' : 'hover:border-brand hover:shadow'} ${on ? 'border-brand bg-brand text-white' : ''}`}
-              >
-                {f.fruit}
-              </button>
-            );
-          })}
+          {fruits.map((f) => (
+            <button
+              key={f.fruit}
+              onClick={() => setSelectedFruits([f])}
+              className="card p-2.5 text-center text-sm font-medium transition hover:border-brand hover:shadow"
+            >
+              {f.fruit}
+            </button>
+          ))}
         </div>
-        {selectedFruits.length > 0 && (
-          <button className="btn-primary mt-3 w-full !py-2.5" onClick={() => setPickingBase(true)}>
-            Continuar
-          </button>
-        )}
       </div>
 
       {standalone.length > 0 && (
