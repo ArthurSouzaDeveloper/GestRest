@@ -158,7 +158,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
               return (
                 <tr key={it.id} className="border-t border-gray-50 dark:border-gray-800">
                   <td className="py-2">
-                    {it.product.name}
+                    {it.comboLabel ?? it.product.name}
                     {it.additionals.length > 0 && (
                       <div className="text-xs text-gray-400">+ {it.additionals.map((a) => a.name).join(', ')}</div>
                     )}

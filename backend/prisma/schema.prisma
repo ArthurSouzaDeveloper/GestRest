@@ -412,6 +412,11 @@ model OrderItem {
   quantity   Int              @default(1)
   unitPrice  Decimal          @db.Decimal(10, 2)
   notes      String?
+  // Preenchido só quando o item é um combo de mais de 1 fruta no "Monte o Seu" de sucos
+  // (ex.: "Abacaxi + Morango") — snapshot pro ticket de produção, productId acima aponta
+  // pra combinação fruta+base de maior preço entre as escolhidas (regra do dono: preço
+  // é sempre o da fruta mais cara + R$1,00 por fruta extra, calculado no backend).
+  comboLabel String?
   station    Station          @default(KITCHEN)
   status     ProductionStatus @default(WAITING)
   startedAt  DateTime?

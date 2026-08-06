@@ -15,11 +15,26 @@ export interface DraftItem {
   additionalIds: string[];
   /** Sum of the selected additionals' unit price, captured at selection time so the cart can show a running total without re-fetching every product's additionals. */
   additionalsTotal: number;
+  /** "Monte o Seu" de sucos com mais de 1 fruta: ids de todas as combinações fruta+base
+   * escolhidas (`product` acima é a de maior preço entre elas). Ausente = item comum. */
+  comboProductIds?: string[];
+  /** Rótulo pronto pra exibir no carrinho, ex. "Abacaxi + Morango" — só pra exibição, o
+   * backend recalcula tudo de novo a partir de comboProductIds. */
+  comboLabel?: string;
 }
 
-/** Price of one unit of this draft line (base product + its additionals). */
+// Regra do dono: R$1,00 por fruta a partir da 2ª ao combinar sabores num suco/frapê.
+// Espelha EXTRA_FRUIT_PRICE em backend/src/application/services/order.service.ts — só
+// usado aqui pra mostrar o total no carrinho antes de enviar; o preço cobrado de verdade
+// é sempre recalculado no backend a partir de comboProductIds, nunca confiado do cliente.
+export const EXTRA_FRUIT_PRICE = 1;
+
+/** Price of one unit of this draft line (base product + its additionals + fruta extra do combo). */
 export function draftItemUnitPrice(item: DraftItem): number {
-  return item.product.price + item.additionalsTotal;
+  const comboExtra = item.comboProductIds && item.comboProductIds.length > 1
+    ? EXTRA_FRUIT_PRICE * (item.comboProductIds.length - 1)
+    : 0;
+  return item.product.price + item.additionalsTotal + comboExtra;
 }
 
 // Só 2 abas no topo — Água e Refrigerantes viraram sub-filtro (chip) dentro de "Sucos e
@@ -390,7 +405,12 @@ export function OrderComposer({
             <div key={i} className="card p-3">
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium">{item.product.name}</div>
+                  <div className="text-sm font-medium">{item.comboLabel ?? item.product.name}</div>
+                  {item.comboProductIds && item.comboProductIds.length > 1 && (
+                    <div className="text-xs text-gray-500">
+                      + {brl(EXTRA_FRUIT_PRICE * (item.comboProductIds.length - 1))} fruta extra
+                    </div>
+                  )}
                   {item.additionalIds.length > 0 && (
                     <div className="text-xs text-gray-500">+ {item.additionalIds.length} adicional(is)</div>
                   )}

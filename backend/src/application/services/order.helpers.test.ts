@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AdditionalKind } from '@prisma/client';
-import { assertCustomProductBase, computeTotals, type OrderWithRelations } from './order.helpers';
+import { assertCustomProductBase, computeTotals, itemDisplayName, type OrderWithRelations } from './order.helpers';
 
 function makeOrder(overrides: Partial<OrderWithRelations> = {}): OrderWithRelations {
   const base = {
@@ -92,5 +92,20 @@ describe('assertCustomProductBase', () => {
     expect(() => assertCustomProductBase(regular, [ADDON, ADDON])).not.toThrow();
     expect(() => assertCustomProductBase(regular, [])).not.toThrow();
     expect(() => assertCustomProductBase(regular, [BASE])).toThrow(/não aceita/);
+  });
+});
+
+describe('itemDisplayName', () => {
+  it('returns the plain product name when there is no combo', () => {
+    expect(itemDisplayName('Morango (Água)', null)).toBe('Morango (Água)');
+    expect(itemDisplayName('Morango (Água)', undefined)).toBe('Morango (Água)');
+  });
+
+  it('combines the fruits with the base extracted from the product name', () => {
+    expect(itemDisplayName('Morango (Água)', 'Abacaxi + Morango')).toBe('Abacaxi + Morango (Água)');
+  });
+
+  it('falls back to just the combo label when the product name has no base suffix', () => {
+    expect(itemDisplayName('Suco Especial', 'Abacaxi + Morango')).toBe('Abacaxi + Morango');
   });
 });

@@ -35,6 +35,26 @@ interface NewItemInput {
   quantity: number;
   notes?: string;
   additionalIds?: string[];
+  // "Monte o Seu" de sucos com mais de 1 fruta (ver createOrderItems) — quando presente,
+  // productId acima é ignorado para fins de preço/estação, é só o que o cliente mandou
+  // como referência.
+  comboProductIds?: string[];
+}
+
+// Regra do dono do restaurante: ao combinar mais de 1 fruta num suco/frapê, o preço é
+// sempre o da combinação fruta+base mais cara entre as escolhidas, mais esse valor fixo
+// por fruta adicional (a partir da 2ª). Nunca confiado do cliente — sempre recalculado
+// aqui a partir dos productId reais.
+const EXTRA_FRUIT_PRICE = 1;
+// Mesmo critério (nome da categoria) já usado no frontend pra decidir quando mostrar o
+// JuiceBuilder em vez da grade normal — mantém os dois lados consistentes sem precisar
+// de um campo novo no schema só pra isso.
+const JUICE_CATEGORY_NAME = 'sucos';
+// Espelha JuiceBuilder.tsx FRUIT_BASE_RE — extrai só o nome da fruta de "Fruta (Base)".
+const FRUIT_NAME_RE = /^(.+) \([^)]+\)$/;
+function fruitName(productName: string): string {
+  const m = productName.match(FRUIT_NAME_RE);
+  return m ? m[1] : productName;
 }
 
 export interface PublicOrderInput {
@@ -105,12 +125,41 @@ async function createOrderItems(
 ): Promise<Set<Station>> {
   const touchedStations = new Set<Station>();
   for (const item of items) {
-    const product = await tx.product.findFirst({
-      where: { id: item.productId, restaurantId: tenantId },
-      include: { category: true },
-    });
-    if (!product) throw new NotFoundError('Produto');
-    if (!product.available) throw new AppError(`Produto indisponível: ${product.name}`);
+    let product;
+    let unitPrice: number | Prisma.Decimal;
+    let comboLabel: string | undefined;
+
+    if (item.comboProductIds && item.comboProductIds.length >= 2) {
+      const comboProducts = await tx.product.findMany({
+        where: { id: { in: item.comboProductIds }, restaurantId: tenantId },
+        include: { category: true },
+      });
+      if (comboProducts.length !== item.comboProductIds.length) throw new NotFoundError('Produto');
+      const unavailable = comboProducts.find((p) => !p.available);
+      if (unavailable) throw new AppError(`Produto indisponível: ${unavailable.name}`);
+      if (new Set(comboProducts.map((p) => p.categoryId)).size > 1) {
+        throw new AppError('As frutas do combo precisam ser da mesma categoria');
+      }
+      if (comboProducts[0].category.name.trim().toLowerCase() !== JUICE_CATEGORY_NAME) {
+        throw new AppError('Combinar frutas só é permitido em sucos');
+      }
+      product = comboProducts.reduce((max, p) => (Number(p.price) > Number(max.price) ? p : max));
+      unitPrice = Number(product.price) + EXTRA_FRUIT_PRICE * (comboProducts.length - 1);
+      // Ordena por nome (não pela ordem que o banco devolveu, que não segue a ordem de
+      // seleção do cliente) pra o rótulo do combo sair sempre estável e previsível.
+      comboLabel = comboProducts
+        .map((p) => fruitName(p.name))
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+        .join(' + ');
+    } else {
+      product = await tx.product.findFirst({
+        where: { id: item.productId, restaurantId: tenantId },
+        include: { category: true },
+      });
+      if (!product) throw new NotFoundError('Produto');
+      if (!product.available) throw new AppError(`Produto indisponível: ${product.name}`);
+      unitPrice = product.price;
+    }
 
     const station = product.category.station;
     touchedStations.add(station);
@@ -128,8 +177,9 @@ async function createOrderItems(
         orderId,
         productId: product.id,
         quantity: Math.max(1, item.quantity),
-        unitPrice: product.price,
+        unitPrice,
         notes: item.notes,
+        comboLabel,
         station,
         status: station === Station.NONE ? ProductionStatus.DONE : ProductionStatus.WAITING,
         additionals: {

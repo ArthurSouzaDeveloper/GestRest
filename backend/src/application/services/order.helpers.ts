@@ -41,6 +41,21 @@ export const orderInclude = {
   payments: true,
 } satisfies Prisma.OrderInclude;
 
+/** Matches product names built by the menu importer, e.g. "Morango (Frapê)" — mirrors JuiceBuilder.tsx's FRUIT_BASE_RE on the frontend. */
+const FRUIT_BASE_RE = /^(.+) \(([^)]+)\)$/;
+
+/**
+ * Nome de exibição de um item de pedido: combo de mais de 1 fruta mostra todas + a base
+ * (ex.: "Abacaxi + Morango (Água)") em vez de só o nome da fruta de maior preço, que
+ * ficaria incompleto. Usado em qualquer lugar que mostre itens pro cliente ou pra equipe
+ * (ticket de produção, acompanhamento público, caixa, mesas).
+ */
+export function itemDisplayName(productName: string, comboLabel: string | null | undefined): string {
+  if (!comboLabel) return productName;
+  const base = productName.match(FRUIT_BASE_RE)?.[2];
+  return base ? `${comboLabel} (${base})` : comboLabel;
+}
+
 /** Scopes an order lookup by id to a single tenant. */
 export function tenantOrderWhere(tenantId: string, id?: string): Prisma.OrderWhereInput {
   return id ? { id, restaurantId: tenantId } : { restaurantId: tenantId };
@@ -150,7 +165,7 @@ export function serializePublicStatus(order: OrderWithRelations) {
     acceptedAt: order.acceptedAt,
     items: order.items
       .filter((i) => i.status !== 'CANCELLED')
-      .map((i) => ({ name: i.product.name, quantity: i.quantity, status: i.status })),
+      .map((i) => ({ name: itemDisplayName(i.product.name, i.comboLabel), quantity: i.quantity, status: i.status })),
     total: computeTotals(order).total,
   };
 }

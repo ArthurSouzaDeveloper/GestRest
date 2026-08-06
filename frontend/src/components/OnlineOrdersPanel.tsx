@@ -124,7 +124,7 @@ function OnlineOrderCard({
       <div className="mt-2 space-y-1 border-t border-gray-100 pt-2 dark:border-gray-800">
         {order.items.filter((i) => i.status !== 'CANCELLED').map((it) => (
           <div key={it.id} className="flex items-center justify-between text-xs">
-            <span>{it.quantity}× {it.product.name}</span>
+            <span>{it.quantity}× {it.comboLabel ?? it.product.name}</span>
             <ProductionBadge status={it.status} />
           </div>
         ))}

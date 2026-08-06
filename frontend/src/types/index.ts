@@ -144,6 +144,8 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   notes?: string;
+  /** Combo de frutas do "Monte o Seu" (ex.: "Abacaxi + Morango") — presente só quando o item combina mais de 1 fruta. */
+  comboLabel?: string | null;
   station: Station;
   status: ProductionStatus;
   product: Product;
