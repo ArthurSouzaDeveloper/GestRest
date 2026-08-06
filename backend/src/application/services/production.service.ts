@@ -1,5 +1,6 @@
 import { ProductionStatus, Station } from '@prisma/client';
 import { prisma } from '../../config/prisma';
+import { itemDisplayName } from './order.helpers';
 
 /**
  * Returns the live production queue for a station: all items that are not yet
@@ -40,7 +41,7 @@ export const productionService = {
         // apart on the ticket even when neither comanda has a customer name set.
         orderNumber: item.order.number,
         customerName: item.order.customer?.name ?? null,
-        productName: item.product.name,
+        productName: itemDisplayName(item.product.name, item.comboLabel),
         avgPrepMin: item.product.avgPrepMin,
         quantity: item.quantity,
         notes: item.notes,

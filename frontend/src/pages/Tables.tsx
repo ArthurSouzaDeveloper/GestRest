@@ -238,6 +238,7 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
           quantity: d.quantity,
           notes: d.notes || undefined,
           additionalIds: d.additionalIds,
+          comboProductIds: d.comboProductIds,
         })),
       }),
     onSuccess: () => {
@@ -308,7 +309,7 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
                 {order.items.map((it) => (
                   <div key={it.id} className="flex items-center justify-between text-sm">
                     <div>
-                      <span className="font-medium">{it.quantity}× {it.product.name}</span>
+                      <span className="font-medium">{it.quantity}× {it.comboLabel ?? it.product.name}</span>
                       {it.additionals.length > 0 && (
                         <span className="text-xs text-gray-500"> ({it.additionals.map((a) => a.name).join(', ')})</span>
                       )}

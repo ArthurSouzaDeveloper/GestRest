@@ -280,6 +280,7 @@ export default function PublicOrder() {
           quantity: d.quantity,
           notes: d.notes || undefined,
           additionalIds: d.additionalIds,
+          comboProductIds: d.comboProductIds,
         })),
       };
       return (await api.post<{ id: string; number: number; estimatedReadyAt: string | null }>(`/public/${slug}/orders`, payload)).data;
@@ -1142,7 +1143,7 @@ function CartStep({
             <div key={i} className="flex items-start justify-between gap-2.5 border-b border-[#14161C]/[0.08] py-3 last:border-b-0">
               <span className="w-6 shrink-0 text-[12.5px] font-extrabold text-brand">{item.quantity}×</span>
               <div className="flex-1">
-                <div className="text-[13px] font-bold text-[#14161C]">{item.product.name}</div>
+                <div className="text-[13px] font-bold text-[#14161C]">{item.comboLabel ?? item.product.name}</div>
                 {item.notes && <div className="mt-0.5 text-[10.5px] text-[#5A6072]">{item.notes}</div>}
                 {item.additionalIds.length > 0 && (
                   <div className="mt-0.5 text-[10.5px] text-[#5A6072]">+ {item.additionalIds.length} adicional(is)</div>
@@ -1336,7 +1337,7 @@ function ReviewStep({
         <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-brand">Itens</h3>
         {draft.map((item, i) => (
           <div key={i} className="text-[12.5px] leading-[1.55] text-[#14161C]">
-            {item.quantity}× {item.product.name} — {brl(draftItemUnitPrice(item) * item.quantity)}
+            {item.quantity}× {item.comboLabel ?? item.product.name} — {brl(draftItemUnitPrice(item) * item.quantity)}
           </div>
         ))}
       </div>

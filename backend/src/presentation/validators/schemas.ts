@@ -177,6 +177,11 @@ export const addItemsSchema = z.object({
         quantity: z.number().int().positive(),
         notes: z.string().optional(),
         additionalIds: z.array(z.string().uuid()).optional(),
+        // "Monte o Seu" de sucos com mais de 1 fruta — ids das combinações fruta+base
+        // escolhidas (productId acima é só um fallback informativo; o preço/estação
+        // reais são recalculados no backend a partir desta lista, nunca confiados do
+        // cliente). Ausente = item comum de 1 produto só, comportamento inalterado.
+        comboProductIds: z.array(z.string().uuid()).min(2).max(4).optional(),
       }),
     )
     .min(1),
@@ -238,6 +243,7 @@ export const publicOrderSchema = z
           quantity: z.number().int().positive().max(20),
           notes: z.string().max(200).optional(),
           additionalIds: z.array(z.string().uuid()).optional(),
+          comboProductIds: z.array(z.string().uuid()).min(2).max(4).optional(),
         }),
       )
       .min(1)
