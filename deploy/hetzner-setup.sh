@@ -25,17 +25,16 @@ if [ ! -f .env ]; then
 fi
 
 # Aviso se ainda houver placeholders
-if grep -q "TROQUE" .env || grep -q "SEU_IP_AQUI" .env; then
-  echo "    !! O .env ainda tem valores de exemplo (TROQUE / SEU_IP_AQUI). Edite antes de continuar:"
+if grep -q "TROQUE" .env || grep -q "SEU_DOMINIO_AQUI" .env; then
+  echo "    !! O .env ainda tem valores de exemplo (TROQUE / SEU_DOMINIO_AQUI). Edite antes de continuar:"
   echo "       nano .env"
   exit 1
 fi
 
-HTTP_PORT=$(grep -E '^HTTP_PORT=' .env | cut -d= -f2- || true)
-HTTP_PORT=${HTTP_PORT:-80}
-echo "==> 3/5  Abrindo a porta ${HTTP_PORT} no firewall (se o ufw estiver ativo)..."
+echo "==> 3/5  Abrindo as portas 80/443 no firewall (se o ufw estiver ativo)..."
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
-  ufw allow "${HTTP_PORT}/tcp" || true
+  ufw allow 80/tcp || true
+  ufw allow 443/tcp || true
 fi
 
 echo "==> 4/5  Build e subida dos containers..."
@@ -77,11 +76,13 @@ else
   echo "    Para trocar a senha do super admin: $COMPOSE exec backend node dist/scripts/create-superadmin.js --email=... --senha=... --nome=..."
 fi
 
-IP=$(grep '^PUBLIC_URL=' .env | cut -d= -f2-)
+DOMAIN=$(grep '^DOMAIN=' .env | cut -d= -f2-)
 echo ""
 echo "======================================================================"
-echo "  ✅ GestRest no ar!  Acesse:  ${IP:-http://SEU_IP}"
-echo "  Painel da plataforma (crie restaurantes aqui): ${IP:-http://SEU_IP}/super"
+echo "  ✅ GestRest no ar!  Acesse:  https://${DOMAIN:-SEU_DOMINIO}"
+echo "  (o certificado HTTPS pode levar até 1-2 minutos pra ficar pronto na"
+echo "   primeira vez — o Caddy emite automaticamente assim que o DNS resolver)"
+echo "  Painel da plataforma (crie restaurantes aqui): https://${DOMAIN:-SEU_DOMINIO}/super"
 echo "  Comandos úteis:"
 echo "    Ver logs:      $COMPOSE logs -f"
 echo "    Reiniciar:     $COMPOSE restart"

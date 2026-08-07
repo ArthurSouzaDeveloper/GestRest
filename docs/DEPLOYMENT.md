@@ -24,20 +24,30 @@ Copie `backend/.env.example` para `backend/.env` e ajuste:
 
 ## 3. Deploy com Docker Compose
 
-Antes do primeiro deploy, crie o arquivo `.env` (mesma pasta do `docker-compose.yml`) com os segredos reais — sem ele, a subida falha de propósito em vez de usar um valor previsível:
+**Produção com domínio e HTTPS (recomendado)**: use `docker-compose.prod.yml`, que já
+inclui um Caddy na frente cuidando do certificado TLS automaticamente (Let's Encrypt) —
+guia completo passo a passo em [`docs/DEPLOY_HETZNER.md`](./DEPLOY_HETZNER.md). Resumo:
+
+```bash
+cp .env.production.example .env
+nano .env   # POSTGRES_PASSWORD, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET (openssl rand -hex 32) e DOMAIN
+docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+```
+
+**`docker-compose.yml` (sem `-f`)** é uma versão mais simples, **sem HTTPS**, pensada só
+para desenvolvimento local ou uma rede interna já protegida por outra camada (ex.: atrás
+de uma VPN) — nunca para expor direto na internet com dados de clientes reais. Também
+exige `.env` com os mesmos três segredos (sem `DOMAIN`, já que não tem Caddy):
 
 ```bash
 cp .env.production.example .env
 nano .env   # troque POSTGRES_PASSWORD, JWT_ACCESS_SECRET e JWT_REFRESH_SECRET (gere com: openssl rand -hex 32)
-```
-
-```bash
 docker compose up --build -d
 ```
 
-Sobe três serviços: `db` (PostgreSQL), `backend` (API — aplica migrações no boot) e `frontend` (nginx servindo a SPA + proxy para a API).
+Qualquer um dos dois sobe os mesmos serviços de base: `db` (PostgreSQL), `backend` (API — aplica migrações no boot) e `frontend` (nginx servindo a SPA + proxy para a API); o `-prod` acrescenta o `caddy`.
 
-Criar o super admin (necessário para acessar `/super` e cadastrar restaurantes):
+Criar o super admin (necessário para acessar `/super` e cadastrar restaurantes) — acrescente `-f docker-compose.prod.yml` se for esse o caminho usado:
 
 ```bash
 docker compose exec backend node dist/scripts/create-superadmin.js \
@@ -49,10 +59,6 @@ Populares dados de demonstração (opcional, só para ambiente de teste — **nu
 ```bash
 docker compose exec -e SEED_PASSWORD=SuaSenhaForte123 backend npx prisma db seed
 ```
-
-Acesse:
-- Aplicação: `http://<host>:8080`
-- API/Swagger: `http://<host>:4000/api/docs`
 
 ## 4. Deploy manual (sem Docker)
 
@@ -90,9 +96,9 @@ Acesse `/super` com o e-mail e senha que você definiu no `create-superadmin.js`
 - [ ] `POSTGRES_PASSWORD` trocado por um valor forte (nunca o padrão `gestrest`).
 - [ ] Porta do PostgreSQL (5432) **não** publicada para a internet — só acessível pelos outros containers da mesma rede docker compose.
 - [ ] `CORS_ORIGIN` restrito ao domínio real.
-- [ ] HTTPS habilitado (cookies de refresh usam `secure` quando `NODE_ENV=production`).
+- [ ] HTTPS habilitado — use `docker-compose.prod.yml` (Caddy + Let's Encrypt automático, ver `docs/DEPLOY_HETZNER.md`); `COOKIE_SECURE=true` só funciona de verdade com HTTPS real na frente.
 - [ ] Backup automático do PostgreSQL agendado via cron (`bash deploy/backup-db.sh` — ver comentário no topo do script).
-- [ ] Limpeza periódica de refresh tokens expirados/revogados agendada via cron (`docker compose exec -T backend node dist/scripts/cleanup-refresh-tokens.js` — ver comentário no topo do script).
+- [ ] Limpeza periódica de refresh tokens expirados/revogados agendada via cron (`docker exec gestrest-backend node dist/scripts/cleanup-refresh-tokens.js` — ver comentário no topo do script).
 - [ ] Usuários de demonstração removidos/senha alterada.
 - [ ] (Alta disponibilidade) Socket.IO com adapter Redis ao rodar múltiplas instâncias.
 

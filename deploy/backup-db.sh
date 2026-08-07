@@ -33,7 +33,10 @@ TIMESTAMP="$(date +%Y-%m-%d_%H%M%S)"
 OUT_FILE="$BACKUP_DIR/gestrest-$TIMESTAMP.sql.gz"
 
 echo "==> Gerando dump de '$DB_NAME' (usuário '$DB_USER')..."
-docker compose exec -T db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$OUT_FILE"
+# "docker exec" no nome fixo do container (gestrest-db) em vez de "docker compose exec":
+# funciona igual independente de qual arquivo compose está rodando (docker-compose.yml
+# ou docker-compose.prod.yml) — não precisa saber/adivinhar qual "-f" usar aqui.
+docker exec gestrest-db pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$OUT_FILE"
 echo "    OK: $OUT_FILE ($(du -h "$OUT_FILE" | cut -f1))"
 
 echo "==> Removendo backups com mais de $RETENTION_DAYS dias..."
