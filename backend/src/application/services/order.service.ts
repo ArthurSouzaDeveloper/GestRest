@@ -213,16 +213,29 @@ async function requireOrder(tenantId: string, id: string) {
 export const orderService = {
   async list(
     tenantId: string,
-    params: { status?: OrderStatus; tableId?: string; orderType?: OrderType } = {},
+    params: {
+      status?: OrderStatus;
+      tableId?: string;
+      orderType?: OrderType;
+      skip?: number;
+      take?: number;
+    } = {},
   ) {
     const where: Prisma.OrderWhereInput = { restaurantId: tenantId };
     if (params.status) where.status = params.status;
     if (params.tableId) where.tableId = params.tableId;
     if (params.orderType) where.orderType = params.orderType;
+    // Sem cota, essa lista crescia sem limite conforme meses de operação se acumulam —
+    // qualquer papel autenticado podia pedir o histórico inteiro do tenant de uma vez
+    // (payload pesado: itens + produtos + adicionais + pagamentos por pedido). Telas que
+    // usam filtro (ex. status=READY_FOR_PAYMENT) já ficam bem abaixo do teto na prática.
+    const take = Math.min(Math.max(params.take ?? 100, 1), 200);
     const orders = await prisma.order.findMany({
       where,
       include: orderInclude,
       orderBy: { openedAt: 'desc' },
+      skip: params.skip,
+      take,
     });
     return orders.map(serializeOrder);
   },
@@ -327,19 +340,23 @@ export const orderService = {
     const estimatedReadyAt = new Date(Date.now() + etaMinutes * 60_000);
 
     const orderId = await prisma.$transaction(async (tx) => {
-      // Reaproveita o mesmo Customer entre pedidos (pelo telefone) em vez de criar um
+      // Reaproveita o mesmo Customer entre pedidos (pelo telefone + nome) em vez de criar um
       // novo a cada vez — é o que permite o cliente "logar" de novo (nome+telefone) e
-      // encontrar os pedidos anteriores depois de fechar o site. Atualiza o nome pro
-      // mais recente digitado, caso tenha mudado.
+      // encontrar os pedidos anteriores depois de fechar o site. Só reaproveita quando o
+      // nome digitado bate com o já cadastrado — NUNCA sobrescreve o nome de um Customer
+      // existente com o que veio nesse request: telefone sozinho não é prova de posse, e
+      // sobrescrever silenciosamente permitiria alguém que só sabe o telefone de outra
+      // pessoa renomear o cadastro dela e depois "logar" (nome+telefone) pra ver o
+      // histórico de pedidos alheio. Nome diferente para o mesmo telefone vira um Customer
+      // novo (não há unicidade de telefone no schema, de propósito).
       const phoneNormalized = normalizePhone(input.customerPhone);
-      const existing = await tx.customer.findFirst({
+      const nameNormalized = input.customerName.trim().toLowerCase();
+      const candidates = await tx.customer.findMany({
         where: { restaurantId: tenantId, phoneNormalized },
       });
+      const existing = candidates.find((c) => c.name.trim().toLowerCase() === nameNormalized);
       const customer = existing
-        ? await tx.customer.update({
-            where: { id: existing.id },
-            data: { name: input.customerName.trim() },
-          })
+        ? existing
         : await tx.customer.create({
             data: {
               name: input.customerName.trim(),
@@ -390,16 +407,20 @@ export const orderService = {
 
   /** Staff accepts a pending online order, moving it into the normal production flow. */
   async accept(id: string, ctx: Ctx) {
-    const order = await requireOrder(ctx.tenantId, id);
-    if (order.status !== OrderStatus.PENDING) throw new ConflictError('Pedido não está aguardando aceite');
+    await requireOrder(ctx.tenantId, id);
 
     const items = await prisma.orderItem.findMany({ where: { orderId: id } });
     const touchedStations = new Set(items.map((i) => i.station));
 
-    await prisma.order.update({
-      where: { id },
+    // updateMany com WHERE status=PENDING (não update simples): duas equipes aceitando o
+    // mesmo pedido online quase ao mesmo tempo antes só duplicavam registro de auditoria e
+    // broadcast de socket (estado final já saía correto de qualquer forma) — agora a
+    // segunda tentativa é rejeitada de forma limpa em vez de re-processar em silêncio.
+    const claimed = await prisma.order.updateMany({
+      where: { id, restaurantId: ctx.tenantId, status: OrderStatus.PENDING },
       data: { status: OrderStatus.OPEN, acceptedAt: new Date() },
     });
+    if (claimed.count === 0) throw new ConflictError('Pedido não está aguardando aceite');
 
     await auditService.record({
       action: AuditAction.ORDER_ACCEPTED,
@@ -533,12 +554,13 @@ export const orderService = {
     data: { discount?: number; serviceRate?: number; notes?: string; version?: number },
     ctx: Ctx,
   ) {
-    const order = await requireOrder(ctx.tenantId, id);
-    if (data.version !== undefined && data.version !== order.version) {
-      throw new ConflictError('O pedido foi alterado por outro usuário. Recarregue e tente novamente.');
-    }
-    await prisma.order.update({
-      where: { id },
+    await requireOrder(ctx.tenantId, id);
+    // updateMany com WHERE version=... (não um update simples por id) faz a checagem valer
+    // de verdade: um "check-then-act" com leitura e escrita separadas deixava duas edições
+    // concorrentes lerem a mesma version, passarem as duas pela checagem, e a segunda
+    // sobrescrever a primeira em silêncio — exatamente o que esse campo deveria evitar.
+    const result = await prisma.order.updateMany({
+      where: { id, restaurantId: ctx.tenantId, ...(data.version !== undefined ? { version: data.version } : {}) },
       data: {
         discount: data.discount,
         serviceRate: data.serviceRate,
@@ -546,6 +568,9 @@ export const orderService = {
         version: { increment: 1 },
       },
     });
+    if (result.count === 0) {
+      throw new ConflictError('O pedido foi alterado por outro usuário. Recarregue e tente novamente.');
+    }
     await auditService.record({
       action: AuditAction.ORDER_UPDATED,
       userId: ctx.userId,
@@ -575,13 +600,19 @@ export const orderService = {
     }
 
     await prisma.$transaction(async (tx) => {
+      // updateMany com WHERE status NOT IN (PAID, CANCELLED) — não um update simples:
+      // duas ações de cancelamento quase simultâneas (dois cliques, garçom e caixa ao
+      // mesmo tempo) antes só duplicavam auditoria/broadcast (o estado final já saía
+      // certo de qualquer forma). Agora a segunda tentativa é rejeitada de forma limpa.
+      const claimed = await tx.order.updateMany({
+        where: { id, restaurantId: ctx.tenantId, status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] } },
+        data: { status: OrderStatus.CANCELLED, closedAt: new Date() },
+      });
+      if (claimed.count === 0) throw new ConflictError('Pedido já foi pago ou cancelado por outra ação');
+
       await tx.orderItem.updateMany({
         where: { orderId: id },
         data: { status: ProductionStatus.CANCELLED },
-      });
-      await tx.order.update({
-        where: { id },
-        data: { status: OrderStatus.CANCELLED, closedAt: new Date() },
       });
       if (order.tableId) await syncTableStatus(order.tableId, tx);
     });

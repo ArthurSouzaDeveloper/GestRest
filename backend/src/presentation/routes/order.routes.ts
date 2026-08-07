@@ -26,15 +26,23 @@ const canCancel = authorize(Role.WAITER, Role.CASHIER, Role.MANAGER, Role.ADMIN)
 // Aceitar/entregar pedido online: mesmos papéis que veem a tela de Cozinha, onde
 // o painel de pedidos online mora.
 const onlineOps = authorize(Role.COOK, Role.MANAGER, Role.ADMIN);
+// Leitura de pedido completo (nome/telefone/endereço do cliente, pagamentos): só quem
+// de fato precisa desse detalhe. JUICER fica de fora — a tela de Suqueiros já tem sua
+// própria fila enxuta (production.routes.ts, só nome do cliente) e nunca chama estas
+// rotas; COOK entra porque o painel de pedidos online mora na tela de Cozinha.
+const orderRead = authorize(Role.WAITER, Role.CASHIER, Role.COOK, Role.MANAGER, Role.ADMIN);
 
 router.get(
   '/',
+  orderRead,
   asyncHandler(async (req, res) =>
     res.json(
       await orderService.list(ctx(req).tenantId, {
         status: req.query.status as OrderStatus | undefined,
         tableId: req.query.tableId as string | undefined,
         orderType: req.query.orderType as OrderType | undefined,
+        skip: req.query.skip !== undefined ? Number(req.query.skip) : undefined,
+        take: req.query.take !== undefined ? Number(req.query.take) : undefined,
       }),
     ),
   ),
@@ -42,6 +50,7 @@ router.get(
 
 router.get(
   '/:id',
+  orderRead,
   asyncHandler(async (req, res) => res.json(await orderService.get(ctx(req).tenantId, req.params.id))),
 );
 

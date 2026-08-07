@@ -24,6 +24,13 @@ Copie `backend/.env.example` para `backend/.env` e ajuste:
 
 ## 3. Deploy com Docker Compose
 
+Antes do primeiro deploy, crie o arquivo `.env` (mesma pasta do `docker-compose.yml`) com os segredos reais — sem ele, a subida falha de propósito em vez de usar um valor previsível:
+
+```bash
+cp .env.production.example .env
+nano .env   # troque POSTGRES_PASSWORD, JWT_ACCESS_SECRET e JWT_REFRESH_SECRET (gere com: openssl rand -hex 32)
+```
+
 ```bash
 docker compose up --build -d
 ```
@@ -79,10 +86,13 @@ Acesse `/super` com o e-mail e senha que você definiu no `create-superadmin.js`
 
 ## 7. Checklist de produção
 
-- [ ] Segredos JWT trocados e fora do versionamento.
+- [ ] Segredos JWT trocados e fora do versionamento (arquivo `.env`, nunca no `docker-compose.yml`).
+- [ ] `POSTGRES_PASSWORD` trocado por um valor forte (nunca o padrão `gestrest`).
+- [ ] Porta do PostgreSQL (5432) **não** publicada para a internet — só acessível pelos outros containers da mesma rede docker compose.
 - [ ] `CORS_ORIGIN` restrito ao domínio real.
 - [ ] HTTPS habilitado (cookies de refresh usam `secure` quando `NODE_ENV=production`).
-- [ ] Backups automáticos do PostgreSQL.
+- [ ] Backup automático do PostgreSQL agendado via cron (`bash deploy/backup-db.sh` — ver comentário no topo do script).
+- [ ] Limpeza periódica de refresh tokens expirados/revogados agendada via cron (`docker compose exec -T backend node dist/scripts/cleanup-refresh-tokens.js` — ver comentário no topo do script).
 - [ ] Usuários de demonstração removidos/senha alterada.
 - [ ] (Alta disponibilidade) Socket.IO com adapter Redis ao rodar múltiplas instâncias.
 

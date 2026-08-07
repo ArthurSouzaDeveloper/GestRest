@@ -5,6 +5,12 @@ on:
     branches: ['**']
   pull_request:
 
+# Defesa em profundidade: o workflow não precisa escrever no repositório em nenhum passo
+# (sem release, sem push, sem comentar PR) — restringe o GITHUB_TOKEN ao mínimo em vez de
+# herdar o padrão (que pode ser mais amplo dependendo da configuração da org/repo).
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend (build + test)

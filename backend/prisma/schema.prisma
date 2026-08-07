@@ -112,7 +112,12 @@ enum AuditAction {
   TABLE_CLOSED
   LOGIN
   USER_CREATED
+  USER_UPDATED // Perfil/status/senha de um usuário alterado por um admin/manager
+  USER_REMOVED // Usuário removido ou desativado (ver userService.remove)
   RESTAURANT_CREATED
+  RESTAURANT_STATUS_CHANGED // Superadmin ativou/desativou um restaurante
+  RESTAURANT_REMOVED // Superadmin apagou um restaurante
+  CUSTOMER_ANONYMIZED // Direito do titular (LGPD Art. 18) — nome/telefone apagados do cadastro
   PUBLIC_ORDER_CREATED // Pedido criado pelo site público (delivery/retirada), sem usuário autenticado
   ORDER_ACCEPTED // Equipe aceitou um pedido online, tirando-o de PENDING
 }

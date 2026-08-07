@@ -1,17 +1,27 @@
+# Segredos (POSTGRES_PASSWORD, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET) vêm de um arquivo
+# `.env` nesta mesma pasta (docker compose carrega `.env` automaticamente, sem precisar de
+# --env-file) — nunca hardcoded aqui, e nunca versionado. Copie .env.production.example
+# para .env e gere valores fortes (`openssl rand -hex 32` para os dois segredos JWT) antes
+# do primeiro `docker compose up`. Sem isso, a subida falha alto (":?mensagem") em vez de
+# silenciosamente usar um valor previsível — auditoria de segurança encontrou os valores
+# antigos (placeholder JWT + senha "gestrest") versionados neste arquivo e usados de verdade
+# em produção, permitindo forjar token de admin e acessar o banco direto.
 services:
   db:
     image: postgres:16-alpine
     container_name: gestrest-db
     environment:
-      POSTGRES_USER: gestrest
-      POSTGRES_PASSWORD: gestrest
-      POSTGRES_DB: gestrest
-    ports:
-      - '5432:5432'
+      POSTGRES_USER: ${POSTGRES_USER:-gestrest}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env (copie de .env.production.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-gestrest}
+    # SEM "ports" aqui de propósito: o Postgres só precisa ser alcançável pelos outros
+    # containers desta mesma rede docker compose (via nome de serviço "db"), nunca pela
+    # internet. Publicar 5432 no host expunha o banco inteiro para fora, com credenciais
+    # previsíveis.
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U gestrest']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-gestrest}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -25,9 +35,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://gestrest:gestrest@db:5432/gestrest?schema=public
-      JWT_ACCESS_SECRET: change-me-in-prod-access
-      JWT_REFRESH_SECRET: change-me-in-prod-refresh
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gestrest}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gestrest}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Defina JWT_ACCESS_SECRET no .env (gere com: openssl rand -hex 32)}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Defina JWT_REFRESH_SECRET no .env (gere com: openssl rand -hex 32)}
       # Lista separada por vírgula — mantém o link antigo por IP funcionando junto com o
       # domínio novo (http e https, até o certificado SSL estar configurado no servidor).
       CORS_ORIGIN: http://178.105.238.245:8081,http://gestrest.app.br,https://gestrest.app.br,http://www.gestrest.app.br,https://www.gestrest.app.br

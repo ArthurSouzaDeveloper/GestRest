@@ -102,20 +102,40 @@ export const superadminService = {
   },
 
   /** Apaga o restaurante e todos os seus dados (cardápio, pedidos, equipe, etc). */
-  async removeRestaurant(id: string) {
+  async removeRestaurant(id: string, actor: { userId: string; ip?: string }) {
     const r = await prisma.restaurant.findUnique({ where: { id } });
     if (!r) throw new NotFoundError('Restaurante');
     await prisma.restaurant.delete({ where: { id } });
+    // Sem restaurantId aqui de propósito: o restaurante (e o próprio AuditLog dele, via
+    // onDelete: Cascade) acabou de ser apagado — este evento fica só no log da plataforma.
+    await auditService.record({
+      action: AuditAction.RESTAURANT_REMOVED,
+      userId: actor.userId,
+      entity: 'Restaurant',
+      entityId: id,
+      ip: actor.ip,
+      metadata: { name: r.name, slug: r.slug },
+    });
   },
 
-  async setActive(id: string, active: boolean) {
+  async setActive(id: string, active: boolean, actor: { userId: string; ip?: string }) {
     const r = await prisma.restaurant.findUnique({ where: { id } });
     if (!r) throw new NotFoundError('Restaurante');
-    return prisma.restaurant.update({
+    const updated = await prisma.restaurant.update({
       where: { id },
       data: { active },
       select: { id: true, name: true, slug: true, active: true },
     });
+    await auditService.record({
+      action: AuditAction.RESTAURANT_STATUS_CHANGED,
+      userId: actor.userId,
+      restaurantId: id,
+      entity: 'Restaurant',
+      entityId: id,
+      ip: actor.ip,
+      metadata: { active },
+    });
+    return updated;
   },
 
   /**
