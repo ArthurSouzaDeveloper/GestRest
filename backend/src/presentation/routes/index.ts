@@ -7,6 +7,7 @@ import productionRoutes from './production.routes';
 import publicOrderRoutes from './public.routes';
 import {
   auditRouter,
+  customerRouter,
   dashboardRouter,
   publicRouter,
   superadminRouter,
@@ -27,6 +28,7 @@ api.use('/orders', orderRoutes);
 api.use('/production', productionRoutes);
 api.use('/dashboard', dashboardRouter);
 api.use('/users', userRouter);
+api.use('/customers', customerRouter);
 api.use('/audit', auditRouter);
 
 export default api;

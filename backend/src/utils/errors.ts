@@ -8,7 +8,13 @@ export class AppError extends Error {
     this.statusCode = statusCode;
     this.code = code;
     this.details = details;
-    Object.setPrototypeOf(this, AppError.prototype);
+    // NÃO usar Object.setPrototypeOf(this, AppError.prototype) aqui: isso reseta o
+    // protótipo de QUALQUER subclasse (ConflictError, NotFoundError...) de volta pra
+    // AppError, quebrando `instanceof ConflictError` etc. em todo o código (bug real
+    // encontrado ao escrever teste de integração — `instanceof AppError` continuava
+    // funcionando, por isso passou despercebido). Alvo de compilação é ES2021, onde
+    // `class extends Error` já funciona nativamente sem esse workaround (que só era
+    // necessário compilando pra ES5).
   }
 }
 

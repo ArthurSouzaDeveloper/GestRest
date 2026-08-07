@@ -6,6 +6,7 @@ import { validateBody } from '../middlewares/validate.middleware';
 import { logoUpload } from '../middlewares/upload.middleware';
 import { dashboardService } from '../../application/services/dashboard.service';
 import { userService } from '../../application/services/user.service';
+import { customerService } from '../../application/services/customer.service';
 import { auditService } from '../../application/services/audit.service';
 import { superadminService } from '../../application/services/superadmin.service';
 import { brandingService } from '../../application/services/branding.service';
@@ -41,14 +42,28 @@ userRouter.post(
 userRouter.patch(
   '/:id',
   validateBody(updateUserSchema),
-  asyncHandler(async (req, res) =>
-    res.json(await userService.update(ctx(req).tenantId, req.params.id, req.body)),
-  ),
+  asyncHandler(async (req, res) => {
+    const c = ctx(req);
+    res.json(await userService.update(c.tenantId, req.params.id, req.body, { userId: c.userId, role: c.role, ip: c.ip }));
+  }),
 );
 userRouter.delete(
   '/:id',
+  asyncHandler(async (req, res) => {
+    const c = ctx(req);
+    res.json(await userService.remove(c.tenantId, req.params.id, { userId: c.userId, ip: c.ip }));
+  }),
+);
+
+// ── Clientes (LGPD — direito do titular à eliminação, ver customer.service.ts) ──
+// Só ADMIN: é uma ação irreversível, tratada como decisão administrativa, não operacional.
+export const customerRouter = Router();
+customerRouter.use(authenticate, authorize(Role.ADMIN));
+customerRouter.get('/', asyncHandler(async (req, res) => res.json(await customerService.list(ctx(req).tenantId))));
+customerRouter.post(
+  '/:id/anonymize',
   asyncHandler(async (req, res) =>
-    res.json(await userService.remove(ctx(req).tenantId, req.params.id, req.user!.sub)),
+    res.json(await customerService.anonymize(ctx(req).tenantId, req.params.id, { userId: req.user!.sub, ip: req.ip })),
   ),
 );
 
@@ -87,13 +102,18 @@ superadminRouter.post(
 superadminRouter.patch(
   '/restaurants/:id',
   asyncHandler(async (req, res) =>
-    res.json(await superadminService.setActive(req.params.id, Boolean(req.body.active))),
+    res.json(
+      await superadminService.setActive(req.params.id, Boolean(req.body.active), {
+        userId: req.user!.sub,
+        ip: req.ip,
+      }),
+    ),
   ),
 );
 superadminRouter.delete(
   '/restaurants/:id',
   asyncHandler(async (req, res) => {
-    await superadminService.removeRestaurant(req.params.id);
+    await superadminService.removeRestaurant(req.params.id, { userId: req.user!.sub, ip: req.ip });
     res.status(204).end();
   }),
 );

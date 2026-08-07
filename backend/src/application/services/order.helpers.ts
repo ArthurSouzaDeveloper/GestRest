@@ -56,11 +56,6 @@ export function itemDisplayName(productName: string, comboLabel: string | null |
   return base ? `${comboLabel} (${base})` : comboLabel;
 }
 
-/** Scopes an order lookup by id to a single tenant. */
-export function tenantOrderWhere(tenantId: string, id?: string): Prisma.OrderWhereInput {
-  return id ? { id, restaurantId: tenantId } : { restaurantId: tenantId };
-}
-
 export type OrderWithRelations = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
 export interface OrderTotals {

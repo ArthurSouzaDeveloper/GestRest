@@ -41,6 +41,22 @@ export const paymentService = {
     }
 
     await prisma.$transaction(async (tx) => {
+      // Trava a transição de status ATOMICAMENTE (updateMany com WHERE status=... em vez
+      // de update simples por id): se duas requisições quase simultâneas chegarem aqui pro
+      // mesmo pedido (duplo clique no botão "Pagar", retry de rede), o Postgres serializa as
+      // duas escritas na mesma linha — a segunda só resolve seu UPDATE depois da primeira
+      // commitar, e nesse ponto o status já não é mais READY_FOR_PAYMENT, então count vem 0
+      // e ela é rejeitada aqui, ANTES de criar qualquer Payment. Sem isso, ambas passavam a
+      // checagem de status feita antes da transação e cada uma criava seus próprios
+      // pagamentos — dinheiro contado em dobro no fechamento de caixa.
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, status: OrderStatus.READY_FOR_PAYMENT },
+        data: { status: OrderStatus.PAID, closedAt: new Date() },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictError('Pedido já foi pago ou teve o status alterado por outra ação');
+      }
+
       for (const line of lines) {
         let change = 0;
         if (line.method === PaymentMethod.CASH && line.cashReceived) {
@@ -57,10 +73,6 @@ export const paymentService = {
           },
         });
       }
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: OrderStatus.PAID, closedAt: new Date() },
-      });
       // Other comandas may still be active at this table — recompute from all of them
       // rather than assuming the table is free just because this one comanda paid out.
       // Pedido online (delivery/retirada) não tem mesa — nada a sincronizar nesse caso.
