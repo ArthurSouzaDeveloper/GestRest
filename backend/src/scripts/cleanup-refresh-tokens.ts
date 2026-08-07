@@ -6,8 +6,10 @@
  * Uso (dentro do container backend, imagem já compilada):
  *   node dist/scripts/cleanup-refresh-tokens.js
  *
- * Exemplo de entrada de cron no host (diariamente às 3h):
- *   0 3 * * * cd /root/GestRest && docker compose exec -T backend node dist/scripts/cleanup-refresh-tokens.js >> /var/log/gestrest-cleanup.log 2>&1
+ * Exemplo de entrada de cron no host (diariamente às 3h) — "docker exec" no nome fixo
+ * do container funciona igual independente de qual docker-compose (plain ou -prod) está
+ * rodando, sem precisar acertar o "-f" certo:
+ *   0 3 * * * docker exec gestrest-backend node dist/scripts/cleanup-refresh-tokens.js >> /var/log/gestrest-cleanup.log 2>&1
  */
 import { PrismaClient } from '@prisma/client';
 

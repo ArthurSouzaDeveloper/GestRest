@@ -1,10 +1,17 @@
-# Deploy de produção (acesso por IP, HTTP) — Hetzner / qualquer VPS Docker.
-# Só o frontend (nginx) é exposto na porta 80; backend e banco ficam na rede interna.
+# Deploy de produção com HTTPS de verdade — Caddy na frente cuida do certificado
+# (Let's Encrypt automático) para o domínio em DOMAIN, e faz proxy pro frontend (nginx).
+# Só Caddy é exposto nas portas 80/443; frontend/backend/banco ficam na rede interna.
 # Uso: docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+#
+# Pré-requisito: o registro DNS de DOMAIN (e www.DOMAIN, se usado) já precisa apontar
+# pro IP deste servidor ANTES de subir — é assim que o Let's Encrypt confirma que você
+# controla o domínio. Se subir antes do DNS propagar, sem problema: o Caddy fica
+# tentando emitir o certificado sozinho em segundo plano até funcionar.
 
 services:
   db:
     image: postgres:16-alpine
+    container_name: gestrest-db
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-gestrest}
@@ -20,6 +27,7 @@ services:
 
   backend:
     build: ./backend
+    container_name: gestrest-backend
     restart: always
     depends_on:
       db:
@@ -30,24 +38,46 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-gestrest}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gestrest}?schema=public
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      # Acesso por IP em HTTP: cookie NÃO pode ser Secure, senão a sessão não persiste.
-      COOKIE_SECURE: 'false'
-      # Origem pública usada pelo Socket.IO / CORS (ex.: http://203.0.113.10)
-      CORS_ORIGIN: ${PUBLIC_URL}
+      # HTTPS de verdade (Caddy na frente) — cookie de refresh só é enviado pelo
+      # navegador em conexão segura, e é exatamente isso que temos agora.
+      COOKIE_SECURE: 'true'
+      # Origem pública usada pelo Socket.IO / CORS.
+      CORS_ORIGIN: https://${DOMAIN}
       # fatal | error | warn | info | debug
       LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - uploads:/app/uploads
     expose:
       - '4000'
 
   frontend:
     build: ./frontend
+    container_name: gestrest-frontend
     restart: always
     depends_on:
       - backend
+    expose:
+      - '80'
+
+  # Reverse proxy com TLS automático (Let's Encrypt) — única coisa exposta pro mundo.
+  caddy:
+    image: caddy:2-alpine
+    container_name: gestrest-caddy
+    restart: always
+    depends_on:
+      - frontend
+    environment:
+      DOMAIN: ${DOMAIN}
     ports:
-      # Porta pública no servidor. Troque HTTP_PORT no .env para conviver com
-      # outros sistemas no mesmo host (ex.: 8081). Dentro do container é sempre 80.
-      - '${HTTP_PORT:-80}:80'
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:

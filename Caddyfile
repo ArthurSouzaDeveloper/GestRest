@@ -1,0 +1,11 @@
+# Caddy obtém e renova o certificado TLS (Let's Encrypt) automaticamente pro domínio em
+# DOMAIN (variável de ambiente, definida no .env) — nenhum passo manual de certbot/cron
+# de renovação necessário. Todo o resto do tráfego só passa direto pro frontend (nginx),
+# que já cuida do proxy interno pra /api e /socket.io (ver frontend/nginx.conf).
+{$DOMAIN} {
+	reverse_proxy frontend:80
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}

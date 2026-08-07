@@ -1,18 +1,20 @@
-# Deploy no Hetzner (acesso por IP)
+# Deploy no Hetzner (com domínio e HTTPS)
 
-Guia para publicar o GestRest num servidor Hetzner Cloud, acessível pelo **IP do servidor via HTTP**. Sem domínio e sem HTTPS (dá para adicionar depois — veja o final).
+Guia para publicar o GestRest num servidor Hetzner Cloud, acessível pelo **domínio próprio, com HTTPS automático** (certificado via Let's Encrypt, renovado sozinho pelo Caddy — nenhum passo manual de certbot).
 
-> Pré-requisitos: um servidor Hetzner já criado (Ubuntu 22.04/24.04) e o IP + acesso SSH como `root`.
+> Pré-requisitos: um servidor Hetzner já criado (Ubuntu 22.04/24.04), o IP + acesso SSH como `root`, e um domínio (ou subdomínio) que você controla o DNS.
 
-## 1. Conectar no servidor
+## 1. Apontar o DNS para o servidor (antes de tudo)
 
-No seu computador, abra o terminal e conecte (troque pelo IP real):
+No painel do seu provedor de domínio, crie um registro **A** apontando o domínio (e `www`, se for usar) para o IP do servidor Hetzner. Isso pode levar alguns minutos a algumas horas para propagar — pode seguir com os próximos passos enquanto espera, o Caddy só precisa disso funcionar na hora de emitir o certificado (e tenta de novo sozinho se ainda não propagou).
+
+## 2. Conectar no servidor
 
 ```bash
 ssh root@SEU_IP
 ```
 
-## 2. Instalar o Git e clonar o projeto
+## 3. Instalar o Git e clonar o projeto
 
 ```bash
 apt update && apt install -y git
@@ -22,7 +24,7 @@ cd GestRest
 
 > Se o repositório for privado, o Git vai pedir usuário e um **token de acesso** do GitHub (em vez de senha).
 
-## 3. Configurar os segredos (.env)
+## 4. Configurar os segredos (.env)
 
 ```bash
 cp .env.production.example .env
@@ -36,8 +38,7 @@ Preencha:
 | `POSTGRES_PASSWORD` | Uma senha forte para o banco (invente uma) |
 | `JWT_ACCESS_SECRET` | Rode `openssl rand -hex 32` e cole o resultado |
 | `JWT_REFRESH_SECRET` | Rode `openssl rand -hex 32` de novo (valor diferente) |
-| `HTTP_PORT` | `80` (padrão). Use outra porta, ex. `8081`, se o servidor já tiver outro sistema na 80 |
-| `PUBLIC_URL` | `http://SEU_IP` — **inclua a porta se não for 80**, ex.: `http://SEU_IP:8081` |
+| `DOMAIN` | O domínio que você apontou no passo 1, sem `http://` (ex.: `gestrest.app.br`) |
 
 Gere os segredos facilmente:
 
@@ -48,32 +49,35 @@ openssl rand -hex 32   # copie a saída para JWT_REFRESH_SECRET
 
 Salve no `nano` com `Ctrl+O`, `Enter`, depois `Ctrl+X`.
 
-## 4. Subir tudo (um comando)
+## 5. Subir tudo (um comando)
 
 ```bash
 bash deploy/hetzner-setup.sh
 ```
 
-O script instala o Docker (se faltar), libera a porta 80, sobe o banco + backend + frontend, aplica as migrações e pede o e-mail/senha do **seu** super admin (não vem nenhuma conta com senha padrão). Ao final mostra o endereço de acesso.
+O script instala o Docker (se faltar), libera as portas 80/443, sobe o banco + backend + frontend + Caddy, aplica as migrações e pede o e-mail/senha do **seu** super admin (não vem nenhuma conta com senha padrão). Ao final mostra o endereço de acesso.
 
-## 5. Liberar a porta no firewall do Hetzner
+## 6. Liberar as portas no firewall do Hetzner
 
-Se você criou um **Firewall** no painel do Hetzner Cloud, adicione uma regra de entrada:
+Se você criou um **Firewall** no painel do Hetzner Cloud, adicione regras de entrada:
 
 - Painel Hetzner → seu servidor → *Firewalls* → *Rules* → **Inbound**
-- Adicione: `TCP` porta `80` (ou a que você definiu em `HTTP_PORT`) de origem `Any IPv4 / Any IPv6`
+- Adicione: `TCP` porta `80` de origem `Any IPv4 / Any IPv6`
+- Adicione: `TCP` porta `443` de origem `Any IPv4 / Any IPv6`
 
 (Sem firewall do Hetzner, o script já cuida do `ufw` interno.)
 
-## 6. Acessar
+## 7. Acessar
 
 Abra no navegador:
 
 ```
-http://SEU_IP
+https://SEU_DOMINIO
 ```
 
-Acesse `http://SEU_IP/super` com o e-mail e a senha que você digitou no passo 4.
+> O certificado pode levar 1-2 minutos pra ficar pronto na primeira vez. Se o navegador avisar de certificado inválido logo depois de subir, aguarde um pouco e recarregue — é o Caddy ainda emitindo.
+
+Acesse `https://SEU_DOMINIO/super` com o e-mail e a senha que você digitou no passo 5.
 
 No painel `/super`, clique em **Novo Restaurante** e cadastre cada casa com o **e-mail e senha próprios do admin dela** — esse admin entra pelo link `/r/<slug>` e monta o cardápio.
 
@@ -135,6 +139,9 @@ docker compose -f docker-compose.prod.yml down
 
 ### Backup do banco
 
+Automatizado via cron (recomendado — ver `deploy/backup-db.sh`, comentário no topo do
+arquivo tem o exemplo de linha de cron). Manualmente:
+
 ```bash
 docker compose -f docker-compose.prod.yml exec db \
   pg_dump -U gestrest gestrest > backup-$(date +%F).sql
@@ -171,33 +178,13 @@ já existentes no pedido.
 ## Rodar junto com outros sistemas no mesmo servidor
 
 Um servidor aguenta vários sistemas — o limite prático é a memória (veja com `free -h`
-e `docker stats`). O único cuidado é a **porta**: só um sistema usa a porta 80.
-
-Para o GestRest conviver com outro sistema, defina no `.env` uma porta livre e
-inclua-a na URL pública:
-
-```env
-HTTP_PORT=8081
-PUBLIC_URL=http://SEU_IP:8081
-```
-
-Depois recrie: `docker compose -f docker-compose.prod.yml --env-file .env up -d`.
-O sistema passa a responder em `http://SEU_IP:8081`, deixando a porta 80 livre para
-outro app. Cada sistema fica isolado na sua própria pasta, rede e banco.
-
-> Dica: com um domínio, um reverse proxy (Caddy) na porta 80/443 roteia vários
-> sistemas por subdomínio, sem portas na URL. Posso montar isso quando você quiser.
-
-## Adicionar um domínio + HTTPS depois (opcional)
-
-Quando tiver um domínio:
-
-1. No seu provedor de DNS, crie um registro **A** apontando o domínio para o IP do Hetzner.
-2. Instale um proxy com HTTPS automático (ex.: **Caddy**) na frente do frontend, ou publique o frontend na porta 443.
-3. No `.env`, troque `PUBLIC_URL` para `https://seu-dominio` e defina `COOKIE_SECURE=true` no serviço `backend` do compose (cookies passam a exigir HTTPS).
-4. Recrie: `docker compose -f docker-compose.prod.yml up -d --build`.
-
-Posso montar essa configuração com Caddy quando você tiver o domínio — é só pedir.
+e `docker stats`). Como o Caddy já roteia por **domínio** (não por porta), dá pra ter
+vários sistemas no mesmo servidor, cada um com seu próprio domínio/subdomínio, todos
+na porta 80/443 — não precisa inventar porta alternativa como antes. Cada sistema fica
+isolado na sua própria pasta, rede, banco e (se usar este mesmo `docker-compose.prod.yml`
+como modelo) seu próprio Caddy — ou, com mais trabalho, um único Caddy compartilhado
+roteando pra vários projetos por domínio. Posso montar essa versão compartilhada quando
+precisar.
 
 ---
 
@@ -205,7 +192,8 @@ Posso montar essa configuração com Caddy quando você tiver o domínio — é 
 
 | Sintoma | O que verificar |
 |---------|-----------------|
-| Página não abre | Porta 80 liberada no firewall do Hetzner? `docker compose -f docker-compose.prod.yml ps` mostra tudo `Up`? |
-| Login não persiste | `PUBLIC_URL` no `.env` bate com o endereço que você digita no navegador? |
+| Página não abre | Portas 80 e 443 liberadas no firewall do Hetzner? `docker compose -f docker-compose.prod.yml ps` mostra tudo `Up`? |
+| Certificado inválido/não confiável | DNS do `DOMAIN` já propagou de verdade para este IP? (`dig +short SEU_DOMINIO` no seu computador deve mostrar o IP do servidor) `docker compose -f docker-compose.prod.yml logs caddy` mostra o que está tentando |
+| Login não persiste | Está acessando por `https://` (não `http://`)? Com HTTPS, o cookie exige conexão segura |
 | Erro 502 | Backend ainda subindo — veja `docker compose -f docker-compose.prod.yml logs backend` |
-| "port is already allocated" | Algo já usa a porta 80 (`apache`/`nginx` do sistema). Pare com `systemctl stop apache2 nginx` |
+| "port is already allocated" | Algo já usa a porta 80/443 (`apache`/`nginx` do sistema, ou outro Caddy). Pare com `systemctl stop apache2 nginx` |
