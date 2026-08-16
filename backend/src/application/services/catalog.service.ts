@@ -1,6 +1,6 @@
 import { AdditionalKind, Prisma, Station } from '@prisma/client';
 import { prisma } from '../../config/prisma';
-import { NotFoundError } from '../../utils/errors';
+import { ConflictError, NotFoundError } from '../../utils/errors';
 
 // Prisma's Decimal serializes to a string over JSON. Left unconverted, arithmetic like
 // `product.price + additionalsTotal` on the client silently does string concatenation
@@ -35,6 +35,18 @@ export const categoryService = {
   },
   async remove(tenantId: string, id: string) {
     await categoryService.ensure(tenantId, id);
+    // Categoria com produtos/adicionais ainda vinculados não pode ser apagada — evita a
+    // cascata que sumia com itens de pedidos já pagos (banco recusa com Restrict, mas
+    // checar antes dá uma mensagem clara em vez do erro cru de constraint).
+    const [productCount, additionalCount] = await Promise.all([
+      prisma.product.count({ where: { categoryId: id } }),
+      prisma.additional.count({ where: { categoryId: id } }),
+    ]);
+    if (productCount > 0 || additionalCount > 0) {
+      throw new ConflictError(
+        'Esta categoria ainda tem produtos ou adicionais cadastrados. Remova ou mova-os antes de apagar a categoria.',
+      );
+    }
     return prisma.category.delete({ where: { id } });
   },
   async ensure(tenantId: string, id: string) {
@@ -109,6 +121,15 @@ export const productService = {
   },
   async remove(tenantId: string, id: string) {
     await productService.get(tenantId, id);
+    // Produto já usado em algum pedido não pode ser apagado — isso levaria o item do
+    // pedido (mesmo de venda já paga) junto. Quem quer tirar do cardápio sem perder
+    // histórico deve usar `available: false` em vez de excluir.
+    const orderItemCount = await prisma.orderItem.count({ where: { productId: id } });
+    if (orderItemCount > 0) {
+      throw new ConflictError(
+        'Este produto já foi usado em pedidos e não pode ser removido. Marque-o como indisponível em vez de excluir.',
+      );
+    }
     return prisma.product.delete({ where: { id } });
   },
 };
@@ -145,6 +166,16 @@ export const additionalService = {
   async remove(tenantId: string, id: string) {
     const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });
     if (!a) throw new NotFoundError('Adicional');
+    // Mesmo raciocínio do productService.remove() acima: adicional já usado em algum
+    // pedido não pode ser apagado, só desativado.
+    const orderItemAdditionalCount = await prisma.orderItemAdditional.count({
+      where: { additionalId: id },
+    });
+    if (orderItemAdditionalCount > 0) {
+      throw new ConflictError(
+        'Este adicional já foi usado em pedidos e não pode ser removido. Marque-o como inativo em vez de excluir.',
+      );
+    }
     return prisma.additional.delete({ where: { id } });
   },
 };

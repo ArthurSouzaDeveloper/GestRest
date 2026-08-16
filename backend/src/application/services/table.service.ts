@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { NotFoundError } from '../../utils/errors';
+import { ConflictError, NotFoundError } from '../../utils/errors';
 
 export const tableService = {
   list(tenantId: string) {
@@ -37,6 +37,15 @@ export const tableService = {
 
   async remove(tenantId: string, id: string) {
     await tableService.get(tenantId, id);
+    // Uma mesa com pedidos (mesmo antigos e já pagos) nunca pode ser apagada — isso levaria
+    // o histórico de vendas junto (banco recusa com Restrict, mas checar antes dá uma
+    // mensagem clara em vez do erro cru de constraint).
+    const orderCount = await prisma.order.count({ where: { tableId: id } });
+    if (orderCount > 0) {
+      throw new ConflictError(
+        'Esta mesa tem pedidos no histórico e não pode ser removida. Isso preserva o registro de vendas.',
+      );
+    }
     return prisma.restaurantTable.delete({ where: { id } });
   },
 };
