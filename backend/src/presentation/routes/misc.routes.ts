@@ -134,7 +134,7 @@ superadminRouter.post(
   logoUpload,
   asyncHandler(async (req, res) => {
     if (!req.file) throw new AppError('Envie um arquivo de imagem');
-    res.json(await brandingService.updateLogo(req.params.id, req.file.filename));
+    res.json(await brandingService.updateLogo(req.params.id, req.file));
   }),
 );
 

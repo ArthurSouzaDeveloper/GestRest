@@ -3,8 +3,11 @@ import path from 'path';
 import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { AppError } from '../../utils/errors';
+import { ALLOWED_MIME, hasValidImageMagicBytes } from '../../presentation/middlewares/upload.middleware';
 
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+const brandingDir = path.resolve(process.cwd(), env.uploadDir, 'branding');
+fs.mkdirSync(brandingDir, { recursive: true });
 
 /**
  * Identidade visual (cor + logo) do site público de pedidos, configurável por restaurante
@@ -33,12 +36,27 @@ export const brandingService = {
     return r;
   },
 
-  /** `filename` já foi salvo em disco pelo middleware de upload (ver upload.middleware.ts) — aqui só grava o caminho público e limpa o arquivo antigo, se houver. */
-  async updateLogo(tenantId: string, filename: string) {
+  /**
+   * `file` chega ainda só em memória (ver upload.middleware.ts — memoryStorage), não
+   * escrito em disco pelo multer. Confere os magic bytes de verdade do arquivo antes de
+   * gravar (o `Content-Type` que o multer usou no fileFilter é só o que o cliente
+   * declarou, fácil de forjar — achado da auditoria QA) e só então grava com um nome
+   * gerado aqui (baseado no :id da rota, nunca no nome original do arquivo — evita path
+   * traversal/colisão).
+   */
+  async updateLogo(tenantId: string, file: { buffer: Buffer; mimetype: string }) {
+    if (!hasValidImageMagicBytes(file.buffer, file.mimetype)) {
+      throw new AppError('O arquivo enviado não é uma imagem PNG, JPEG ou WebP válida');
+    }
+
     const current = await prisma.restaurant.findUniqueOrThrow({
       where: { id: tenantId },
       select: { logoUrl: true },
     });
+
+    const ext = ALLOWED_MIME[file.mimetype];
+    const filename = `${tenantId}-${Date.now()}${ext}`;
+    await fs.promises.writeFile(path.join(brandingDir, filename), file.buffer);
 
     const logoUrl = `/uploads/branding/${filename}`;
     const r = await prisma.restaurant.update({

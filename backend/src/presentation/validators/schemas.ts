@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PaymentMethod, Role, Station } from '@prisma/client';
+import { stripHtmlTags } from '../../utils/sanitize';
 
 // Applies to every password being SET (create/update/reset) — not to the login payload,
 // which just needs to accept whatever was set under this rule at the time. 72 is bcrypt's
@@ -13,36 +14,45 @@ const strongPassword = z
   .regex(/[a-zA-Z]/, 'A senha precisa ter pelo menos uma letra')
   .regex(/[0-9]/, 'A senha precisa ter pelo menos um número');
 
+/**
+ * Texto livre (nome, descrição, observação) que fica salvo e pode reaparecer em outras
+ * telas/exports — remove qualquer coisa com cara de tag HTML antes de gravar (defesa em
+ * profundidade, achado da auditoria QA — ver stripHtmlTags em utils/sanitize.ts).
+ */
+function text(schema: z.ZodString) {
+  return schema.transform(stripHtmlTags);
+}
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1).max(72),
 });
 
 export const createRestaurantSchema = z.object({
-  name: z.string().min(2),
+  name: text(z.string().min(2)),
   slug: z.string().min(2).optional(),
-  adminName: z.string().min(2),
+  adminName: text(z.string().min(2)),
   adminEmail: z.string().email(),
   adminPassword: strongPassword,
   tablesCount: z.number().int().positive().max(100).optional(),
 });
 
 export const createUserSchema = z.object({
-  name: z.string().min(2),
+  name: text(z.string().min(2)),
   email: z.string().email(),
   password: strongPassword,
   role: z.nativeEnum(Role),
 });
 
 export const updateUserSchema = z.object({
-  name: z.string().min(2).optional(),
+  name: text(z.string().min(2)).optional(),
   role: z.nativeEnum(Role).optional(),
   active: z.boolean().optional(),
   password: strongPassword.optional(),
 });
 
 export const categorySchema = z.object({
-  name: z.string().min(2),
+  name: text(z.string().min(2)),
   station: z.nativeEnum(Station),
   sortOrder: z.number().int().optional(),
 });
@@ -52,15 +62,15 @@ export const categorySchema = z.object({
 // them — a rejection shows up as a validation_error log line, a silent strip would not.
 export const categoryUpdateSchema = z
   .object({
-    name: z.string().min(2).optional(),
+    name: text(z.string().min(2)).optional(),
     station: z.nativeEnum(Station).optional(),
     sortOrder: z.number().int().optional(),
   })
   .strict();
 
 export const productSchema = z.object({
-  name: z.string().min(2),
-  description: z.string().optional(),
+  name: text(z.string().min(2)),
+  description: text(z.string()).optional(),
   price: z.number().nonnegative(),
   categoryId: z.string().uuid(),
   avgPrepMin: z.number().int().positive().optional(),
@@ -71,8 +81,8 @@ export const productSchema = z.object({
 
 export const productUpdateSchema = z
   .object({
-    name: z.string().min(2).optional(),
-    description: z.string().optional(),
+    name: text(z.string().min(2)).optional(),
+    description: text(z.string()).optional(),
     price: z.number().nonnegative().optional(),
     categoryId: z.string().uuid().optional(),
     avgPrepMin: z.number().int().positive().optional(),
@@ -83,7 +93,7 @@ export const productUpdateSchema = z
   .strict();
 
 export const additionalSchema = z.object({
-  name: z.string().min(1),
+  name: text(z.string().min(1)),
   price: z.number().nonnegative(),
   categoryId: z.string().uuid().optional(),
   active: z.boolean().optional(),
@@ -92,7 +102,7 @@ export const additionalSchema = z.object({
 
 export const additionalUpdateSchema = z
   .object({
-    name: z.string().min(1).optional(),
+    name: text(z.string().min(1)).optional(),
     price: z.number().nonnegative().optional(),
     categoryId: z.string().uuid().optional(),
     active: z.boolean().optional(),
@@ -101,14 +111,14 @@ export const additionalUpdateSchema = z
   .strict();
 
 export const deliveryZoneSchema = z.object({
-  name: z.string().min(2),
+  name: text(z.string().min(2)),
   fee: z.number().nonnegative(),
   active: z.boolean().optional(),
 });
 
 export const deliveryZoneUpdateSchema = z
   .object({
-    name: z.string().min(2).optional(),
+    name: text(z.string().min(2)).optional(),
     fee: z.number().nonnegative().optional(),
     active: z.boolean().optional(),
   })
@@ -134,7 +144,7 @@ export const deliveryDistanceBandUpdateSchema = z
 export const deliveryPricingSettingsSchema = z
   .object({
     mode: z.enum(['ZONE', 'DISTANCE_BANDS']),
-    originAddress: z.string().min(2).max(200).optional(),
+    originAddress: text(z.string().min(2).max(200)).optional(),
     originLat: z.number().min(-90).max(90).optional(),
     originLng: z.number().min(-180).max(180).optional(),
   })
@@ -164,9 +174,9 @@ export const tableSchema = z.object({
 
 export const openOrderSchema = z.object({
   tableId: z.string().uuid(),
-  customerName: z.string().optional(),
+  customerName: text(z.string()).optional(),
   peopleCount: z.number().int().positive().optional(),
-  notes: z.string().optional(),
+  notes: text(z.string()).optional(),
 });
 
 export const addItemsSchema = z.object({
@@ -175,7 +185,7 @@ export const addItemsSchema = z.object({
       z.object({
         productId: z.string().uuid(),
         quantity: z.number().int().positive(),
-        notes: z.string().optional(),
+        notes: text(z.string()).optional(),
         additionalIds: z.array(z.string().uuid()).optional(),
         // "Monte o Seu" de sucos com mais de 1 fruta — ids das combinações fruta+base
         // escolhidas (productId acima é só um fallback informativo; o preço/estação
@@ -190,13 +200,13 @@ export const addItemsSchema = z.object({
 export const updateOrderSchema = z.object({
   discount: z.number().nonnegative().optional(),
   serviceRate: z.number().min(0).max(100).optional(),
-  notes: z.string().optional(),
+  notes: text(z.string()).optional(),
   version: z.number().int().optional(),
 });
 
 export const updateItemSchema = z.object({
   quantity: z.number().int().positive().optional(),
-  notes: z.string().optional(),
+  notes: text(z.string()).optional(),
 });
 
 export const paymentSchema = z.object({
@@ -217,7 +227,7 @@ export const paymentSchema = z.object({
 export const publicOrderSchema = z
   .object({
     orderType: z.enum(['DELIVERY', 'PICKUP']),
-    customerName: z.string().min(2).max(80),
+    customerName: text(z.string().min(2).max(80)),
     customerPhone: z.string().min(8).max(20),
     deliveryZoneId: z.string().uuid().optional(),
     // Modo por distância: coordenadas do endereço escolhido no autocomplete (ver
@@ -225,13 +235,13 @@ export const publicOrderSchema = z
     // sempre recalcula a distância/faixa de novo a partir daqui em openPublic().
     deliveryLat: z.number().min(-90).max(90).optional(),
     deliveryLng: z.number().min(-180).max(180).optional(),
-    deliveryStreet: z.string().min(2).max(200).optional(),
-    deliveryNumber: z.string().min(1).max(20).optional(),
+    deliveryStreet: text(z.string().min(2).max(200)).optional(),
+    deliveryNumber: text(z.string().min(1).max(20)).optional(),
     deliveryCep: z.string().max(12).optional(),
-    deliveryComplement: z.string().max(200).optional(),
+    deliveryComplement: text(z.string().max(200)).optional(),
     declaredPaymentMethod: z.enum(['PIX', 'CASH', 'CREDIT', 'DEBIT']),
     changeFor: z.number().positive().optional(),
-    notes: z.string().max(300).optional(),
+    notes: text(z.string().max(300)).optional(),
     // Honeypot: campo invisível pro cliente real; bot que preenche todo input do form cai
     // aqui. Nome propositalmente sem relação com nenhum campo comum (nome/email/telefone/
     // endereço/site) pra não colidir com autofill do navegador e barrar cliente de verdade.
@@ -241,7 +251,7 @@ export const publicOrderSchema = z
         z.object({
           productId: z.string().uuid(),
           quantity: z.number().int().positive().max(20),
-          notes: z.string().max(200).optional(),
+          notes: text(z.string().max(200)).optional(),
           additionalIds: z.array(z.string().uuid()).optional(),
           comboProductIds: z.array(z.string().uuid()).min(2).max(4).optional(),
         }),
@@ -265,7 +275,7 @@ export const publicOrderSchema = z
 // site — mesmas regras de tamanho do publicOrderSchema, já que é o mesmo par de campos.
 export const customerLoginSchema = z
   .object({
-    name: z.string().min(2).max(80),
+    name: text(z.string().min(2).max(80)),
     phone: z.string().min(8).max(20),
   })
   .strict();
