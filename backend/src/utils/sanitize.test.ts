@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { maskEmail, redact } from './sanitize';
+import { maskEmail, redact, stripHtmlTags } from './sanitize';
 
 describe('redact', () => {
   it('redacts known sensitive keys at any depth', () => {
@@ -59,5 +59,23 @@ describe('maskEmail', () => {
 
   it('redacts malformed input with no @', () => {
     expect(maskEmail('not-an-email')).toBe('[REDACTED]');
+  });
+});
+
+describe('stripHtmlTags', () => {
+  it('removes a script tag entirely', () => {
+    expect(stripHtmlTags('<script>alert(1)</script>')).toBe('alert(1)');
+  });
+
+  it('removes an attribute-laden tag (event handler XSS attempt)', () => {
+    expect(stripHtmlTags('<img src=x onerror="alert(1)">Suco de Laranja')).toBe('Suco de Laranja');
+  });
+
+  it('leaves plain text with no tags untouched (besides trimming)', () => {
+    expect(stripHtmlTags('Suco de Laranja 500ml')).toBe('Suco de Laranja 500ml');
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(stripHtmlTags('  Pastel de Carne  ')).toBe('Pastel de Carne');
   });
 });

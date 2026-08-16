@@ -120,6 +120,7 @@ enum AuditAction {
   CUSTOMER_ANONYMIZED // Direito do titular (LGPD Art. 18) — nome/telefone apagados do cadastro
   PUBLIC_ORDER_CREATED // Pedido criado pelo site público (delivery/retirada), sem usuário autenticado
   ORDER_ACCEPTED // Equipe aceitou um pedido online, tirando-o de PENDING
+  REFRESH_TOKEN_REUSE_DETECTED // Reuso de refresh token já revogado — sinal de possível roubo de token (achado de auditoria QA), derruba todas as sessões do usuário
 }
 
 // ─────────────────────────────────────────────────────────────

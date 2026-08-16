@@ -42,6 +42,20 @@ export function redact(value: unknown, seen: WeakSet<object> = new WeakSet()): u
   return out;
 }
 
+/**
+ * Remove qualquer coisa com cara de tag HTML (`<script>`, `<img onerror=...>` etc.) de um
+ * texto livre antes de gravar no banco — defesa em profundidade (achado da auditoria QA):
+ * hoje nada no front usa `dangerouslySetInnerHTML`, então o React já escapa isso sozinho
+ * ao renderizar, mas um texto armazenado cru fica vulnerável no dia em que esse dado for
+ * usado em qualquer lugar que não escape automaticamente (e-mail transacional, PDF de
+ * recibo, um painel fora do React). Só remove o que parece uma tag — não faz HTML-encode
+ * (não troca `<`/`>`/`&` por entidade), porque o valor ainda passa pelo escape do React na
+ * hora de exibir; entidade-codificar aqui também deixaria o texto duplamente escapado.
+ */
+export function stripHtmlTags(value: string): string {
+  return value.replace(/<[^>]*>/g, '').trim();
+}
+
 /** Masks an e-mail for security logs (e.g. failed login attempts) while keeping enough signal to spot patterns. */
 export function maskEmail(email: string): string {
   const at = email.indexOf('@');

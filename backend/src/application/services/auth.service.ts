@@ -87,7 +87,28 @@ export const authService = {
     }
 
     const stored = await prisma.refreshToken.findUnique({ where: { token } });
-    if (!stored || stored.revoked || stored.expiresAt < new Date()) {
+
+    // Reuso de um refresh token já revogado (rotacionado antes, ou usado depois de um
+    // logout) é sinal forte de roubo de token — quem é dono legítimo da sessão já trocou
+    // (ou encerrou) esse token, então qualquer uso posterior dele não pode ser ele. Antes
+    // isso só rejeitava essa chamada e deixava as outras sessões do usuário intactas, sem
+    // nenhum alerta (achado da auditoria QA) — agora derruba a família inteira de sessões
+    // e registra o evento, forçando relogin em todo lugar.
+    if (stored?.revoked) {
+      const revoked = await prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revoked: false },
+        data: { revoked: true },
+      });
+      logger.warn('refresh_token_reuse_detected', { userId: stored.userId, sessionsRevoked: revoked.count });
+      await auditService.record({
+        action: AuditAction.REFRESH_TOKEN_REUSE_DETECTED,
+        userId: stored.userId,
+        metadata: { sessionsRevoked: revoked.count },
+      });
+      throw new UnauthorizedError('Sessão inválida — faça login novamente');
+    }
+
+    if (!stored || stored.expiresAt < new Date()) {
       throw new UnauthorizedError('Sessão expirada');
     }
 
