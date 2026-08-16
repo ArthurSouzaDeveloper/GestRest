@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2, Receipt } from 'lucide-react';
 import api, { apiError } from '../lib/api';
@@ -6,6 +6,36 @@ import { brl, time } from '../lib/format';
 import { Card, PageHeader, Spinner, orderTypeLabels, paymentMethodLabels } from '../components/ui';
 import { useRealtime } from '../hooks/useRealtime';
 import type { Order, PaymentMethod } from '../types';
+
+/**
+ * Agrupa as comandas prontas pra pagamento por mesa — várias pessoas/grupos podem estar
+ * com comandas separadas na mesma mesa (ver table.service.ts), e sem agrupar visualmente
+ * fica difícil o caixa achar todas as comandas de uma mesma mesa numa lista corrida.
+ * Cada comanda continua sendo paga separadamente (isso não muda); o grupo só ajuda a achar
+ * e mostra o total somado da mesa como referência. Pedidos sem mesa (delivery/retirada)
+ * ficam numa lista à parte, sem agrupamento (cada um já é uma unidade própria).
+ */
+function groupByTable(orders: Order[]) {
+  const byTable = new Map<number, Order[]>();
+  const standalone: Order[] = [];
+  for (const o of orders) {
+    if (o.table) {
+      const list = byTable.get(o.table.number) ?? [];
+      list.push(o);
+      byTable.set(o.table.number, list);
+    } else {
+      standalone.push(o);
+    }
+  }
+  const tables = [...byTable.entries()]
+    .map(([number, tableOrders]) => ({
+      number,
+      orders: tableOrders,
+      total: tableOrders.reduce((sum, o) => sum + o.totals.total, 0),
+    }))
+    .sort((a, b) => a.number - b.number);
+  return { tables, standalone };
+}
 
 const METHOD_KEYS: PaymentMethod[] = ['PIX', 'CASH', 'CREDIT', 'DEBIT', 'MEAL_VOUCHER'];
 
@@ -26,6 +56,8 @@ export default function Cashier() {
     if (selectedId && !orders.find((o) => o.id === selectedId)) setSelectedId(orders[0]?.id ?? null);
   }, [orders, selectedId]);
 
+  const { tables, standalone } = useMemo(() => groupByTable(orders), [orders]);
+
   if (isLoading) return <Spinner />;
 
   const selected = orders.find((o) => o.id === selectedId) ?? null;
@@ -34,29 +66,38 @@ export default function Cashier() {
     <div>
       <PageHeader title="Caixa" subtitle="Pedidos prontos para pagamento" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
-        {/* Left: ready orders */}
-        <div className="space-y-2">
+        {/* Left: ready orders, grouped by table */}
+        <div className="space-y-4">
           {orders.length === 0 && <div className="card p-6 text-center text-sm text-gray-400">Nenhum pedido pronto.</div>}
-          {orders.map((o) => (
-            <button
-              key={o.id}
-              onClick={() => setSelectedId(o.id)}
-              className={`w-full rounded-lg border p-3 text-left transition ${
-                o.id === selectedId ? 'border-brand bg-brand-50 dark:bg-brand/20' : 'border-gray-200 dark:border-gray-800'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">
-                  {o.table ? `Mesa ${o.table.number}` : orderTypeLabels[o.orderType]}{' '}
-                  <span className="font-normal text-gray-400">· Comanda #{o.number}</span>
+
+          {tables.map((t) => (
+            <div key={t.number}>
+              <div className="mb-1 flex items-center justify-between px-1 text-xs font-medium uppercase tracking-wide text-gray-400">
+                <span>
+                  Mesa {t.number} {t.orders.length > 1 && `· ${t.orders.length} comandas`}
                 </span>
-                <span className="font-semibold text-brand">{brl(o.totals.total)}</span>
+                <span>{brl(t.total)}</span>
               </div>
-              <div className="text-xs text-gray-500">
-                {o.customer?.name ?? 'Sem nome'} · {o.items.length} itens · {time(o.openedAt)}
+              <div className="space-y-2">
+                {t.orders.map((o) => (
+                  <OrderButton key={o.id} order={o} selected={o.id === selectedId} onSelect={() => setSelectedId(o.id)} />
+                ))}
               </div>
-            </button>
+            </div>
           ))}
+
+          {standalone.length > 0 && (
+            <div>
+              {tables.length > 0 && (
+                <div className="mb-1 px-1 text-xs font-medium uppercase tracking-wide text-gray-400">Delivery / Retirada</div>
+              )}
+              <div className="space-y-2">
+                {standalone.map((o) => (
+                  <OrderButton key={o.id} order={o} selected={o.id === selectedId} onSelect={() => setSelectedId(o.id)} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: detail + payment */}
@@ -67,6 +108,28 @@ export default function Cashier() {
         )}
       </div>
     </div>
+  );
+}
+
+function OrderButton({ order: o, selected, onSelect }: { order: Order; selected: boolean; onSelect: () => void }) {
+  return (
+    <button
+      onClick={onSelect}
+      className={`w-full rounded-lg border p-3 text-left transition ${
+        selected ? 'border-brand bg-brand-50 dark:bg-brand/20' : 'border-gray-200 dark:border-gray-800'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">
+          {o.table ? `Mesa ${o.table.number}` : orderTypeLabels[o.orderType]}{' '}
+          <span className="font-normal text-gray-400">· Comanda #{o.number}</span>
+        </span>
+        <span className="font-semibold text-brand">{brl(o.totals.total)}</span>
+      </div>
+      <div className="text-xs text-gray-500">
+        {o.customer?.name ?? 'Sem nome'} · {o.items.length} itens · {time(o.openedAt)}
+      </div>
+    </button>
   );
 }
 
