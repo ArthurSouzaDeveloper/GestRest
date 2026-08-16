@@ -105,7 +105,27 @@ export const superadminService = {
   async removeRestaurant(id: string, actor: { userId: string; ip?: string }) {
     const r = await prisma.restaurant.findUnique({ where: { id } });
     if (!r) throw new NotFoundError('Restaurante');
-    await prisma.restaurant.delete({ where: { id } });
+
+    // Apagar um tenant inteiro é, de propósito, diferente de apagar um recurso avulso
+    // (mesa/categoria/produto — ver table.service.ts e catalog.service.ts): aqui a
+    // intenção é mesmo zerar tudo. Mas o schema agora tem `onDelete: Restrict` em algumas
+    // relações (order_items->product, orders->table/waiter, payments->cashier, etc. —
+    // correção da auditoria QA, pra um DELETE avulso nunca levar histórico de venda
+    // junto) e o Postgres não garante a ordem entre cascatas paralelas de um único
+    // `DELETE restaurants`, então um `prisma.restaurant.delete()` direto esbarraria
+    // nessas mesmas constraints. Por isso apagamos manualmente, na ordem certa (filhos
+    // antes dos pais), tudo que participa de alguma relação Restrict, antes de apagar o
+    // restaurante — o resto (categorias, mesas, usuários, clientes...) continua caindo
+    // sozinho via Cascade normal.
+    await prisma.$transaction([
+      prisma.orderItemAdditional.deleteMany({ where: { orderItem: { order: { restaurantId: id } } } }),
+      prisma.payment.deleteMany({ where: { restaurantId: id } }),
+      prisma.orderItem.deleteMany({ where: { order: { restaurantId: id } } }),
+      prisma.order.deleteMany({ where: { restaurantId: id } }),
+      prisma.product.deleteMany({ where: { restaurantId: id } }),
+      prisma.additional.deleteMany({ where: { restaurantId: id } }),
+      prisma.restaurant.delete({ where: { id } }),
+    ]);
     // Sem restaurantId aqui de propósito: o restaurante (e o próprio AuditLog dele, via
     // onDelete: Cascade) acabou de ser apagado — este evento fica só no log da plataforma.
     await auditService.record({
