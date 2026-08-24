@@ -3,6 +3,12 @@ import { Server as SocketServer } from 'socket.io';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { verifyAccessToken } from '../utils/auth';
+import { verifyAgentKey } from '../application/services/printerSettings.service';
+
+// Rooms que uma ponte de impressão pode entrar — nunca cashier/floor/dashboard, mesmo
+// autenticada: a chave de impressão não é um login de funcionário, só dá acesso ao que
+// a produção (Cozinha/Suqueiros) já expõe publicamente pra qualquer papel autenticado.
+const PRINTER_AGENT_ALLOWED_ROOMS: string[] = ['kitchen', 'juice_bar'];
 
 /**
  * Real-time rooms:
@@ -27,7 +33,9 @@ export function initSocket(httpServer: HttpServer): SocketServer {
     cors: { origin: env.corsOrigins, credentials: true },
   });
 
-  // Optional JWT handshake auth (token via auth payload)
+  // Optional JWT handshake auth (token via auth payload) — ou, alternativamente, uma
+  // ponte de impressão local se autenticando com printerKey em vez de token (nunca os
+  // dois; token tem prioridade se ambos vierem, o que não deveria acontecer na prática).
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token as string | undefined;
     if (token) {
@@ -39,7 +47,28 @@ export function initSocket(httpServer: HttpServer): SocketServer {
           reason: err instanceof Error ? err.message : String(err),
         });
       }
+      next();
+      return;
     }
+
+    const printerKey = socket.handshake.auth?.printerKey as string | undefined;
+    if (printerKey) {
+      verifyAgentKey(printerKey)
+        .then((restaurantId) => {
+          if (restaurantId) {
+            socket.data.printerRestaurantId = restaurantId;
+          } else {
+            logger.debug('socket_auth_failed', { socketId: socket.id, reason: 'invalid_printer_key' });
+          }
+          next();
+        })
+        .catch((err) => {
+          logger.debug('socket_auth_failed', { socketId: socket.id, reason: err instanceof Error ? err.message : String(err) });
+          next();
+        });
+      return;
+    }
+
     next();
   });
 
@@ -54,8 +83,13 @@ export function initSocket(httpServer: HttpServer): SocketServer {
     // an unauthenticated socket or a suffix mismatch is simply rejected.
     socket.on('join', (room: string) => {
       const [base, tenantSuffix] = room.split(':');
-      const knownRoom = Object.values(ROOMS).includes(base as never);
-      const ownTenant = socket.data.user?.restaurantId;
+      const ownTenant = socket.data.user?.restaurantId ?? socket.data.printerRestaurantId;
+
+      // Uma ponte de impressão só pode entrar nas rooms de produção do próprio tenant —
+      // nunca cashier/floor/dashboard, mesmo que a room exista e o tenant bata.
+      const knownRoom = socket.data.printerRestaurantId
+        ? PRINTER_AGENT_ALLOWED_ROOMS.includes(base)
+        : Object.values(ROOMS).includes(base as never);
 
       if (!knownRoom || !ownTenant || tenantSuffix !== ownTenant) {
         logger.warn('socket_join_rejected', {

@@ -155,6 +155,13 @@ export const deliveryPricingSettingsSchema = z
 // que sabe o que já está salvo.
 export const autoAcceptSchema = z.object({ enabled: z.boolean() }).strict();
 
+export const printerSettingsSchema = z
+  .object({
+    printerHost: z.string().min(1).max(255),
+    printerPort: z.number().int().min(1).max(65535).optional(),
+  })
+  .strict();
+
 export const etaSettingsSchema = z
   .object({
     mode: z.enum(['AUTO', 'MANUAL']),

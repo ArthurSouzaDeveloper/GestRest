@@ -15,6 +15,7 @@ import { emitTenant, ROOMS } from '../../socket';
 import { auditService } from './audit.service';
 import { deliveryPricingService } from './deliveryPricing.service';
 import { etaService } from './eta.service';
+import { printJobService } from './printJob.service';
 import { assertCustomProductBase, normalizePhone, orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
 
 interface Ctx {
@@ -120,20 +121,30 @@ async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = p
   if (order.tableId) await syncTableStatus(order.tableId, tx);
 }
 
+interface CreatedOrderItems {
+  touchedStations: Set<Station>;
+  // Itens recém-criados, com produto/adicionais carregados — usado por
+  // printJobService.enqueueForItems() pra montar o texto do ticket sem precisar buscar
+  // tudo de novo. Vazio de conteúdo relevante pra quem só usa touchedStations.
+  items: Prisma.OrderItemGetPayload<{ include: { product: true; additionals: true } }>[];
+}
+
 /**
  * Validates and creates order items inside an existing transaction — shared by addItems()
  * (staff, an already-open order) and openPublic() (online ordering, a brand new order) so
  * both paths enforce identical rules: product must belong to the tenant, must be available,
- * price/additionals are snapshotted at order time. Returns the set of stations touched, so
- * callers know which production room(s) to wake up.
+ * price/additionals are snapshotted at order time. Returns the set of stations touched (pra
+ * quem precisa acordar a tela de produção certa) e os itens criados (pra quem precisa montar
+ * o ticket de impressão — ver printJob.service.ts).
  */
 async function createOrderItems(
   tx: Prisma.TransactionClient,
   tenantId: string,
   orderId: string,
   items: NewItemInput[],
-): Promise<Set<Station>> {
+): Promise<CreatedOrderItems> {
   const touchedStations = new Set<Station>();
+  const createdItems: CreatedOrderItems['items'] = [];
   for (const item of items) {
     let product;
     let unitPrice: number | Prisma.Decimal;
@@ -182,7 +193,7 @@ async function createOrderItems(
 
     assertCustomProductBase(product, additionals);
 
-    await tx.orderItem.create({
+    const created = await tx.orderItem.create({
       data: {
         orderId,
         productId: product.id,
@@ -200,9 +211,11 @@ async function createOrderItems(
           })),
         },
       },
+      include: { product: true, additionals: true },
     });
+    createdItems.push(created);
   }
-  return touchedStations;
+  return { touchedStations, items: createdItems };
 }
 
 async function loadAndBroadcast(tenantId: string, orderId: string, event: string) {
@@ -403,7 +416,13 @@ export const orderService = {
           estimatedReadyAt,
         },
       });
-      const touchedStations = await createOrderItems(tx, tenantId, order.id, input.items);
+      const { touchedStations, items: createdItems } = await createOrderItems(tx, tenantId, order.id, input.items);
+      // Só gera trabalho de impressão aqui se o pedido já nasceu aceito — sem aceite
+      // automático os itens ficam invisíveis na fila até accept() (que gera o próprio
+      // ticket nesse momento), não faz sentido imprimir antes disso.
+      if (restaurant.autoAcceptOnlineOrders) {
+        await printJobService.enqueueForItems(tx, tenantId, order.id, createdItems);
+      }
       // De propósito: nem syncOrderStatus nem syncTableStatus aqui — sem aceite automático
       // o pedido fica parado em PENDING (sem mesa) até a equipe aceitar via accept().
       return { orderId: order.id, touchedStations };
@@ -426,18 +445,26 @@ export const orderService = {
   async accept(id: string, ctx: Ctx) {
     await requireOrder(ctx.tenantId, id);
 
-    const items = await prisma.orderItem.findMany({ where: { orderId: id } });
-    const touchedStations = new Set(items.map((i) => i.station));
+    const touchedStations = await prisma.$transaction(async (tx) => {
+      const items = await tx.orderItem.findMany({
+        where: { orderId: id },
+        include: { product: true, additionals: true },
+      });
+      const stations = new Set(items.map((i) => i.station));
 
-    // updateMany com WHERE status=PENDING (não update simples): duas equipes aceitando o
-    // mesmo pedido online quase ao mesmo tempo antes só duplicavam registro de auditoria e
-    // broadcast de socket (estado final já saía correto de qualquer forma) — agora a
-    // segunda tentativa é rejeitada de forma limpa em vez de re-processar em silêncio.
-    const claimed = await prisma.order.updateMany({
-      where: { id, restaurantId: ctx.tenantId, status: OrderStatus.PENDING },
-      data: { status: OrderStatus.OPEN, acceptedAt: new Date() },
+      // updateMany com WHERE status=PENDING (não update simples): duas equipes aceitando o
+      // mesmo pedido online quase ao mesmo tempo antes só duplicavam registro de auditoria e
+      // broadcast de socket (estado final já saía correto de qualquer forma) — agora a
+      // segunda tentativa é rejeitada de forma limpa em vez de re-processar em silêncio.
+      const claimed = await tx.order.updateMany({
+        where: { id, restaurantId: ctx.tenantId, status: OrderStatus.PENDING },
+        data: { status: OrderStatus.OPEN, acceptedAt: new Date() },
+      });
+      if (claimed.count === 0) throw new ConflictError('Pedido não está aguardando aceite');
+
+      await printJobService.enqueueForItems(tx, ctx.tenantId, id, items);
+      return stations;
     });
-    if (claimed.count === 0) throw new ConflictError('Pedido não está aguardando aceite');
 
     await auditService.record({
       action: AuditAction.ORDER_ACCEPTED,
@@ -459,10 +486,11 @@ export const orderService = {
       throw new ConflictError('Pedido já finalizado');
     }
 
-    const touchedStations = await prisma.$transaction(async (tx) => {
-      const stations = await createOrderItems(tx, ctx.tenantId, orderId, items);
+    const { touchedStations } = await prisma.$transaction(async (tx) => {
+      const created = await createOrderItems(tx, ctx.tenantId, orderId, items);
+      await printJobService.enqueueForItems(tx, ctx.tenantId, orderId, created.items);
       await syncOrderStatus(orderId, tx);
-      return stations;
+      return created;
     });
 
     await auditService.record({
@@ -475,11 +503,7 @@ export const orderService = {
       metadata: { count: items.length },
     });
 
-    const rooms = [...touchedStations]
-      .map((s) => stationRoom[s])
-      .filter((r): r is string => Boolean(r));
-    if (rooms.length) emitTenant(ctx.tenantId, rooms, 'production:updated', { orderId });
-
+    broadcastProductionUpdate(ctx.tenantId, orderId, touchedStations);
     return loadAndBroadcast(ctx.tenantId, orderId, 'order:updated');
   },
 
