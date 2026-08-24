@@ -6,8 +6,9 @@ import swaggerUi from 'swagger-ui-express';
 import path from 'path';
 import { env } from './config/env';
 import api from './presentation/routes';
+import printAgentRouter from './presentation/routes/printAgent.routes';
 import { errorHandler, notFoundHandler } from './presentation/middlewares/error.middleware';
-import { apiLimiter } from './presentation/middlewares/rateLimit.middleware';
+import { apiLimiter, printAgentLimiter } from './presentation/middlewares/rateLimit.middleware';
 import { requestContextMiddleware } from './presentation/middlewares/requestContext.middleware';
 import { openApiDocument } from './config/swagger';
 
@@ -34,6 +35,10 @@ export function createApp(): Application {
 
   // Rate-limited API
   app.use('/api', apiLimiter, api);
+
+  // Ponte de impressão local — fora do /api de staff, de propósito (autenticação própria
+  // por chave, não JWT; ver printerAgent.middleware.ts e a spec de impressão automática).
+  app.use('/print-agent', printAgentLimiter, printAgentRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

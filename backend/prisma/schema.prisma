@@ -121,6 +121,12 @@ enum AuditAction {
   PUBLIC_ORDER_CREATED // Pedido criado pelo site público (delivery/retirada), sem usuário autenticado
   ORDER_ACCEPTED // Equipe aceitou um pedido online, tirando-o de PENDING
   REFRESH_TOKEN_REUSE_DETECTED // Reuso de refresh token já revogado — sinal de possível roubo de token (achado de auditoria QA), derruba todas as sessões do usuário
+  PRINTER_AGENT_KEY_GENERATED // ADMIN gerou/regenerou a chave de acesso da ponte de impressão local
+}
+
+enum PrintJobStatus {
+  PENDING
+  PRINTED
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -175,6 +181,20 @@ model Restaurant {
   // de quem já usa o sistema; configurável só por ADMIN (mesmo critério do tempo
   // estimado, EtaMode acima).
   autoAcceptOnlineOrders Boolean @default(false)
+
+  // Impressora térmica de rede (ESC/POS via TCP) usada pra imprimir os tickets de
+  // produção — uma só, compartilhada entre Cozinha e Suqueiros (o ticket indica a
+  // estação no cabeçalho). Nulo = impressão automática desligada pra esse restaurante
+  // (nenhum PrintJob é consumível sem host configurado).
+  printerHost String?
+  printerPort Int?    @default(9100)
+
+  // Hash (bcrypt, mesmo padrão de senha de usuário — ver utils/auth.ts) da chave de
+  // acesso da ponte de impressão local. Nunca guardamos a chave em texto puro; ela é
+  // mostrada ao ADMIN uma única vez, no momento em que é gerada.
+  printerAgentKeyHash String?
+
+  printJobs PrintJob[]
 
   @@map("restaurants")
 }
@@ -416,14 +436,39 @@ model Order {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  items    OrderItem[]
-  payments Payment[]
+  items     OrderItem[]
+  payments  Payment[]
+  printJobs PrintJob[]
 
   @@index([restaurantId, status])
   @@index([restaurantId, orderType, status])
   @@index([tableId])
   @@index([waiterId])
   @@map("orders")
+}
+
+// Trabalho de impressão de um ticket de produção (Cozinha/Suqueiros), consumido pela
+// ponte local que fica na rede do restaurante (ver docs/superpowers/specs/
+// 2026-08-24-impressao-termica-auto-aceite-design.md). Diferente das relações
+// Restrict da correção da auditoria QA acima: aqui é Cascade de propósito — um
+// trabalho de impressão é um artefato operacional efêmero, não um registro
+// financeiro histórico, não há razão pra bloquear a exclusão do pedido por causa dele.
+model PrintJob {
+  id           String         @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderId      String
+  order        Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  station      Station // sempre KITCHEN ou JUICE_BAR — NONE nunca gera trabalho de impressão
+  // Conteúdo do ticket já renderizado em bytes ESC/POS, pronto pra mandar direto pra
+  // impressora — a ponte local não formata nada, só repassa.
+  payload      Bytes
+  status       PrintJobStatus @default(PENDING)
+  createdAt    DateTime       @default(now())
+  printedAt    DateTime?
+
+  @@index([restaurantId, status])
+  @@map("print_jobs")
 }
 
 model OrderItem {

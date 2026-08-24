@@ -37,6 +37,19 @@ export const mapsLookupLimiter = rateLimit({
   message: { error: { code: 'RATE_LIMITED', message: 'Muitas buscas de endereço em pouco tempo. Tente novamente em alguns minutos.' } },
 });
 
+// Ponte de impressão local — faz polling contínuo (a cada poucos segundos, o dia
+// inteiro), então o limite aqui é sobre volume normal de uso automatizado, não sobre
+// tentativas humanas ocasionais como os limitadores acima. Generoso o bastante pra
+// nunca travar o polling normal (mesmo com retentativas), apertado o bastante pra não
+// virar um vetor de abuso caso uma chave vaze.
+export const printAgentLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: { code: 'RATE_LIMITED', message: 'Muitas requisições. Tente novamente.' } },
+});
+
 // Login do site público (nome+telefone) — sem senha, então o limite existe pra dificultar
 // alguém tentando adivinhar nome+telefone de outra pessoa por força bruta, não pra travar
 // um cliente de verdade (que erra o telefone no máximo umas duas vezes).

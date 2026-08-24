@@ -15,6 +15,7 @@ import {
 } from '../../application/services/deliveryPricing.service';
 import { etaSettingsService } from '../../application/services/eta.service';
 import { autoAcceptService } from '../../application/services/autoAccept.service';
+import { printerSettingsService } from '../../application/services/printerSettings.service';
 import {
   additionalSchema,
   additionalUpdateSchema,
@@ -27,6 +28,7 @@ import {
   deliveryZoneSchema,
   deliveryZoneUpdateSchema,
   etaSettingsSchema,
+  printerSettingsSchema,
   productSchema,
   productUpdateSchema,
 } from '../validators/schemas';
@@ -240,6 +242,31 @@ router.patch(
   admin,
   validateBody(autoAcceptSchema),
   asyncHandler(async (req, res) => res.json(await autoAcceptService.update(tid(req), req.body))),
+);
+
+// ── Impressora térmica (ponte local) — configuração de conexão, geração da chave de
+// acesso da ponte, e status de trabalhos de impressão pendentes. Restrito a ADMIN. ──
+router.get(
+  '/printer-settings',
+  asyncHandler(async (req, res) => res.json(await printerSettingsService.getConnection(tid(req)))),
+);
+router.patch(
+  '/printer-settings',
+  admin,
+  validateBody(printerSettingsSchema),
+  asyncHandler(async (req, res) => res.json(await printerSettingsService.updateConnection(tid(req), req.body))),
+);
+router.post(
+  '/printer-agent-key',
+  admin,
+  asyncHandler(async (req, res) =>
+    res.json(await printerSettingsService.generateAgentKey(tid(req), { userId: req.user!.sub, ip: req.ip })),
+  ),
+);
+router.get(
+  '/printer-status',
+  admin,
+  asyncHandler(async (req, res) => res.json(await printerSettingsService.getStatus(tid(req)))),
 );
 
 export default router;
