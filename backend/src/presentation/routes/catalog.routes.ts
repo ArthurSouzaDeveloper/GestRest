@@ -14,9 +14,11 @@ import {
   deliveryPricingSettingsService,
 } from '../../application/services/deliveryPricing.service';
 import { etaSettingsService } from '../../application/services/eta.service';
+import { autoAcceptService } from '../../application/services/autoAccept.service';
 import {
   additionalSchema,
   additionalUpdateSchema,
+  autoAcceptSchema,
   categorySchema,
   categoryUpdateSchema,
   deliveryDistanceBandSchema,
@@ -225,6 +227,19 @@ router.patch(
   admin,
   validateBody(etaSettingsSchema),
   asyncHandler(async (req, res) => res.json(await etaSettingsService.update(tid(req), req.body))),
+);
+
+// ── Aceite automático de pedidos online — pula o "aguardando aceite" (PENDING) e já
+// cai direto na fila de produção. Restrito a ADMIN, mesmo critério do tempo estimado. ──
+router.get(
+  '/auto-accept',
+  asyncHandler(async (req, res) => res.json(await autoAcceptService.get(tid(req)))),
+);
+router.patch(
+  '/auto-accept',
+  admin,
+  validateBody(autoAcceptSchema),
+  asyncHandler(async (req, res) => res.json(await autoAcceptService.update(tid(req), req.body))),
 );
 
 export default router;

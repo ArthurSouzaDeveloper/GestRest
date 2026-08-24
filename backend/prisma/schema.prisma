@@ -169,6 +169,13 @@ model Restaurant {
   brandColor String?
   logoUrl    String?
 
+  // Aceite automático de pedidos online (delivery/retirada): quando true, o pedido já
+  // nasce aberto (OPEN) em vez de aguardar aceite manual (PENDING) — ver
+  // order.service.ts#openPublic(). Desligado por padrão, pra não mudar o comportamento
+  // de quem já usa o sistema; configurável só por ADMIN (mesmo critério do tempo
+  // estimado, EtaMode acima).
+  autoAcceptOnlineOrders Boolean @default(false)
+
   @@map("restaurants")
 }
 

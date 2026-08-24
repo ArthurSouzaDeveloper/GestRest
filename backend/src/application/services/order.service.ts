@@ -80,6 +80,16 @@ const stationRoom: Record<Station, string | null> = {
   [Station.NONE]: null,
 };
 
+/**
+ * Acorda a(s) tela(s) de produção pra itens que acabaram de ficar visíveis/acionáveis —
+ * reaproveitado por accept() (aceite manual de pedido online) e por openPublic() quando o
+ * aceite automático está ligado (mesmo momento lógico, só disparado em pontos diferentes).
+ */
+function broadcastProductionUpdate(tenantId: string, orderId: string, stations: Iterable<Station>) {
+  const rooms = [...stations].map((s) => stationRoom[s]).filter((r): r is string => Boolean(r));
+  if (rooms.length) emitTenant(tenantId, rooms, 'production:updated', { orderId });
+}
+
 /** Recomputes order status from item statuses and syncs the table (across ALL of its comandas). */
 async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = prisma) {
   const order = await tx.order.findUnique({
@@ -307,13 +317,16 @@ export const orderService = {
   async openPublic(tenantId: string, input: PublicOrderInput, ip?: string) {
     if (input.items.length === 0) throw new AppError('Nenhum item informado');
 
+    // Buscado incondicionalmente (não só pra DELIVERY) porque autoAcceptOnlineOrders vale
+    // pra qualquer tipo de pedido online.
+    const restaurant = await prisma.restaurant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { deliveryPricingMode: true, autoAcceptOnlineOrders: true },
+    });
+
     let deliveryFee = 0;
     let deliveryDistanceKm: number | undefined;
     if (input.orderType === 'DELIVERY') {
-      const restaurant = await prisma.restaurant.findUniqueOrThrow({
-        where: { id: tenantId },
-        select: { deliveryPricingMode: true },
-      });
       if (restaurant.deliveryPricingMode === DeliveryPricingMode.DISTANCE_BANDS) {
         // Nunca confia num frete/distância que o cliente tenha visto na tela antes — só
         // manda lat/lng (o endereço escolhido) e o back recalcula tudo de novo aqui, do
@@ -339,7 +352,7 @@ export const orderService = {
     const { minutes: etaMinutes } = await etaService.estimate(tenantId, input.orderType);
     const estimatedReadyAt = new Date(Date.now() + etaMinutes * 60_000);
 
-    const orderId = await prisma.$transaction(async (tx) => {
+    const { orderId, touchedStations } = await prisma.$transaction(async (tx) => {
       // Reaproveita o mesmo Customer entre pedidos (pelo telefone + nome) em vez de criar um
       // novo a cada vez — é o que permite o cliente "logar" de novo (nome+telefone) e
       // encontrar os pedidos anteriores depois de fechar o site. Só reaproveita quando o
@@ -369,7 +382,10 @@ export const orderService = {
         data: {
           restaurantId: tenantId,
           orderType: input.orderType as OrderType,
-          status: OrderStatus.PENDING,
+          // Com o aceite automático ligado, o pedido já nasce aberto e visível na fila de
+          // produção — sem passar pelo "aguardando aceite" que hoje exige um clique manual.
+          status: restaurant.autoAcceptOnlineOrders ? OrderStatus.OPEN : OrderStatus.PENDING,
+          acceptedAt: restaurant.autoAcceptOnlineOrders ? new Date() : undefined,
           customerId: customer.id,
           // Taxa de serviço (10% padrão) é um conceito de atendimento em mesa — não se
           // aplica a delivery/retirada, e o carrinho do site nunca mostrou esse valor.
@@ -387,10 +403,10 @@ export const orderService = {
           estimatedReadyAt,
         },
       });
-      await createOrderItems(tx, tenantId, order.id, input.items);
-      // De propósito: nem syncOrderStatus nem syncTableStatus aqui — o pedido fica parado
-      // em PENDING (sem mesa) até a equipe aceitar via accept().
-      return order.id;
+      const touchedStations = await createOrderItems(tx, tenantId, order.id, input.items);
+      // De propósito: nem syncOrderStatus nem syncTableStatus aqui — sem aceite automático
+      // o pedido fica parado em PENDING (sem mesa) até a equipe aceitar via accept().
+      return { orderId: order.id, touchedStations };
     });
 
     await auditService.record({
@@ -399,9 +415,10 @@ export const orderService = {
       entity: 'Order',
       entityId: orderId,
       ip,
-      metadata: { orderType: input.orderType, itemCount: input.items.length },
+      metadata: { orderType: input.orderType, itemCount: input.items.length, autoAccepted: restaurant.autoAcceptOnlineOrders },
     });
 
+    if (restaurant.autoAcceptOnlineOrders) broadcastProductionUpdate(tenantId, orderId, touchedStations);
     return loadAndBroadcast(tenantId, orderId, 'order:created');
   },
 
@@ -431,8 +448,7 @@ export const orderService = {
       ip: ctx.ip,
     });
 
-    const rooms = [...touchedStations].map((s) => stationRoom[s]).filter((r): r is string => Boolean(r));
-    if (rooms.length) emitTenant(ctx.tenantId, rooms, 'production:updated', { orderId: id });
+    broadcastProductionUpdate(ctx.tenantId, id, touchedStations);
     return loadAndBroadcast(ctx.tenantId, id, 'order:updated');
   },
 
