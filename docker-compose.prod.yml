@@ -75,6 +75,16 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    # gestquadra_default: rede do projeto Docker separado do Arena180 (arena180.com.br),
+    # que roda no mesmo servidor e agora também tem seu HTTPS servido por este mesmo
+    # Caddy (portas 80/443 do host só podem ter um dono) — ver Caddyfile.
+    networks:
+      - default
+      - gestquadra_default
+
+networks:
+  gestquadra_default:
+    external: true
 
 volumes:
   pgdata:
