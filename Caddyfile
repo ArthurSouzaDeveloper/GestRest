@@ -3,7 +3,7 @@
 # de renovação necessário. Todo o resto do tráfego só passa direto pro frontend (nginx),
 # que já cuida do proxy interno pra /api e /socket.io (ver frontend/nginx.conf).
 {$DOMAIN} {
-	reverse_proxy frontend:80
+	reverse_proxy gestrest-frontend:80
 }
 
 www.{$DOMAIN} {
