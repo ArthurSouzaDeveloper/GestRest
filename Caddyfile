@@ -9,3 +9,18 @@
 www.{$DOMAIN} {
 	redir https://{$DOMAIN}{uri} permanent
 }
+
+# Arena180 (arena180.com.br) roda num projeto Docker separado no mesmo servidor e usa seu
+# próprio domínio agora — hospedado aqui só porque as portas 80/443 do host só podem ter um
+# dono. Fala com a porta 443 interna do nginx dele (não a 80) porque o nginx do Arena180 foi
+# feito pra terminar HTTPS sozinho e redireciona qualquer request em texto puro pra https —
+# como quem garante o cadeado pro navegador agora é este Caddy (certificado próprio, válido,
+# emitido automaticamente pra arena180.com.br), a perna interna Caddy→Arena180 não precisa
+# validar o certificado dele, só criptografar esse pedaço da rede interna do Docker.
+arena180.com.br {
+	reverse_proxy https://gestquadra-frontend-1:443 {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+}
