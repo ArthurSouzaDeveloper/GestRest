@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { OrderType, Station } from '@prisma/client';
 import { renderTicket } from './escpos.helpers';
 
+const PLACED_AT = new Date('2026-09-17T12:00:00Z');
+
 describe('renderTicket', () => {
   it('começa com o comando de inicialização da impressora (ESC @)', () => {
     const bytes = renderTicket({
@@ -10,6 +12,9 @@ describe('renderTicket', () => {
       orderType: OrderType.DINE_IN,
       orderNumber: 12,
       customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
       items: [{ name: 'Pastel de Carne', quantity: 1, additionals: [] }],
     });
     expect(bytes.subarray(0, 2)).toEqual(Buffer.from([0x1b, 0x40]));
@@ -22,6 +27,9 @@ describe('renderTicket', () => {
       orderType: OrderType.DINE_IN,
       orderNumber: 12,
       customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
       items: [{ name: 'Pastel de Carne', quantity: 1, additionals: [] }],
     });
     expect(bytes.subarray(-3)).toEqual(Buffer.from([0x1d, 0x56, 0x01]));
@@ -34,6 +42,9 @@ describe('renderTicket', () => {
       orderType: OrderType.DELIVERY,
       orderNumber: 42,
       customerName: 'Maria',
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
       items: [
         { name: 'Suco de Laranja', quantity: 2, additionals: ['Adoçante'], notes: 'sem gelo' },
       ],
@@ -54,6 +65,9 @@ describe('renderTicket', () => {
       orderType: OrderType.DINE_IN,
       orderNumber: 1,
       customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
       items: [{ name: 'Pastéis de Coração e Limão', quantity: 1, additionals: [] }],
     });
     const text = bytes.toString('ascii');
@@ -69,6 +83,9 @@ describe('renderTicket', () => {
       orderType: OrderType.DINE_IN,
       orderNumber: 1,
       customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
       items: [{ name: 'X', quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(comMesa).toContain('MESA 7');
@@ -79,8 +96,70 @@ describe('renderTicket', () => {
       orderType: OrderType.PICKUP,
       orderNumber: 1,
       customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
       items: [{ name: 'X', quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(retirada).toContain('RETIRADA');
+  });
+
+  it('inclui telefone do cliente e endereço completo de entrega quando presentes', () => {
+    const bytes = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 8,
+      customerName: 'Joao',
+      customerPhone: '(19) 99999-8888',
+      deliveryAddress: {
+        street: 'Rua das Laranjeiras',
+        number: '123',
+        complement: 'Apto 4',
+        zoneName: 'Centro - Americana',
+        cep: '13470-000',
+      },
+      placedAt: PLACED_AT,
+      items: [{ name: 'X', quantity: 1, additionals: [] }],
+    });
+    const text = bytes.toString('ascii');
+    expect(text).toContain('Tel: (19) 99999-8888');
+    expect(text).toContain('Rua das Laranjeiras, 123 - Apto 4');
+    expect(text).toContain('Centro - Americana');
+    expect(text).toContain('CEP: 13470-000');
+  });
+
+  it('não imprime bloco de endereço quando não há entrega associada', () => {
+    const bytes = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: 2,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 3,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [{ name: 'X', quantity: 1, additionals: [] }],
+    });
+    const text = bytes.toString('ascii');
+    expect(text).not.toContain('CEP');
+    expect(text).not.toContain('Tel:');
+  });
+
+  it('imprime o horário do pedido fixado no fuso de São Paulo, não no fuso do processo', () => {
+    const bytes = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: 1,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [{ name: 'X', quantity: 1, additionals: [] }],
+    });
+    const text = bytes.toString('ascii');
+    const expected = PLACED_AT.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    expect(text).toContain(expected);
   });
 });

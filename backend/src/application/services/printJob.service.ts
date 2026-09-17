@@ -33,10 +33,26 @@ export const printJobService = {
       select: {
         number: true,
         orderType: true,
+        openedAt: true,
         table: { select: { number: true } },
-        customer: { select: { name: true } },
+        customer: { select: { name: true, phone: true } },
+        deliveryZone: { select: { name: true } },
+        deliveryStreet: true,
+        deliveryNumber: true,
+        deliveryComplement: true,
+        deliveryCep: true,
       },
     });
+    const deliveryAddress =
+      order.orderType === 'DELIVERY' && order.deliveryStreet && order.deliveryNumber
+        ? {
+            street: order.deliveryStreet,
+            number: order.deliveryNumber,
+            complement: order.deliveryComplement,
+            zoneName: order.deliveryZone?.name ?? null,
+            cep: order.deliveryCep,
+          }
+        : null;
 
     for (const [station, stationItems] of byStation) {
       const ticketItems: TicketItem[] = stationItems.map((item) => ({
@@ -51,6 +67,9 @@ export const printJobService = {
         orderType: order.orderType,
         orderNumber: order.number,
         customerName: order.customer?.name ?? null,
+        customerPhone: order.customer?.phone ?? null,
+        deliveryAddress,
+        placedAt: order.openedAt,
         items: ticketItems,
       });
       await tx.printJob.create({

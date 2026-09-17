@@ -32,12 +32,23 @@ export interface TicketItem {
   additionals: string[];
 }
 
+export interface TicketDeliveryAddress {
+  street: string;
+  number: string;
+  complement: string | null;
+  zoneName: string | null;
+  cep: string | null;
+}
+
 export interface TicketInput {
   station: Station;
   tableNumber: number | null;
   orderType: OrderType;
   orderNumber: number;
   customerName: string | null;
+  customerPhone: string | null;
+  deliveryAddress: TicketDeliveryAddress | null;
+  placedAt: Date;
   items: TicketItem[];
 }
 
@@ -71,7 +82,16 @@ export function renderTicket(input: TicketInput): Buffer {
   const origin = input.tableNumber != null ? `MESA ${input.tableNumber}` : ORDER_TYPE_LABEL[input.orderType];
   parts.push(BOLD_ON, line(`${origin} - PEDIDO #${input.orderNumber}`), BOLD_OFF);
   if (input.customerName) parts.push(line(input.customerName));
-  parts.push(line(new Date().toLocaleString('pt-BR')));
+  if (input.customerPhone) parts.push(line(`Tel: ${input.customerPhone}`));
+  if (input.deliveryAddress) {
+    const addr = input.deliveryAddress;
+    parts.push(line(`${addr.street}, ${addr.number}${addr.complement ? ` - ${addr.complement}` : ''}`));
+    if (addr.zoneName) parts.push(line(addr.zoneName));
+    if (addr.cep) parts.push(line(`CEP: ${addr.cep}`));
+  }
+  // Horário fixado à zona de São Paulo de propósito — o container do backend roda em
+  // UTC, então usar o fuso padrão do processo mostraria uma hora adiantada no ticket.
+  parts.push(line(input.placedAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })));
   parts.push(line('--------------------------------'));
 
   for (const item of input.items) {

@@ -134,6 +134,33 @@ describe('fila de impressão térmica (PrintJob)', () => {
     await prisma.restaurant.delete({ where: { id: otherRestaurant.id } });
   });
 
+  it('pedido de entrega gera ticket com telefone e endereço completo do cliente', async () => {
+    const zone = await prisma.deliveryZone.create({
+      data: { name: 'Centro - Americana', fee: 5, restaurantId },
+    });
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Entrega',
+      customerPhone: '11999990003',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua das Laranjeiras',
+      deliveryNumber: '123',
+      deliveryComplement: 'Apto 4',
+      deliveryCep: '13470-000',
+      items: [{ productId: kitchenProductId, quantity: 1 }],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const job = await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id } });
+    const text = job.payload.toString('ascii');
+    expect(text).toContain('Tel: 11999990003');
+    expect(text).toContain('Rua das Laranjeiras, 123 - Apto 4');
+    expect(text).toContain('Centro - Americana');
+    expect(text).toContain('CEP: 13470-000');
+  });
+
   it('verifyAgentKey() só valida a chave certa do tenant certo', async () => {
     const { key } = await printerSettingsService.generateAgentKey(restaurantId, { userId: waiterId });
 
