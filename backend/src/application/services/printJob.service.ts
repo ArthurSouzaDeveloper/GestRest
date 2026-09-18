@@ -2,7 +2,9 @@ import { Prisma, Station } from '@prisma/client';
 import { renderTicket, type TicketItem } from './escpos.helpers';
 import { itemDisplayName } from './order.helpers';
 
-type CreatedOrderItem = Prisma.OrderItemGetPayload<{ include: { product: true; additionals: true } }>;
+type CreatedOrderItem = Prisma.OrderItemGetPayload<{
+  include: { product: { include: { category: true } }; additionals: true };
+}>;
 
 /**
  * Gera um trabalho de impressão por estação tocada, sempre que itens ficam
@@ -57,6 +59,7 @@ export const printJobService = {
     for (const [station, stationItems] of byStation) {
       const ticketItems: TicketItem[] = stationItems.map((item) => ({
         name: itemDisplayName(item.product.name, item.comboLabel),
+        category: item.product.category.name,
         quantity: item.quantity,
         notes: item.notes,
         additionals: item.additionals.map((a) => a.name),

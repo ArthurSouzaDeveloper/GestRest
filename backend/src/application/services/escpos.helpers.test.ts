@@ -15,7 +15,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'Pastel de Carne', quantity: 1, additionals: [] }],
+      items: [{ name: 'Pastel de Carne', category: 'Pastéis Salgados', quantity: 1, additionals: [] }],
     });
     expect(bytes.subarray(0, 2)).toEqual(Buffer.from([0x1b, 0x40]));
   });
@@ -30,7 +30,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'Pastel de Carne', quantity: 1, additionals: [] }],
+      items: [{ name: 'Pastel de Carne', category: 'Pastéis Salgados', quantity: 1, additionals: [] }],
     });
     expect(bytes.subarray(-3)).toEqual(Buffer.from([0x1d, 0x56, 0x01]));
   });
@@ -46,14 +46,21 @@ describe('renderTicket', () => {
       deliveryAddress: null,
       placedAt: PLACED_AT,
       items: [
-        { name: 'Suco de Laranja', quantity: 2, additionals: ['Adoçante'], notes: 'sem gelo' },
+        {
+          name: 'Suco de Laranja',
+          category: 'Sucos',
+          quantity: 2,
+          additionals: ['Adoçante'],
+          notes: 'sem gelo',
+        },
       ],
     });
     const text = bytes.toString('ascii');
     expect(text).toContain('SUQUEIROS');
     expect(text).toContain('ENTREGA - PEDIDO #42');
     expect(text).toContain('Maria');
-    expect(text).toContain('2x Suco de Laranja');
+    expect(text).toContain('2x [SUCOS]');
+    expect(text).toContain('Suco de Laranja');
     expect(text).toContain('+ Adocante');
     expect(text).toContain('obs: sem gelo');
   });
@@ -68,10 +75,13 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'Pastéis de Coração e Limão', quantity: 1, additionals: [] }],
+      items: [
+        { name: 'Pastéis de Coração e Limão', category: 'Pastéis Doces', quantity: 1, additionals: [] },
+      ],
     });
     const text = bytes.toString('ascii');
     expect(text).toContain('Pasteis de Coracao e Limao');
+    expect(text).toContain('PASTEIS DOCES');
     // eslint-disable-next-line no-control-regex
     expect(text).not.toMatch(/[^\x00-\x7F]/);
   });
@@ -86,7 +96,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'X', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(comMesa).toContain('MESA 7');
 
@@ -99,7 +109,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'X', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(retirada).toContain('RETIRADA');
   });
@@ -120,7 +130,7 @@ describe('renderTicket', () => {
         cep: '13470-000',
       },
       placedAt: PLACED_AT,
-      items: [{ name: 'X', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
     });
     const text = bytes.toString('ascii');
     expect(text).toContain('Tel: (19) 99999-8888');
@@ -139,7 +149,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'X', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
     });
     const text = bytes.toString('ascii');
     expect(text).not.toContain('CEP');
@@ -156,10 +166,40 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'X', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
     });
     const text = bytes.toString('ascii');
     const expected = PLACED_AT.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     expect(text).toContain(expected);
+  });
+
+  it('mostra a categoria do produto pra diferenciar sabores repetidos entre pastel e mini pizza', () => {
+    const pastel = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: 4,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 9,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [{ name: 'Mussarela', category: 'Pastéis Salgados', quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(pastel).toContain('1x [PASTEIS SALGADOS]');
+    expect(pastel).toContain('Mussarela');
+
+    const miniPizza = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: 4,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 9,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [{ name: 'Mussarela', category: 'Mini Pizza Salgada', quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(miniPizza).toContain('1x [MINI PIZZA SALGADA]');
+    expect(miniPizza).toContain('Mussarela');
   });
 });

@@ -126,7 +126,7 @@ interface CreatedOrderItems {
   // Itens recém-criados, com produto/adicionais carregados — usado por
   // printJobService.enqueueForItems() pra montar o texto do ticket sem precisar buscar
   // tudo de novo. Vazio de conteúdo relevante pra quem só usa touchedStations.
-  items: Prisma.OrderItemGetPayload<{ include: { product: true; additionals: true } }>[];
+  items: Prisma.OrderItemGetPayload<{ include: { product: { include: { category: true } }; additionals: true } }>[];
 }
 
 /**
@@ -211,7 +211,7 @@ async function createOrderItems(
           })),
         },
       },
-      include: { product: true, additionals: true },
+      include: { product: { include: { category: true } }, additionals: true },
     });
     createdItems.push(created);
   }
@@ -448,7 +448,7 @@ export const orderService = {
     const touchedStations = await prisma.$transaction(async (tx) => {
       const items = await tx.orderItem.findMany({
         where: { orderId: id },
-        include: { product: true, additionals: true },
+        include: { product: { include: { category: true } }, additionals: true },
       });
       const stations = new Set(items.map((i) => i.station));
 

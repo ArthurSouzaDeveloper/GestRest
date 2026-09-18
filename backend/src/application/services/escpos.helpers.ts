@@ -27,6 +27,10 @@ const ORDER_TYPE_LABEL: Record<OrderType, string> = {
 
 export interface TicketItem {
   name: string;
+  /** Nome da categoria do produto (ex.: "Pastéis Salgados", "Mini Pizza Doce") — impresso
+   * logo após a quantidade pra equipe não confundir sabores que existem em mais de uma
+   * categoria (ex.: "Mussarela" existe tanto em Pastéis quanto em Mini Pizza). */
+  category: string;
   quantity: number;
   notes?: string | null;
   additionals: string[];
@@ -95,7 +99,12 @@ export function renderTicket(input: TicketInput): Buffer {
   parts.push(line('--------------------------------'));
 
   for (const item of input.items) {
-    parts.push(BOLD_ON, line(`${item.quantity}x ${item.name}`), BOLD_OFF);
+    parts.push(
+      BOLD_ON,
+      line(`${item.quantity}x [${item.category.toUpperCase()}]`),
+      line(item.name),
+      BOLD_OFF,
+    );
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
   }

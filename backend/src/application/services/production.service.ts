@@ -42,6 +42,7 @@ export const productionService = {
         orderNumber: item.order.number,
         customerName: item.order.customer?.name ?? null,
         productName: itemDisplayName(item.product.name, item.comboLabel),
+        category: item.product.category.name,
         avgPrepMin: item.product.avgPrepMin,
         quantity: item.quantity,
         notes: item.notes,

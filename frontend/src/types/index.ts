@@ -217,6 +217,7 @@ export interface ProductionTicket {
   orderNumber: number;
   customerName: string | null;
   productName: string;
+  category: string;
   avgPrepMin: number;
   quantity: number;
   notes?: string;

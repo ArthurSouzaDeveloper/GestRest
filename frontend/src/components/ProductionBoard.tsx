@@ -54,38 +54,45 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
               )}
             >
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <span className="rounded-md bg-brand px-2.5 py-1 text-sm font-bold text-white">
+                <span className="flex items-center gap-2">
+                  <span className="rounded-md bg-brand px-3 py-1.5 text-base font-bold text-white">
                     {t.tableNumber !== null ? `Mesa ${t.tableNumber}` : orderTypeLabels[t.orderType]}
                   </span>
                   {/* Uma mesa pode ter várias comandas simultâneas — o nº da comanda desambigua. */}
-                  <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                  <span className="rounded-md bg-gray-100 px-2.5 py-1.5 text-sm font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                     #{t.orderNumber}
                   </span>
                 </span>
                 <span
                   className={clsx(
-                    'flex items-center gap-1 text-sm font-medium',
+                    'flex items-center gap-1 text-base font-medium',
                     t.critical ? 'text-red-600' : 'text-gray-500',
                   )}
                 >
-                  {t.critical ? <AlertTriangle size={14} /> : <Clock size={14} />}
+                  {t.critical ? <AlertTriangle size={18} /> : <Clock size={18} />}
                   {t.waitingMin} min
                 </span>
               </div>
 
-              <div className="mt-3 text-lg font-semibold leading-tight">
+              {/* Categoria em destaque logo acima do sabor — mesmo sabor pode existir em
+                  categorias diferentes (ex.: "Mussarela" no Pastel e na Mini Pizza), então
+                  isso precisa ser a primeira coisa que salta aos olhos, igual no ticket
+                  impresso (ver escpos.helpers.ts). */}
+              <div className="mt-3 text-sm font-bold uppercase tracking-wide text-brand dark:text-brand-100">
+                {t.category}
+              </div>
+              <div className="text-3xl font-bold leading-tight">
                 {t.quantity}× {t.productName}
               </div>
-              {t.customerName && <div className="text-xs text-gray-500">Cliente: {t.customerName}</div>}
+              {t.customerName && <div className="mt-1 text-sm text-gray-500">Cliente: {t.customerName}</div>}
 
               {t.additionals.length > 0 && (
-                <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                <div className="mt-2 text-base text-gray-600 dark:text-gray-300">
                   <span className="font-medium">Adicionais:</span> {t.additionals.join(', ')}
                 </div>
               )}
               {t.notes && (
-                <div className="mt-1 rounded bg-yellow-50 px-2 py-1 text-sm italic text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
+                <div className="mt-1 rounded bg-yellow-50 px-2.5 py-1.5 text-base italic text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
                   {t.notes}
                 </div>
               )}
