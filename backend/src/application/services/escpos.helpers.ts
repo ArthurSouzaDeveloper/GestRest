@@ -32,6 +32,8 @@ export interface TicketItem {
    * categoria (ex.: "Mussarela" existe tanto em Pastéis quanto em Mini Pizza). */
   category: string;
   quantity: number;
+  /** Preço unitário (por item, já com o valor certo pra combos — ver createOrderItems). */
+  unitPrice: number;
   notes?: string | null;
   additionals: string[];
 }
@@ -74,6 +76,16 @@ function line(text: string): Buffer {
 }
 
 /**
+ * Formata em reais sem usar Intl: Intl.NumberFormat('pt-BR', { style: 'currency' }) separa
+ * "R$" do valor com um espaço "não separável" (U+00A0), que não é acentuação — a limpeza de
+ * toAscii() não pega — e viraria byte corrompido na impressora. Escrito na mão, é sempre
+ * ASCII puro.
+ */
+function formatCurrency(value: number): string {
+  return `R$ ${value.toFixed(2).replace('.', ',')}`;
+}
+
+/**
  * Monta o conteúdo de um ticket de produção em bytes ESC/POS crus, prontos pra mandar
  * direto pra impressora térmica de rede — ver printJob.service.ts e a spec de
  * impressão automática (docs/superpowers/specs/2026-08-24-impressao-termica-auto-
@@ -104,6 +116,7 @@ export function renderTicket(input: TicketInput): Buffer {
       line(`${item.quantity}x [${item.category.toUpperCase()}]`),
       line(item.name),
       BOLD_OFF,
+      line(`  ${formatCurrency(item.unitPrice)} / un.`),
     );
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));

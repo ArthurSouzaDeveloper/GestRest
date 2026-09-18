@@ -159,6 +159,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).toContain('Rua das Laranjeiras, 123 - Apto 4');
     expect(text).toContain('Centro - Americana');
     expect(text).toContain('CEP: 13470-000');
+    expect(text).toContain('R$ 10,00 / un.');
   });
 
   it('verifyAgentKey() só valida a chave certa do tenant certo', async () => {

@@ -61,6 +61,7 @@ export const printJobService = {
         name: itemDisplayName(item.product.name, item.comboLabel),
         category: item.product.category.name,
         quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
         notes: item.notes,
         additionals: item.additionals.map((a) => a.name),
       }));

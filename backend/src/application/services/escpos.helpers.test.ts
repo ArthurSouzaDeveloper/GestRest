@@ -15,7 +15,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'Pastel de Carne', category: 'Pastéis Salgados', quantity: 1, additionals: [] }],
+      items: [{ name: 'Pastel de Carne', category: 'Pastéis Salgados', unitPrice: 10, quantity: 1, additionals: [] }],
     });
     expect(bytes.subarray(0, 2)).toEqual(Buffer.from([0x1b, 0x40]));
   });
@@ -30,7 +30,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'Pastel de Carne', category: 'Pastéis Salgados', quantity: 1, additionals: [] }],
+      items: [{ name: 'Pastel de Carne', category: 'Pastéis Salgados', unitPrice: 10, quantity: 1, additionals: [] }],
     });
     expect(bytes.subarray(-3)).toEqual(Buffer.from([0x1d, 0x56, 0x01]));
   });
@@ -49,6 +49,7 @@ describe('renderTicket', () => {
         {
           name: 'Suco de Laranja',
           category: 'Sucos',
+          unitPrice: 8,
           quantity: 2,
           additionals: ['Adoçante'],
           notes: 'sem gelo',
@@ -76,7 +77,7 @@ describe('renderTicket', () => {
       deliveryAddress: null,
       placedAt: PLACED_AT,
       items: [
-        { name: 'Pastéis de Coração e Limão', category: 'Pastéis Doces', quantity: 1, additionals: [] },
+        { name: 'Pastéis de Coração e Limão', category: 'Pastéis Doces', unitPrice: 10, quantity: 1, additionals: [] },
       ],
     });
     const text = bytes.toString('ascii');
@@ -96,7 +97,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(comMesa).toContain('MESA 7');
 
@@ -109,7 +110,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(retirada).toContain('RETIRADA');
   });
@@ -130,7 +131,7 @@ describe('renderTicket', () => {
         cep: '13470-000',
       },
       placedAt: PLACED_AT,
-      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', unitPrice: 10, quantity: 1, additionals: [] }],
     });
     const text = bytes.toString('ascii');
     expect(text).toContain('Tel: (19) 99999-8888');
@@ -149,7 +150,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', unitPrice: 10, quantity: 1, additionals: [] }],
     });
     const text = bytes.toString('ascii');
     expect(text).not.toContain('CEP');
@@ -166,7 +167,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'X', category: 'Y', quantity: 1, additionals: [] }],
+      items: [{ name: 'X', category: 'Y', unitPrice: 10, quantity: 1, additionals: [] }],
     });
     const text = bytes.toString('ascii');
     const expected = PLACED_AT.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -183,7 +184,7 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'Mussarela', category: 'Pastéis Salgados', quantity: 1, additionals: [] }],
+      items: [{ name: 'Mussarela', category: 'Pastéis Salgados', unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(pastel).toContain('1x [PASTEIS SALGADOS]');
     expect(pastel).toContain('Mussarela');
@@ -197,9 +198,31 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      items: [{ name: 'Mussarela', category: 'Mini Pizza Salgada', quantity: 1, additionals: [] }],
+      items: [{ name: 'Mussarela', category: 'Mini Pizza Salgada', unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(miniPizza).toContain('1x [MINI PIZZA SALGADA]');
     expect(miniPizza).toContain('Mussarela');
+  });
+
+  it('imprime o preço unitário de cada item, em reais, sem usar caractere não-ASCII', () => {
+    const bytes = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: 6,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 10,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [
+        { name: 'Carne', category: 'Pastéis Salgados', unitPrice: 12, quantity: 3, additionals: [] },
+        { name: 'Chocolate', category: 'Pastéis Doces', unitPrice: 15.5, quantity: 1, additionals: [] },
+      ],
+    });
+    const text = bytes.toString('ascii');
+    expect(text).toContain('R$ 12,00 / un.');
+    expect(text).toContain('R$ 15,50 / un.');
+    // eslint-disable-next-line no-control-regex
+    expect(text).not.toMatch(/[^\x00-\x7F]/);
   });
 });
