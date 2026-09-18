@@ -82,9 +82,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(await prisma.printJob.count({ where: { orderId: order.id } })).toBe(0);
 
     await orderService.accept(order.id, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
+    // Retirada/entrega sai em 2 vias (pedido do dono do restaurante) — ver teste dedicado
+    // abaixo pra checar o conteúdo da 2a via especificamente.
     const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
-    expect(jobs).toHaveLength(1);
-    expect(jobs[0].station).toBe(Station.KITCHEN);
+    expect(jobs).toHaveLength(2);
+    expect(jobs.every((j) => j.station === Station.KITCHEN)).toBe(true);
   });
 
   it('aceite automático já gera o PrintJob na criação do pedido', async () => {
@@ -99,8 +101,8 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(order.status).toBe(OrderStatus.OPEN);
 
     const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
-    expect(jobs).toHaveLength(1);
-    expect(jobs[0].station).toBe(Station.JUICE_BAR);
+    expect(jobs).toHaveLength(2);
+    expect(jobs.every((j) => j.station === Station.JUICE_BAR)).toBe(true);
     await autoAcceptService.update(restaurantId, { enabled: false });
   });
 
@@ -160,6 +162,35 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).toContain('Centro - Americana');
     expect(text).toContain('CEP: 13470-000');
     expect(text).toContain('R$ 10,00 / un.');
+  });
+
+  it('entrega/retirada sai em 2 vias (a segunda marcada); mesa sai em 1 via só', async () => {
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const delivery = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente 2 Vias',
+      customerPhone: '11999990004',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId: kitchenProductId, quantity: 1 }],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const deliveryJobs = await prisma.printJob.findMany({ where: { orderId: delivery.id } });
+    expect(deliveryJobs).toHaveLength(2);
+    const texts = deliveryJobs.map((j) => j.payload.toString('ascii'));
+    expect(texts.filter((t) => t.includes('2a VIA'))).toHaveLength(1);
+    expect(texts.filter((t) => !t.includes('2a VIA'))).toHaveLength(1);
+
+    const table = await prisma.restaurantTable.create({ data: { number: 502, restaurantId } });
+    const dineIn = await orderService.open({ tableId: table.id }, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
+    await orderService.addItems(
+      dineIn!.id,
+      [{ productId: kitchenProductId, quantity: 1 }],
+      { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
+    );
+    const dineInJobs = await prisma.printJob.findMany({ where: { orderId: dineIn!.id } });
+    expect(dineInJobs).toHaveLength(1);
+    expect(dineInJobs[0].payload.toString('ascii')).not.toContain('2a VIA');
   });
 
   it('verifyAgentKey() só valida a chave certa do tenant certo', async () => {

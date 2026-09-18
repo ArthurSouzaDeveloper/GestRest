@@ -225,4 +225,33 @@ describe('renderTicket', () => {
     // eslint-disable-next-line no-control-regex
     expect(text).not.toMatch(/[^\x00-\x7F]/);
   });
+
+  it('marca a 2a via com destaque quando copyLabel é passado; não marca nada quando ausente', () => {
+    const semVia = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.PICKUP,
+      orderNumber: 5,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [{ name: 'X', category: 'Y', unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(semVia).not.toContain('VIA');
+
+    const comVia = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.PICKUP,
+      orderNumber: 5,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      copyLabel: '2a VIA',
+      items: [{ name: 'X', category: 'Y', unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(comVia).toContain('*** 2a VIA ***');
+  });
 });

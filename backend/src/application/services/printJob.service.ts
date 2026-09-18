@@ -65,7 +65,7 @@ export const printJobService = {
         notes: item.notes,
         additionals: item.additionals.map((a) => a.name),
       }));
-      const payload = renderTicket({
+      const baseTicket = {
         station,
         tableNumber: order.table?.number ?? null,
         orderType: order.orderType,
@@ -75,10 +75,24 @@ export const printJobService = {
         deliveryAddress,
         placedAt: order.openedAt,
         items: ticketItems,
-      });
+      };
       await tx.printJob.create({
-        data: { restaurantId: tenantId, orderId, station, payload },
+        data: { restaurantId: tenantId, orderId, station, payload: renderTicket(baseTicket) },
       });
+
+      // Entrega/retirada sai em 2 vias — o motoboy/cliente leva uma anexada ao pedido,
+      // a outra fica no restaurante como comprovante (pedido explícito do dono do
+      // restaurante). Mesa não duplica: quem prepara e quem serve estão no mesmo lugar.
+      if (order.orderType !== 'DINE_IN') {
+        await tx.printJob.create({
+          data: {
+            restaurantId: tenantId,
+            orderId,
+            station,
+            payload: renderTicket({ ...baseTicket, copyLabel: '2a VIA' }),
+          },
+        });
+      }
     }
   },
 };

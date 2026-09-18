@@ -56,6 +56,9 @@ export interface TicketInput {
   deliveryAddress: TicketDeliveryAddress | null;
   placedAt: Date;
   items: TicketItem[];
+  /** "2a VIA" na segunda cópia de pedidos de entrega/retirada (ver printJob.service.ts) —
+   * null na via normal, pra não confundir a equipe com o que pareceria um pedido duplicado. */
+  copyLabel?: string | null;
 }
 
 /**
@@ -94,6 +97,10 @@ function formatCurrency(value: number): string {
  */
 export function renderTicket(input: TicketInput): Buffer {
   const parts: Buffer[] = [INIT, HEADER_MODE_ON, line(STATION_LABEL[input.station]), NORMAL_MODE];
+
+  if (input.copyLabel) {
+    parts.push(HEADER_MODE_ON, line(`*** ${input.copyLabel} ***`), NORMAL_MODE);
+  }
 
   const origin = input.tableNumber != null ? `MESA ${input.tableNumber}` : ORDER_TYPE_LABEL[input.orderType];
   parts.push(BOLD_ON, line(`${origin} - PEDIDO #${input.orderNumber}`), BOLD_OFF);
