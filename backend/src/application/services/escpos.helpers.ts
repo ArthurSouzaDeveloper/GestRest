@@ -118,13 +118,16 @@ export function renderTicket(input: TicketInput): Buffer {
   parts.push(line('--------------------------------'));
 
   for (const item of input.items) {
-    parts.push(
-      BOLD_ON,
-      line(`${item.quantity}x [${item.category.toUpperCase()}]`),
-      line(item.name),
-      BOLD_OFF,
-      line(`  ${formatCurrency(item.unitPrice)} / un.`),
-    );
+    parts.push(BOLD_ON);
+    // Categoria só ajuda na Cozinha, onde o mesmo sabor existe em categorias diferentes
+    // (ex.: "Mussarela" no Pastel e na Mini Pizza) — nos Suqueiros só teria "SUCOS" em
+    // toda linha, sem servir pra nada (o sabor/base já vem completo no nome do item).
+    if (input.station === Station.KITCHEN) {
+      parts.push(line(`${item.quantity}x [${item.category.toUpperCase()}]`), line(item.name));
+    } else {
+      parts.push(line(`${item.quantity}x ${item.name}`));
+    }
+    parts.push(BOLD_OFF, line(`  ${formatCurrency(item.unitPrice)} / un.`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
   }

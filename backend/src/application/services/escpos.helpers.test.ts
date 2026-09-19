@@ -60,8 +60,8 @@ describe('renderTicket', () => {
     expect(text).toContain('SUQUEIROS');
     expect(text).toContain('ENTREGA - PEDIDO #42');
     expect(text).toContain('Maria');
-    expect(text).toContain('2x [SUCOS]');
-    expect(text).toContain('Suco de Laranja');
+    expect(text).toContain('2x Suco de Laranja');
+    expect(text).not.toContain('[SUCOS]');
     expect(text).toContain('+ Adocante');
     expect(text).toContain('obs: sem gelo');
   });
@@ -202,6 +202,23 @@ describe('renderTicket', () => {
     }).toString('ascii');
     expect(miniPizza).toContain('1x [MINI PIZZA SALGADA]');
     expect(miniPizza).toContain('Mussarela');
+  });
+
+  it('não mostra categoria nos Suqueiros — sabor/base já vem completo no nome do item', () => {
+    const text = renderTicket({
+      station: Station.JUICE_BAR,
+      tableNumber: 4,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 9,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [{ name: 'Manga (Agua)', category: 'Sucos', unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(text).toContain('1x Manga (Agua)');
+    expect(text).not.toContain('SUCOS');
+    expect(text).not.toContain('[');
   });
 
   it('imprime o preço unitário de cada item, em reais, sem usar caractere não-ASCII', () => {

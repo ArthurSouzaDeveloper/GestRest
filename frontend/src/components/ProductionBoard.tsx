@@ -118,13 +118,16 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
               <div className="mt-3 flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
                 {block.items.map((item) => (
                   <div key={item.id} className="py-3 first:pt-0 last:pb-0">
-                    {/* Categoria em destaque logo acima do sabor — mesmo sabor pode existir
-                        em categorias diferentes (ex.: "Mussarela" no Pastel e na Mini
-                        Pizza), então isso precisa ser a primeira coisa que salta aos
-                        olhos, igual no ticket impresso (ver escpos.helpers.ts). */}
-                    <div className="text-sm font-bold uppercase tracking-wide text-brand dark:text-brand-100">
-                      {item.category}
-                    </div>
+                    {/* Categoria em destaque logo acima do sabor — só na Cozinha, onde o
+                        mesmo sabor pode existir em categorias diferentes (ex.: "Mussarela"
+                        no Pastel e na Mini Pizza). Nos Suqueiros só mostraria "SUCOS" em
+                        todo item, sem servir pra nada — mesma regra do ticket impresso
+                        (ver escpos.helpers.ts). */}
+                    {room === 'kitchen' && (
+                      <div className="text-sm font-bold uppercase tracking-wide text-brand dark:text-brand-100">
+                        {item.category}
+                      </div>
+                    )}
                     <div className="text-2xl font-bold leading-tight">
                       {item.quantity}× {item.productName}
                     </div>
