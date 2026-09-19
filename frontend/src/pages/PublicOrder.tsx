@@ -47,8 +47,11 @@ function EtaNote({ eta }: { eta?: EtaEstimate }) {
 // cantos mais retos, divisórias grossas, tipografia pesada, azul do sistema principal
 // no lugar do roxo antigo. Espelham 1:1 as classes do preview. ───────────────
 const FIELD_LABEL = 'mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#5A6072]';
+// Fonte >= 16px de propósito: abaixo disso, o Safari do iPhone dá zoom automático
+// assim que o campo ganha foco (pra deixar o texto legível) e não volta sozinho — é
+// esse zoom "grudado" que fazia o site parecer instável no celular.
 const FIELD_INPUT =
-  'w-full rounded-[6px] border border-[#14161C]/[0.18] bg-white px-3.5 py-2.5 text-[13.5px] text-[#14161C] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20';
+  'w-full rounded-[6px] border border-[#14161C]/[0.18] bg-white px-3.5 py-2.5 text-[16px] text-[#14161C] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20';
 const PRIMARY_CTA =
   'block w-full rounded-[6px] bg-gradient-to-br from-brand to-brand-700 px-4 py-3.5 text-center text-[13.5px] font-extrabold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] transition disabled:cursor-not-allowed disabled:opacity-50';
 const STEP_TITLE = 'mb-[18px] text-[18px] font-extrabold tracking-tight text-[#14161C]';

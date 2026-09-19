@@ -254,7 +254,7 @@ export function OrderComposer({
         <div className="relative mb-3">
           <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
-            className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-9 text-[15px] text-gray-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-9 text-[16px] text-gray-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             placeholder="Pesquisar produto..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
