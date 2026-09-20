@@ -346,7 +346,6 @@ export default function PublicOrder() {
     <div className="min-h-screen bg-[#F4F6FA]" style={deriveBrandVars(restaurant.brandColor)}>
       {!introOrConfirmation && (
         <PublicHeader
-          restaurantName={restaurant.name}
           title={headerTitle[step as Exclude<Step, 'intro' | 'confirmation'>]}
           onBack={() => {
             if (step === 'review') setStep('payment');
@@ -531,11 +530,9 @@ export default function PublicOrder() {
 }
 
 function PublicHeader({
-  restaurantName,
   title,
   onBack,
 }: {
-  restaurantName: string;
   title: string;
   onBack: () => void;
 }) {
@@ -545,9 +542,6 @@ function PublicHeader({
         <button onClick={onBack} className="flex text-white/85 hover:text-white" title="Voltar">
           <ChevronLeft size={20} strokeWidth={2.3} />
         </button>
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-white text-[10.5px] font-extrabold text-brand">
-          {restaurantName.slice(0, 2).toUpperCase()}
-        </div>
         <span className="text-sm font-extrabold uppercase tracking-wide text-white">{title}</span>
       </div>
     </div>
