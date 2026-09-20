@@ -69,6 +69,33 @@ describe('fila de impressão térmica (PrintJob)', () => {
     }
   });
 
+  it('imprime a descrição do produto e nunca a categoria', async () => {
+    const category = await prisma.category.findFirstOrThrow({ where: { restaurantId, station: Station.KITCHEN } });
+    const productWithDescription = await prisma.product.create({
+      data: {
+        name: 'Frango Premium',
+        description: 'Frango, geleia de pimenta, bacon, queijo e cream cheese.',
+        price: 22,
+        categoryId: category.id,
+        restaurantId,
+      },
+    });
+    const table = await prisma.restaurantTable.create({ data: { number: 503, restaurantId } });
+    const order = await orderService.open({ tableId: table.id }, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
+    await orderService.addItems(
+      order!.id,
+      [{ productId: productWithDescription.id, quantity: 1 }],
+      { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
+    );
+
+    const job = await prisma.printJob.findFirstOrThrow({ where: { orderId: order!.id } });
+    const text = job.payload.toString('ascii');
+    expect(text).toContain('1x Frango Premium');
+    expect(text).toContain('Frango, geleia de pimenta, bacon, queijo e cream cheese.');
+    // Sem colchetes de categoria em lugar nenhum do ticket (ver renderTicket).
+    expect(text).not.toContain('[');
+  });
+
   it('aceite manual de pedido online gera o PrintJob no momento do aceite, não antes', async () => {
     await autoAcceptService.update(restaurantId, { enabled: false });
     const order = await orderService.openPublic(restaurantId, {

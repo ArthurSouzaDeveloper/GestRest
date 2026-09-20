@@ -27,11 +27,10 @@ const ORDER_TYPE_LABEL: Record<OrderType, string> = {
 
 export interface TicketItem {
   name: string;
-  /** Nome da categoria do produto (ex.: "Pastéis Salgados", "Mini Pizza Doce") — impresso
-   * logo após a quantidade pra equipe não confundir sabores que existem em mais de uma
-   * categoria (ex.: "Mussarela" existe tanto em Pastéis quanto em Mini Pizza). */
-  category: string;
   quantity: number;
+  /** Descrição do produto do cardápio (ex.: "Frango, geleia de pimenta, bacon, queijo e
+   * cream cheese.") — nem todo produto tem uma cadastrada. */
+  description: string | null;
   /** Preço unitário (por item, já com o valor certo pra combos — ver createOrderItems). */
   unitPrice: number;
   notes?: string | null;
@@ -118,16 +117,11 @@ export function renderTicket(input: TicketInput): Buffer {
   parts.push(line('--------------------------------'));
 
   for (const item of input.items) {
-    parts.push(BOLD_ON);
-    // Categoria só ajuda na Cozinha, onde o mesmo sabor existe em categorias diferentes
-    // (ex.: "Mussarela" no Pastel e na Mini Pizza) — nos Suqueiros só teria "SUCOS" em
-    // toda linha, sem servir pra nada (o sabor/base já vem completo no nome do item).
-    if (input.station === Station.KITCHEN) {
-      parts.push(line(`${item.quantity}x [${item.category.toUpperCase()}]`), line(item.name));
-    } else {
-      parts.push(line(`${item.quantity}x ${item.name}`));
-    }
-    parts.push(BOLD_OFF, line(`  ${formatCurrency(item.unitPrice)} / un.`));
+    // Pedido do dono do restaurante: só nome, quantidade, descrição e valor — sem
+    // categoria nenhuma (nem cozinha, nem suqueiros).
+    parts.push(BOLD_ON, line(`${item.quantity}x ${item.name}`), BOLD_OFF);
+    if (item.description) parts.push(line(`  ${item.description}`));
+    parts.push(line(`  ${formatCurrency(item.unitPrice)} / un.`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
   }
