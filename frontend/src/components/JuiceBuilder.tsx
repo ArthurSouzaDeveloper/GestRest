@@ -206,7 +206,7 @@ export function JuiceBuilder({
                         {fruitName} — {brl(p.price)}
                         {p.id === primary.id && <span className="text-brand"> (preço base)</span>}
                       </span>
-                      <button onClick={() => removeFruit(fruitName)} className="text-gray-400 hover:text-red-500" title="Remover fruta">
+                      <button onClick={() => removeFruit(fruitName)} className="-m-1.5 p-1.5 text-gray-400 hover:text-red-500" title="Remover fruta">
                         <X size={12} />
                       </button>
                     </li>
@@ -227,25 +227,25 @@ export function JuiceBuilder({
 
         {!standaloneChosen && candidatesToAdd.length > 0 && selectedFruits.length < MAX_FRUITS && (
           <button
-            className="flex items-center gap-1.5 text-sm font-medium text-brand"
+            className="-mx-1 flex items-center gap-1.5 px-1 py-2 text-sm font-medium text-brand"
             onClick={() => setAddingFruit(true)}
           >
             <Plus size={14} /> Adicionar outra fruta (+{brl(EXTRA_FRUIT_PRICE)})
           </button>
         )}
 
-        <div className="flex items-center justify-between border-b border-gray-100 py-3.5 dark:border-gray-800">
+        <div className="flex items-center justify-between border-b border-gray-100 py-2.5 dark:border-gray-800">
           <span className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">Quantidade</span>
-          <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-2">
             <button
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-gray-300 text-sm font-bold text-gray-700 dark:border-gray-600 dark:text-gray-200"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 text-base font-bold text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:active:bg-gray-800"
               onClick={() => setQuantity((q) => Math.max(1, q - 1))}
             >
               –
             </button>
-            <span className="w-4 text-center text-sm font-bold text-gray-900 dark:text-gray-100">{quantity}</span>
+            <span className="w-6 text-center text-base font-bold text-gray-900 dark:text-gray-100">{quantity}</span>
             <button
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-brand text-sm font-bold text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-base font-bold text-white active:bg-brand-600"
               onClick={() => setQuantity((q) => q + 1)}
             >
               +

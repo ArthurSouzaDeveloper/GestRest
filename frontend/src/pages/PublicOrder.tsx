@@ -539,7 +539,7 @@ function PublicHeader({
   return (
     <div className="sticky top-0 z-10 bg-gradient-to-br from-brand to-brand-700">
       <div className={`mx-auto flex items-center gap-2.5 px-4 py-3 ${title === 'Cardápio' ? 'max-w-3xl' : 'max-w-md'}`}>
-        <button onClick={onBack} className="flex text-white/85 hover:text-white" title="Voltar">
+        <button onClick={onBack} className="-m-2.5 flex p-2.5 text-white/85 hover:text-white" title="Voltar">
           <ChevronLeft size={20} strokeWidth={2.3} />
         </button>
         <span className="text-sm font-extrabold uppercase tracking-wide text-white">{title}</span>
