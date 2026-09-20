@@ -3,6 +3,7 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { createPollLoop } = require('./poll');
 
 /**
  * Ponte de impressão local do GestRest — roda num computador dentro do restaurante,
@@ -57,36 +58,9 @@ async function ackJob(jobId) {
   if (!res.ok) throw new Error(`confirmação falhou: HTTP ${res.status}`);
 }
 
-async function pollAndPrint() {
-  let jobs;
-  try {
-    const res = await fetch(`${API_URL}/print-agent/jobs`, {
-      headers: { 'X-Printer-Key': PRINTER_KEY },
-    });
-    if (!res.ok) {
-      console.error(`[erro] Não consegui buscar tickets: HTTP ${res.status}`);
-      return;
-    }
-    jobs = await res.json();
-  } catch (err) {
-    console.error('[erro] Não consegui falar com o GestRest:', err.message);
-    return;
-  }
-
-  for (const job of jobs) {
-    try {
-      await printJob(job);
-      await ackJob(job.id);
-      console.log(`[ok] Ticket impresso — ${job.station} (${job.id}).`);
-    } catch (err) {
-      // Não confirma (ack) quando falha — o ticket continua pendente e será
-      // tentado de novo no próximo ciclo, nada se perde.
-      console.error(`[erro] Falha ao imprimir o ticket ${job.id}, vou tentar de novo:`, err.message);
-    }
-  }
-}
+const loop = createPollLoop({ apiUrl: API_URL, printerKey: PRINTER_KEY, printJob, ackJob });
 
 console.log('Ponte de impressão do GestRest iniciada.');
 console.log(`Verificando tickets novos a cada ${POLL_INTERVAL_MS / 1000}s... (Ctrl+C para parar)`);
-pollAndPrint();
-setInterval(pollAndPrint, POLL_INTERVAL_MS);
+loop.tick();
+setInterval(loop.tick, POLL_INTERVAL_MS);
