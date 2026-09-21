@@ -17,10 +17,10 @@ type CreatedOrderItem = Prisma.OrderItemGetPayload<{
  * Categoria fora dessas 3 famílias (ex.: "Sucos") não ganha prefixo nenhum — mostrar
  * "SUCOS" no ticket de suco já foi removido a pedido do próprio cliente antes.
  */
-function categoryTypeLabel(categoryName: string): string | null {
+export function categoryTypeLabel(categoryName: string): string | null {
   const name = categoryName
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();
   const isDoce = name.includes('doce');
   if (name.includes('mini pizza')) return isDoce ? 'Mini Pizza Doce' : 'Mini Pizza Salgada';
