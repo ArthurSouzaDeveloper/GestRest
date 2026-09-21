@@ -31,6 +31,7 @@ const NAV: NavItem[] = [
   { to: '/cozinha', label: 'Cozinha', icon: <ChefHat size={18} />, roles: ['ADMIN', 'MANAGER', 'COOK'] },
   { to: '/suqueiros', label: 'Suqueiros', icon: <CupSoda size={18} />, roles: ['ADMIN', 'MANAGER', 'JUICER'] },
   { to: '/caixa', label: 'Caixa', icon: <CreditCard size={18} />, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
+  { to: '/motoboy', label: 'Motoboy', icon: <Bike size={18} />, roles: ['ADMIN', 'MANAGER', 'MOTOBOY'] },
   { to: '/produtos', label: 'Produtos', icon: <Package size={18} />, roles: ['ADMIN', 'MANAGER'] },
   { to: '/entregas', label: 'Entregas', icon: <Bike size={18} />, roles: ['ADMIN', 'MANAGER'] },
   { to: '/relatorios', label: 'Relatórios', icon: <BarChart3 size={18} />, roles: ['ADMIN', 'MANAGER'] },

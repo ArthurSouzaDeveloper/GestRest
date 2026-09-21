@@ -23,6 +23,7 @@ enum Role {
   JUICER // Suqueiro
   COOK // Cozinheiro
   CASHIER // Caixa
+  MOTOBOY // Só marca pedidos de entrega como entregues (fila compartilhada)
 }
 
 // Estação de produção: para onde o item é roteado

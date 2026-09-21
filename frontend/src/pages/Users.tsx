@@ -6,7 +6,7 @@ import { Card, Modal, PageHeader, Spinner } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import type { Role, User } from '../types';
 
-const ROLES: Role[] = ['ADMIN', 'MANAGER', 'WAITER', 'JUICER', 'COOK', 'CASHIER'];
+const ROLES: Role[] = ['ADMIN', 'MANAGER', 'WAITER', 'JUICER', 'COOK', 'CASHIER', 'MOTOBOY'];
 const ROLE_LABELS: Record<Role, string> = {
   SUPERADMIN: 'Super Admin',
   ADMIN: 'Administrador',
@@ -15,6 +15,7 @@ const ROLE_LABELS: Record<Role, string> = {
   JUICER: 'Suqueiro',
   COOK: 'Cozinheiro',
   CASHIER: 'Caixa',
+  MOTOBOY: 'Motoboy',
 };
 
 export default function Users() {

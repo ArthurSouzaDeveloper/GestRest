@@ -21,6 +21,7 @@ const ASSIGNABLE_ROLES: Role[] = [
   Role.JUICER,
   Role.COOK,
   Role.CASHIER,
+  Role.MOTOBOY,
 ];
 
 export const userService = {

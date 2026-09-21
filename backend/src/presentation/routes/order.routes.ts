@@ -23,14 +23,19 @@ const production = authorize(Role.JUICER, Role.COOK, Role.MANAGER, Role.ADMIN);
 // Cancelamento: tanto o garçom (corrige o próprio lançamento, com o serviço aplicando o
 // limite de "antes da cozinha começar") quanto o caixa (sem limite) podem acionar.
 const canCancel = authorize(Role.WAITER, Role.CASHIER, Role.MANAGER, Role.ADMIN);
-// Aceitar/entregar pedido online: mesmos papéis que veem a tela de Cozinha, onde
-// o painel de pedidos online mora.
+// Aceitar pedido online: mesmos papéis que veem a tela de Cozinha, onde o painel de
+// pedidos online mora. MOTOBOY fica de fora de propósito — só entra pedido já aceito e
+// pronto, não decide o que a cozinha vai preparar.
 const onlineOps = authorize(Role.COOK, Role.MANAGER, Role.ADMIN);
+// Marcar entrega como concluída: mesmos papéis de onlineOps + MOTOBOY, que só tem essa
+// ação (fila compartilhada — qualquer motoboy logado vê e marca qualquer entrega).
+const canDeliver = authorize(Role.COOK, Role.MANAGER, Role.ADMIN, Role.MOTOBOY);
 // Leitura de pedido completo (nome/telefone/endereço do cliente, pagamentos): só quem
 // de fato precisa desse detalhe. JUICER fica de fora — a tela de Suqueiros já tem sua
 // própria fila enxuta (production.routes.ts, só nome do cliente) e nunca chama estas
-// rotas; COOK entra porque o painel de pedidos online mora na tela de Cozinha.
-const orderRead = authorize(Role.WAITER, Role.CASHIER, Role.COOK, Role.MANAGER, Role.ADMIN);
+// rotas; COOK entra porque o painel de pedidos online mora na tela de Cozinha; MOTOBOY
+// entra porque a fila de entregas (Motoboy.tsx) é a mesma lista de pedidos filtrada.
+const orderRead = authorize(Role.WAITER, Role.CASHIER, Role.COOK, Role.MANAGER, Role.ADMIN, Role.MOTOBOY);
 
 router.get(
   '/',
@@ -128,7 +133,7 @@ router.post(
 
 router.post(
   '/:id/deliver',
-  onlineOps,
+  canDeliver,
   asyncHandler(async (req, res) => res.json(await paymentService.deliverOnline(req.params.id, ctx(req)))),
 );
 

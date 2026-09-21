@@ -10,6 +10,7 @@ import Tables from './pages/Tables';
 import Kitchen from './pages/Kitchen';
 import JuiceBar from './pages/JuiceBar';
 import Cashier from './pages/Cashier';
+import Motoboy from './pages/Motoboy';
 import Products from './pages/Products';
 import UsersPage from './pages/Users';
 import Reports from './pages/Reports';
@@ -47,6 +48,8 @@ function Home() {
       return <Navigate to="/caixa" replace />;
     case 'WAITER':
       return <Navigate to="/mesas" replace />;
+    case 'MOTOBOY':
+      return <Navigate to="/motoboy" replace />;
     default:
       return <Dashboard />;
   }
@@ -65,6 +68,7 @@ export default function App() {
       <Route path="/cozinha" element={<Protected roles={['ADMIN', 'MANAGER', 'COOK']}><Kitchen /></Protected>} />
       <Route path="/suqueiros" element={<Protected roles={['ADMIN', 'MANAGER', 'JUICER']}><JuiceBar /></Protected>} />
       <Route path="/caixa" element={<Protected roles={['ADMIN', 'MANAGER', 'CASHIER']}><Cashier /></Protected>} />
+      <Route path="/motoboy" element={<Protected roles={['ADMIN', 'MANAGER', 'MOTOBOY']}><Motoboy /></Protected>} />
       <Route path="/produtos" element={<Protected roles={['ADMIN', 'MANAGER']}><Products /></Protected>} />
       <Route path="/entregas" element={<Protected roles={['ADMIN', 'MANAGER']}><DeliveryZones /></Protected>} />
       <Route path="/relatorios" element={<Protected roles={['ADMIN', 'MANAGER']}><Reports /></Protected>} />

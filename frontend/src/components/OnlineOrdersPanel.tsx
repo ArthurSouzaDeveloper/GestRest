@@ -5,7 +5,7 @@ import api, { apiError } from '../lib/api';
 import { brl, time } from '../lib/format';
 import { Card, ProductionBadge, orderTypeLabels, paymentMethodLabels } from './ui';
 import { useRealtime } from '../hooks/useRealtime';
-import type { Order } from '../types';
+import type { Order, OrderType } from '../types';
 
 const QUERY_KEYS: ['online-orders-delivery', 'online-orders-pickup'] = ['online-orders-delivery', 'online-orders-pickup'];
 
@@ -14,8 +14,25 @@ const QUERY_KEYS: ['online-orders-delivery', 'online-orders-pickup'] = ['online-
  * a equipe já usa aquela fila pra comandas de mesa, e nada lá muda. Fica aqui, no topo,
  * até o dia em que o resto do sistema de gestão for implementado e as duas visões
  * puderem ser unificadas.
+ *
+ * Reaproveitado pela tela do Motoboy (Motoboy.tsx): mesma lista/ação de "Marcar
+ * Entregue", só filtrando pra DELIVERY e escondendo "Aceitar Pedido" (motoboy não decide
+ * o que a cozinha prepara, só retira o que já está pronto).
  */
-export function OnlineOrdersPanel() {
+export function OnlineOrdersPanel({
+  orderTypes = ['DELIVERY', 'PICKUP'],
+  canAccept = true,
+  title = 'Pedidos Online',
+  emptyMessage,
+}: {
+  orderTypes?: OrderType[];
+  canAccept?: boolean;
+  title?: string;
+  /** Quando a lista está vazia: por padrão o painel some (faz sentido dentro da tela da
+   * Cozinha, que tem outras coisas pra mostrar); numa tela dedicada (Motoboy.tsx) fica
+   * em branco sem isso — passe uma mensagem pra mostrar um estado vazio de verdade. */
+  emptyMessage?: string;
+} = {}) {
   useRealtime(['cashier', 'floor'], [[QUERY_KEYS[0]], [QUERY_KEYS[1]]]);
   const qc = useQueryClient();
   const [error, setError] = useState('');
@@ -24,15 +41,17 @@ export function OnlineOrdersPanel() {
     queryKey: [QUERY_KEYS[0]],
     queryFn: async () => (await api.get<Order[]>('/orders', { params: { orderType: 'DELIVERY' } })).data,
     refetchInterval: 10000,
+    enabled: orderTypes.includes('DELIVERY'),
   });
   const { data: pickupOrders = [] } = useQuery({
     queryKey: [QUERY_KEYS[1]],
     queryFn: async () => (await api.get<Order[]>('/orders', { params: { orderType: 'PICKUP' } })).data,
     refetchInterval: 10000,
+    enabled: orderTypes.includes('PICKUP'),
   });
 
   const orders = [...deliveryOrders, ...pickupOrders].filter(
-    (o) => o.status !== 'PAID' && o.status !== 'CANCELLED',
+    (o) => o.status !== 'PAID' && o.status !== 'CANCELLED' && (canAccept || o.status !== 'PENDING'),
   );
   const pending = orders.filter((o) => o.status === 'PENDING');
   const active = orders.filter((o) => o.status !== 'PENDING');
@@ -53,14 +72,17 @@ export function OnlineOrdersPanel() {
     onError: (e) => setError(apiError(e)),
   });
 
-  if (orders.length === 0) return null;
+  if (orders.length === 0) {
+    if (!emptyMessage) return null;
+    return <p className="py-10 text-center text-sm text-gray-400">{emptyMessage}</p>;
+  }
 
   return (
     <div className="mb-6">
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Pedidos Online</h2>
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">{title}</h2>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {pending.map((o) => (
+        {canAccept && pending.map((o) => (
           <OnlineOrderCard key={o.id} order={o} action={{ label: 'Aceitar Pedido', pending: accept.isPending, onClick: () => accept.mutate(o.id) }} />
         ))}
         {active.map((o) => (

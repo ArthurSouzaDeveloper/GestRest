@@ -1,4 +1,4 @@
-export type Role = 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'WAITER' | 'JUICER' | 'COOK' | 'CASHIER';
+export type Role = 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'WAITER' | 'JUICER' | 'COOK' | 'CASHIER' | 'MOTOBOY';
 
 export interface RestaurantRef {
   id: string;
