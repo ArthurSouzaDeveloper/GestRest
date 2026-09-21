@@ -2,7 +2,23 @@ import { Prisma, Station } from '@prisma/client';
 import { renderTicket, type TicketItem } from './escpos.helpers';
 import { itemDisplayName } from './order.helpers';
 
-type CreatedOrderItem = Prisma.OrderItemGetPayload<{ include: { product: true; additionals: true } }>;
+type CreatedOrderItem = Prisma.OrderItemGetPayload<{
+  include: { product: { include: { category: true } }; additionals: true };
+}>;
+
+/**
+ * Nomes de categoria de hoje (ver import-menu-rei-do-suco.ts) -> tipo do prato pra
+ * mostrar no ticket, pedido explícito do cliente (ex.: "1x Pastel - Mussarela"). Uma
+ * categoria fora dessa lista (ex.: "Sucos") não ganha prefixo — mostrar "SUCOS" no
+ * ticket de suco já foi removido a pedido do próprio cliente antes.
+ */
+const CATEGORY_TYPE_LABEL: Record<string, string> = {
+  'Pastéis Salgados': 'Pastel',
+  'Pastéis Doces': 'Pastel',
+  'Mini Pizza Salgada': 'Mini Pizza',
+  'Mini Pizza Doce': 'Mini Pizza',
+  Porções: 'Porção',
+};
 
 /**
  * Gera um trabalho de impressão por estação tocada, sempre que itens ficam
@@ -57,6 +73,7 @@ export const printJobService = {
     for (const [station, stationItems] of byStation) {
       const ticketItems: TicketItem[] = stationItems.map((item) => ({
         name: itemDisplayName(item.product.name, item.comboLabel),
+        typeLabel: CATEGORY_TYPE_LABEL[item.product.category.name] ?? null,
         description: item.product.description,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),

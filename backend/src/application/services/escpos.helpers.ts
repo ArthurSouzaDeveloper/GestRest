@@ -27,6 +27,12 @@ const ORDER_TYPE_LABEL: Record<OrderType, string> = {
 
 export interface TicketItem {
   name: string;
+  /** "Pastel", "Mini Pizza" ou "Porção" — pedido do cliente pra distinguir o tipo do
+   * prato de cara no ticket (ex.: "1x Pastel - Mussarela"), sem reintroduzir a categoria
+   * crua do produto na impressão (a soletrada "SUCOS" nos tickets de suco, removida a
+   * pedido do próprio cliente, continua fora — ver printJob.service.ts). null/undefined
+   * não imprime prefixo nenhum. */
+  typeLabel?: string | null;
   quantity: number;
   /** Descrição do produto do cardápio (ex.: "Frango, geleia de pimenta, bacon, queijo e
    * cream cheese.") — nem todo produto tem uma cadastrada. */
@@ -117,9 +123,11 @@ export function renderTicket(input: TicketInput): Buffer {
   parts.push(line('--------------------------------'));
 
   for (const item of input.items) {
-    // Pedido do dono do restaurante: só nome, quantidade, descrição e valor — sem
-    // categoria nenhuma (nem cozinha, nem suqueiros).
-    parts.push(BOLD_ON, line(`${item.quantity}x ${item.name}`), BOLD_OFF);
+    // Pedido do dono do restaurante: nome, quantidade, descrição e valor — sem a
+    // categoria crua do produto (nem cozinha, nem suqueiros), só o tipo do prato
+    // (pastel/mini pizza/porção) quando informado, prefixado ao nome do sabor.
+    const label = item.typeLabel ? `${item.typeLabel} - ${item.name}` : item.name;
+    parts.push(BOLD_ON, line(`${item.quantity}x ${label}`), BOLD_OFF);
     if (item.description) parts.push(line(`  ${item.description}`));
     parts.push(line(`  ${formatCurrency(item.unitPrice)} / un.`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));

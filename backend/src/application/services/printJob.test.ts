@@ -96,6 +96,52 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).not.toContain('[');
   });
 
+  it('prefixa o tipo do prato no ticket (Pastel/Mini Pizza/Porção) conforme a categoria, mas nunca em suco', async () => {
+    const pasteisSalgados = await prisma.category.create({
+      data: { name: 'Pastéis Salgados', station: Station.KITCHEN, restaurantId },
+    });
+    const miniPizzaSalgada = await prisma.category.create({
+      data: { name: 'Mini Pizza Salgada', station: Station.KITCHEN, restaurantId },
+    });
+    const porcoes = await prisma.category.create({
+      data: { name: 'Porções', station: Station.KITCHEN, restaurantId },
+    });
+    const pastel = await prisma.product.create({
+      data: { name: 'Mussarela', price: 14.5, categoryId: pasteisSalgados.id, restaurantId },
+    });
+    const miniPizza = await prisma.product.create({
+      data: { name: 'Calabresa', price: 16, categoryId: miniPizzaSalgada.id, restaurantId },
+    });
+    const porcao = await prisma.product.create({
+      data: { name: 'Batata Frita', price: 22, categoryId: porcoes.id, restaurantId },
+    });
+
+    const table = await prisma.restaurantTable.create({ data: { number: 511, restaurantId } });
+    const order = await orderService.open({ tableId: table.id }, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
+    await orderService.addItems(
+      order!.id,
+      [
+        { productId: pastel.id, quantity: 1 },
+        { productId: miniPizza.id, quantity: 1 },
+        { productId: porcao.id, quantity: 1 },
+        { productId: juiceProductId, quantity: 1 },
+      ],
+      { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
+    );
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order!.id } });
+    const kitchenText = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
+    const juiceText = jobs.find((j) => j.station === Station.JUICE_BAR)!.payload.toString('ascii');
+
+    expect(kitchenText).toContain('1x Pastel - Mussarela');
+    expect(kitchenText).toContain('1x Mini Pizza - Calabresa');
+    expect(kitchenText).toContain('1x Porcao - Batata Frita');
+    // "Sucos" (categoria do juiceProductId, ver beforeAll) não está no mapeamento —
+    // continua sem prefixo nenhum, como já era antes desta mudança.
+    expect(juiceText).toContain('1x Suco');
+    expect(juiceText).not.toContain('Sucos - Suco');
+  });
+
   it('aceite manual de pedido online gera o PrintJob no momento do aceite, não antes', async () => {
     await autoAcceptService.update(restaurantId, { enabled: false });
     const order = await orderService.openPublic(restaurantId, {

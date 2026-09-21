@@ -264,6 +264,30 @@ describe('renderTicket', () => {
     expect(text).not.toMatch(/[^\x00-\x7F]/);
   });
 
+  it('prefixa o tipo do prato (pastel/mini pizza/porção) quando informado, mas não inventa um pra quem não tem', () => {
+    const bytes = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: 4,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 9,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [
+        { name: 'Mussarela', typeLabel: 'Pastel', description: null, unitPrice: 10, quantity: 1, additionals: [] },
+        { name: 'Calabresa', typeLabel: 'Mini Pizza', description: null, unitPrice: 12, quantity: 2, additionals: [] },
+        { name: 'Batata Frita', typeLabel: 'Porção', description: null, unitPrice: 18, quantity: 1, additionals: [] },
+        { name: 'Suco de Laranja', typeLabel: null, description: null, unitPrice: 8, quantity: 1, additionals: [] },
+      ],
+    }).toString('ascii');
+    expect(bytes).toContain('1x Pastel - Mussarela');
+    expect(bytes).toContain('2x Mini Pizza - Calabresa');
+    expect(bytes).toContain('1x Porcao - Batata Frita');
+    expect(bytes).toContain('1x Suco de Laranja');
+    expect(bytes).not.toContain('null - Suco de Laranja');
+  });
+
   it('marca a 2a via com destaque quando copyLabel é passado; não marca nada quando ausente', () => {
     const semVia = renderTicket({
       station: Station.KITCHEN,
