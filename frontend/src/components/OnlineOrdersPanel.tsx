@@ -24,6 +24,7 @@ export function OnlineOrdersPanel({
   canAccept = true,
   title = 'Pedidos Online',
   emptyMessage,
+  defaultTab = 'preparing',
 }: {
   orderTypes?: OrderType[];
   canAccept?: boolean;
@@ -32,10 +33,14 @@ export function OnlineOrdersPanel({
    * Cozinha, que tem outras coisas pra mostrar); numa tela dedicada (Motoboy.tsx) fica
    * em branco sem isso — passe uma mensagem pra mostrar um estado vazio de verdade. */
   emptyMessage?: string;
+  /** Motoboy.tsx abre direto em "Prontos" — é a fila que ele realmente usa; a Cozinha
+   * abre em "Em preparo", o que está sendo cozinhado agora. */
+  defaultTab?: 'preparing' | 'ready';
 } = {}) {
   useRealtime(['cashier', 'floor'], [[QUERY_KEYS[0]], [QUERY_KEYS[1]]]);
   const qc = useQueryClient();
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<'preparing' | 'ready'>(defaultTab);
 
   const { data: deliveryOrders = [] } = useQuery({
     queryKey: [QUERY_KEYS[0]],
@@ -54,7 +59,12 @@ export function OnlineOrdersPanel({
     (o) => o.status !== 'PAID' && o.status !== 'CANCELLED' && (canAccept || o.status !== 'PENDING'),
   );
   const pending = orders.filter((o) => o.status === 'PENDING');
-  const active = orders.filter((o) => o.status !== 'PENDING');
+  // "Em preparo" (pendente de aceite + em produção) fica separado de "Prontos" (todos os
+  // itens concluídos, só falta entregar/retirar) — antes ficavam todos juntos na mesma
+  // lista, e um pedido pronto há um tempo (só esperando alguém marcar como entregue)
+  // atrapalhava a visão de quem só quer ver o que ainda está sendo preparado.
+  const preparing = orders.filter((o) => o.status === 'OPEN' || o.status === 'IN_PRODUCTION');
+  const ready = orders.filter((o) => o.status === 'READY_FOR_PAYMENT');
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: [QUERY_KEYS[0]] });
@@ -77,31 +87,54 @@ export function OnlineOrdersPanel({
     return <p className="py-10 text-center text-sm text-gray-400">{emptyMessage}</p>;
   }
 
+  const preparingCount = pending.length + preparing.length;
+
   return (
     <div className="mb-6">
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">{title}</h2>
+
+      <div className="mb-3 flex gap-2">
+        <button
+          className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'preparing' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+          onClick={() => setTab('preparing')}
+        >
+          Em preparo{preparingCount > 0 ? ` (${preparingCount})` : ''}
+        </button>
+        <button
+          className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'ready' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+          onClick={() => setTab('ready')}
+        >
+          Prontos{ready.length > 0 ? ` (${ready.length})` : ''}
+        </button>
+      </div>
+
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+
+      {tab === 'preparing' && preparingCount === 0 && (
+        <p className="py-6 text-center text-sm text-gray-400">Nenhum pedido em preparo no momento.</p>
+      )}
+      {tab === 'ready' && ready.length === 0 && (
+        <p className="py-6 text-center text-sm text-gray-400">Nenhum pedido pronto no momento.</p>
+      )}
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {canAccept && pending.map((o) => (
+        {tab === 'preparing' && canAccept && pending.map((o) => (
           <OnlineOrderCard key={o.id} order={o} action={{ label: 'Aceitar Pedido', pending: accept.isPending, onClick: () => accept.mutate(o.id) }} />
         ))}
-        {active.map((o) => (
+        {tab === 'preparing' && preparing.map((o) => <OnlineOrderCard key={o.id} order={o} />)}
+        {tab === 'ready' && ready.map((o) => (
           <OnlineOrderCard
             key={o.id}
             order={o}
-            action={
-              o.status === 'READY_FOR_PAYMENT'
-                ? {
-                    label: 'Marcar Entregue',
-                    pending: deliver.isPending,
-                    onClick: () => {
-                      if (window.confirm(`Confirmar entrega do pedido #${o.number}? Isso registra o pagamento (${o.declaredPaymentMethod ? paymentMethodLabels[o.declaredPaymentMethod] : '—'}).`)) {
-                        deliver.mutate(o.id);
-                      }
-                    },
-                  }
-                : undefined
-            }
+            action={{
+              label: 'Marcar Entregue',
+              pending: deliver.isPending,
+              onClick: () => {
+                if (window.confirm(`Confirmar entrega do pedido #${o.number}? Isso registra o pagamento (${o.declaredPaymentMethod ? paymentMethodLabels[o.declaredPaymentMethod] : '—'}).`)) {
+                  deliver.mutate(o.id);
+                }
+              },
+            }}
           />
         ))}
       </div>

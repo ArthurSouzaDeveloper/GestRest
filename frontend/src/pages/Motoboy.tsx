@@ -13,8 +13,9 @@ export default function Motoboy() {
       <OnlineOrdersPanel
         orderTypes={['DELIVERY']}
         canAccept={false}
-        title="Prontos para sair / a caminho"
+        title="Pedidos de entrega"
         emptyMessage="Nenhuma entrega pendente no momento."
+        defaultTab="ready"
       />
     </div>
   );
