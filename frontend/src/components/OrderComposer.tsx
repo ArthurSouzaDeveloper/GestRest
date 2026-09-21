@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda } from 'lucide-react';
 import api from '../lib/api';
@@ -129,7 +129,9 @@ export function OrderComposer({
   basePath?: string;
 }) {
   const [topGroup, setTopGroup] = useState<TopGroup>('COMIDAS');
-  const [activeCat, setActiveCat] = useState<string>('all');
+  // Sem valor inicial fixo: o efeito abaixo escolhe a primeira categoria assim que a
+  // lista carrega (ver nota ali sobre por que não existe mais "Todos").
+  const [activeCat, setActiveCat] = useState<string>('');
   const [search, setSearch] = useState('');
   // index: qual linha do draft o modal edita; null = criar uma linha nova ao salvar
   // (usado pelos montáveis, que podem ter várias linhas distintas do mesmo produto).
@@ -181,6 +183,17 @@ export function OrderComposer({
     return chips;
   }, [topGroup, groupProducts, categories, sucosCategoryId, categoriesById]);
   const showChipRow = topGroup === 'COMIDAS' ? groupChips.length > 1 : groupChips.length > 0;
+
+  // Não existe mais "Todos": misturar categorias diferentes na mesma lista deixava fácil
+  // adicionar o produto errado sem perceber quando duas categorias tinham um sabor de
+  // mesmo nome (ex.: "Mussarela" no pastel e na mini pizza) — o pedido saía com o tipo de
+  // prato errado (ou nenhum) na impressão. Por isso sempre tem que existir uma categoria
+  // de verdade selecionada; este efeito garante isso assim que a lista carrega ou quando
+  // a categoria ativa deixa de existir na aba atual (ex.: trocou de Comidas pra Bebidas).
+  useEffect(() => {
+    if (groupChips.length === 0) return;
+    if (!groupChips.some((c) => c.key === activeCat)) setActiveCat(groupChips[0].key);
+  }, [groupChips, activeCat]);
 
   // Buscando: procura em TODOS os produtos (qualquer aba) por nome ou descrição.
   // Sem busca: filtra pela aba selecionada e, dentro dela, pelo chip escolhido (categoria
@@ -278,35 +291,30 @@ export function OrderComposer({
             <div className="mb-2 grid grid-cols-2 gap-2">
               <button
                 className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
-                onClick={() => { setTopGroup('COMIDAS'); setActiveCat('all'); }}
+                onClick={() => setTopGroup('COMIDAS')}
               >
                 <Utensils size={15} className="shrink-0" /> Pastéis e Mini Pizzas
               </button>
               <button
                 className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
-                onClick={() => { setTopGroup('BEBIDAS'); setActiveCat(sucosCategoryId ?? 'all'); }}
+                onClick={() => setTopGroup('BEBIDAS')}
               >
                 <CupSoda size={15} className="shrink-0" /> Sucos e Bebidas
               </button>
             </div>
 
-            {/* Sub-filtro dentro do grupo. Em Comidas tem "Todos" (categorias pequenas, faz
-                sentido ver junto); em Sucos e Bebidas não tem "Todos" — Sucos já domina o
-                grupo, então misturar tudo só deixa a lista maior sem ajudar. */}
+            {/* Sub-filtro dentro do grupo — sempre uma categoria de verdade, nunca "Todos"
+                (ver o efeito que garante isso acima): misturar categorias diferentes na
+                mesma lista arriscava adicionar o produto errado quando duas categorias têm
+                sabor de mesmo nome. Fileira única com scroll horizontal em vez de quebrar
+                linha — com várias categorias, quebrar linha empurrava a lista de produtos
+                pra baixo, e ficava difícil ver todas as opções de cara. */}
             {showChipRow && (
-              <div className="mb-2 flex flex-wrap gap-2">
-                {topGroup === 'COMIDAS' && (
-                  <button
-                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === 'all' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
-                    onClick={() => setActiveCat('all')}
-                  >
-                    Todos
-                  </button>
-                )}
+              <div className="mb-2 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {groupChips.map((chip) => (
                   <button
                     key={chip.key}
-                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                    className={`h-9 shrink-0 whitespace-nowrap rounded-full px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                     onClick={() => setActiveCat(chip.key)}
                   >
                     {chip.label}
