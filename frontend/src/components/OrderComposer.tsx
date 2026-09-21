@@ -343,7 +343,13 @@ export function OrderComposer({
                   className="flex cursor-pointer items-center gap-3 border-b border-gray-100 py-3.5 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
                 >
                   <div className="min-w-0 flex-1">
-                    {searching && (
+                    {/* Fora da busca, o rótulo de categoria só é necessário na aba "Todos"
+                        (activeCat === 'all') — dentro de uma categoria específica já dá pra
+                        saber o que é o item, e mostrar de novo seria ruído. Sem isso, dois
+                        produtos de mesmo nome em categorias diferentes (ex.: "Mussarela" no
+                        pastel e na mini pizza) ficavam indistinguíveis em "Todos", e dava pra
+                        adicionar o item errado sem perceber. */}
+                    {(searching || activeCat === 'all') && (
                       <span className="mb-0.5 block w-fit rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800">
                         {productBadgeLabel(p)}
                       </span>

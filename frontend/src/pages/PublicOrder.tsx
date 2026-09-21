@@ -16,6 +16,9 @@ import {
   MessageCircle,
   MapPin,
   Loader2,
+  Bike,
+  Store,
+  CheckCircle2,
 } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
@@ -1132,66 +1135,83 @@ function CartStep({
     <div className="space-y-4">
       <EtaNote eta={eta} />
 
+      {orderKind && (
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-brand-100 px-3 py-1.5 text-[11.5px] font-bold text-brand">
+          {orderKind === 'DELIVERY' ? <Bike size={13} /> : <Store size={13} />}
+          {orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada no balcão'}
+        </div>
+      )}
+
+      <h2 className="text-[11px] font-bold uppercase tracking-wide text-[#9AA0AC]">Itens do pedido</h2>
+
       {draft.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">Seu carrinho está vazio.</p>
       ) : (
-        <div>
+        <div className="space-y-2.5">
           {draft.map((item, i) => (
-            <div key={i} className="flex items-start justify-between gap-2.5 border-b border-[#14161C]/[0.08] py-3 last:border-b-0">
-              <span className="w-6 shrink-0 text-[12.5px] font-extrabold text-brand">{item.quantity}×</span>
-              <div className="flex-1">
-                <div className="text-[13px] font-bold text-[#14161C]">{item.comboLabel ?? item.product.name}</div>
-                {item.notes && <div className="mt-0.5 text-[10.5px] text-[#5A6072]">{item.notes}</div>}
-                {item.additionalIds.length > 0 && (
-                  <div className="mt-0.5 text-[10.5px] text-[#5A6072]">+ {item.additionalIds.length} adicional(is)</div>
-                )}
-                <div className="mt-1.5 flex items-center gap-2">
-                  <button
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[#14161C]/15 text-[#14161C]"
-                    onClick={() => {
-                      const next = [...draft];
-                      if (next[i].quantity > 1) next[i] = { ...next[i], quantity: next[i].quantity - 1 };
-                      else next.splice(i, 1);
-                      setDraft(next);
-                    }}
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <button
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[#14161C]/15 text-[#14161C]"
-                    onClick={() => {
-                      const next = [...draft];
-                      next[i] = { ...next[i], quantity: next[i].quantity + 1 };
-                      setDraft(next);
-                    }}
-                  >
-                    <Plus size={12} />
-                  </button>
-                  <button className="text-red-500" onClick={() => setDraft(draft.filter((_, j) => j !== i))}>
-                    <X size={14} />
-                  </button>
+            <div key={i} className={`${CARD} p-3.5 shadow-sm`}>
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="min-w-0">
+                  <div className="text-[13.5px] font-bold text-[#14161C]">{item.comboLabel ?? item.product.name}</div>
+                  <div className="mt-0.5 text-[11px] text-[#5A6072]">{brl(draftItemUnitPrice(item))} cada</div>
+                  {item.notes && <div className="mt-0.5 text-[10.5px] text-[#5A6072]">{item.notes}</div>}
+                  {item.additionalIds.length > 0 && (
+                    <div className="mt-0.5 text-[10.5px] text-[#5A6072]">+ {item.additionalIds.length} adicional(is)</div>
+                  )}
                 </div>
+                <span className="shrink-0 text-[13.5px] font-extrabold tabular-nums text-[#14161C]">
+                  {brl(draftItemUnitPrice(item) * item.quantity)}
+                </span>
               </div>
-              <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-[#14161C]">
-                {brl(draftItemUnitPrice(item) * item.quantity)}
-              </span>
+              <div className="mt-2.5 flex items-center justify-end gap-2.5">
+                <button
+                  className="flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-brand text-brand"
+                  onClick={() => {
+                    const next = [...draft];
+                    if (next[i].quantity > 1) next[i] = { ...next[i], quantity: next[i].quantity - 1 };
+                    else next.splice(i, 1);
+                    setDraft(next);
+                  }}
+                >
+                  <Minus size={13} />
+                </button>
+                <span className="min-w-[16px] text-center text-[13px] font-extrabold text-[#14161C]">{item.quantity}</span>
+                <button
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-white"
+                  onClick={() => {
+                    const next = [...draft];
+                    next[i] = { ...next[i], quantity: next[i].quantity + 1 };
+                    setDraft(next);
+                  }}
+                >
+                  <Plus size={13} />
+                </button>
+                <button className="ml-1 text-red-500" onClick={() => setDraft(draft.filter((_, j) => j !== i))}>
+                  <X size={15} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      <div className="mt-2 border-t-2 border-[#14161C]/[0.12] pt-3.5">
+      <div className={`${CARD} p-3.5 shadow-sm`}>
         <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
           <span>Subtotal</span>
           <span>{brl(subtotal)}</span>
         </div>
+        {orderKind === 'PICKUP' && (
+          <div className="flex items-center gap-1.5 py-1 text-[11.5px] font-semibold text-green-600">
+            <CheckCircle2 size={13} /> Retirada no balcão — sem taxa de entrega
+          </div>
+        )}
         {orderKind === 'DELIVERY' && (
           <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
             <span>Taxa de entrega{deliveryZoneName ? ` · ${deliveryZoneName}` : ''}</span>
             <span>{brl(deliveryFee)}</span>
           </div>
         )}
-        <div className="flex justify-between pt-2 text-[15.5px] font-extrabold text-[#14161C]">
+        <div className="mt-1.5 flex justify-between border-t-2 border-[#14161C]/[0.1] pt-2.5 text-[15.5px] font-extrabold text-[#14161C]">
           <span>Total</span>
           <span>{brl(total)}</span>
         </div>
@@ -1243,6 +1263,15 @@ function PaymentStep({
           </button>
         ))}
       </div>
+
+      {paymentMethod === 'PIX' && (
+        <div className={`${CARD} mt-4 p-3.5`}>
+          <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-[#5A6072]">Pagamento via PIX</div>
+          <p className="text-[11.5px] leading-[1.5] text-[#5A6072]">
+            A chave PIX aparece na tela de revisão, antes de confirmar.
+          </p>
+        </div>
+      )}
 
       {needsChange && (
         <div className="mt-4">
