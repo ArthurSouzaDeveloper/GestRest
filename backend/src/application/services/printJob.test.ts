@@ -96,21 +96,37 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).not.toContain('[');
   });
 
-  it('prefixa o tipo do prato no ticket (Pastel/Mini Pizza/Porção) conforme a categoria, mas nunca em suco', async () => {
+  it('prefixa o tipo do prato no ticket (Pastel/Mini Pizza/Porção, com salgado/doce) conforme a categoria, mas nunca em suco', async () => {
+    // Nomes de categoria propositalmente "não-canônicos" (singular, sem acento, ordem
+    // diferente) — a regra bate por conteúdo (contém "pastel"/"mini pizza"/"porção" +
+    // "doce"/"salgado"), não por string exata, então renomear a categoria no cardápio do
+    // restaurante (como aconteceu de verdade em produção) não quebra o prefixo.
     const pasteisSalgados = await prisma.category.create({
-      data: { name: 'Pastéis Salgados', station: Station.KITCHEN, restaurantId },
+      data: { name: 'Pastel Salgado', station: Station.KITCHEN, restaurantId },
+    });
+    const pasteisDoces = await prisma.category.create({
+      data: { name: 'PASTEIS DOCES', station: Station.KITCHEN, restaurantId },
     });
     const miniPizzaSalgada = await prisma.category.create({
       data: { name: 'Mini Pizza Salgada', station: Station.KITCHEN, restaurantId },
     });
+    const miniPizzaDoce = await prisma.category.create({
+      data: { name: 'Mini Pizza Doce', station: Station.KITCHEN, restaurantId },
+    });
     const porcoes = await prisma.category.create({
       data: { name: 'Porções', station: Station.KITCHEN, restaurantId },
     });
-    const pastel = await prisma.product.create({
+    const pastelSalgado = await prisma.product.create({
       data: { name: 'Mussarela', price: 14.5, categoryId: pasteisSalgados.id, restaurantId },
     });
-    const miniPizza = await prisma.product.create({
+    const pastelDoce = await prisma.product.create({
+      data: { name: 'Chocolate', price: 15, categoryId: pasteisDoces.id, restaurantId },
+    });
+    const miniPizzaSalgadaProduto = await prisma.product.create({
       data: { name: 'Calabresa', price: 16, categoryId: miniPizzaSalgada.id, restaurantId },
+    });
+    const miniPizzaDoceProduto = await prisma.product.create({
+      data: { name: 'Banana com Canela', price: 16, categoryId: miniPizzaDoce.id, restaurantId },
     });
     const porcao = await prisma.product.create({
       data: { name: 'Batata Frita', price: 22, categoryId: porcoes.id, restaurantId },
@@ -121,8 +137,10 @@ describe('fila de impressão térmica (PrintJob)', () => {
     await orderService.addItems(
       order!.id,
       [
-        { productId: pastel.id, quantity: 1 },
-        { productId: miniPizza.id, quantity: 1 },
+        { productId: pastelSalgado.id, quantity: 1 },
+        { productId: pastelDoce.id, quantity: 1 },
+        { productId: miniPizzaSalgadaProduto.id, quantity: 1 },
+        { productId: miniPizzaDoceProduto.id, quantity: 1 },
         { productId: porcao.id, quantity: 1 },
         { productId: juiceProductId, quantity: 1 },
       ],
@@ -133,11 +151,13 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const kitchenText = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
     const juiceText = jobs.find((j) => j.station === Station.JUICE_BAR)!.payload.toString('ascii');
 
-    expect(kitchenText).toContain('1x Pastel - Mussarela');
-    expect(kitchenText).toContain('1x Mini Pizza - Calabresa');
+    expect(kitchenText).toContain('1x Pastel Salgado - Mussarela');
+    expect(kitchenText).toContain('1x Pastel Doce - Chocolate');
+    expect(kitchenText).toContain('1x Mini Pizza Salgada - Calabresa');
+    expect(kitchenText).toContain('1x Mini Pizza Doce - Banana com Canela');
     expect(kitchenText).toContain('1x Porcao - Batata Frita');
-    // "Sucos" (categoria do juiceProductId, ver beforeAll) não está no mapeamento —
-    // continua sem prefixo nenhum, como já era antes desta mudança.
+    // "Sucos" (categoria do juiceProductId, ver beforeAll) não bate em nenhuma das 3
+    // famílias — continua sem prefixo nenhum, como já era antes desta mudança.
     expect(juiceText).toContain('1x Suco');
     expect(juiceText).not.toContain('Sucos - Suco');
   });

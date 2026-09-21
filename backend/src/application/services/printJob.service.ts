@@ -7,18 +7,27 @@ type CreatedOrderItem = Prisma.OrderItemGetPayload<{
 }>;
 
 /**
- * Nomes de categoria de hoje (ver import-menu-rei-do-suco.ts) -> tipo do prato pra
- * mostrar no ticket, pedido explícito do cliente (ex.: "1x Pastel - Mussarela"). Uma
- * categoria fora dessa lista (ex.: "Sucos") não ganha prefixo — mostrar "SUCOS" no
- * ticket de suco já foi removido a pedido do próprio cliente antes.
+ * Deriva o tipo do prato pro ticket a partir do NOME da categoria (contém "pastel"/
+ * "mini pizza"/"porção" + "doce"/"salgad[o|a]"?), em vez de bater a string inteira e
+ * exata — "Pastéis Salgados", "Pastel salgado", "MINI PIZZA Doce" etc. caem todos na
+ * mesma regra, sem acento/maiúscula importar nem quebrar silenciosamente se a categoria
+ * for renomeada no cardápio (foi exatamente isso que aconteceu: o mapeamento por nome
+ * exato antigo não bateu com a categoria real de pastel em produção). Pedido explícito
+ * do cliente pra mostrar salgado/doce também (ex.: "1x Pastel Salgado - Mussarela").
+ * Categoria fora dessas 3 famílias (ex.: "Sucos") não ganha prefixo nenhum — mostrar
+ * "SUCOS" no ticket de suco já foi removido a pedido do próprio cliente antes.
  */
-const CATEGORY_TYPE_LABEL: Record<string, string> = {
-  'Pastéis Salgados': 'Pastel',
-  'Pastéis Doces': 'Pastel',
-  'Mini Pizza Salgada': 'Mini Pizza',
-  'Mini Pizza Doce': 'Mini Pizza',
-  Porções: 'Porção',
-};
+function categoryTypeLabel(categoryName: string): string | null {
+  const name = categoryName
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+  const isDoce = name.includes('doce');
+  if (name.includes('mini pizza')) return isDoce ? 'Mini Pizza Doce' : 'Mini Pizza Salgada';
+  if (name.includes('pastel') || name.includes('pasteis')) return isDoce ? 'Pastel Doce' : 'Pastel Salgado';
+  if (name.includes('porcao') || name.includes('porcoes')) return 'Porção';
+  return null;
+}
 
 /**
  * Gera um trabalho de impressão por estação tocada, sempre que itens ficam
@@ -73,7 +82,7 @@ export const printJobService = {
     for (const [station, stationItems] of byStation) {
       const ticketItems: TicketItem[] = stationItems.map((item) => ({
         name: itemDisplayName(item.product.name, item.comboLabel),
-        typeLabel: CATEGORY_TYPE_LABEL[item.product.category.name] ?? null,
+        typeLabel: categoryTypeLabel(item.product.category.name),
         description: item.product.description,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
