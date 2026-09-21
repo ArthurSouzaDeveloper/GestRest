@@ -297,7 +297,7 @@ export function OrderComposer({
               <div className="mb-2 flex flex-wrap gap-2">
                 {topGroup === 'COMIDAS' && (
                   <button
-                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === 'all' ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
+                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === 'all' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                     onClick={() => setActiveCat('all')}
                   >
                     Todos
@@ -306,7 +306,7 @@ export function OrderComposer({
                 {groupChips.map((chip) => (
                   <button
                     key={chip.key}
-                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'bg-brand text-white' : 'border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'}`}
+                    className={`h-9 rounded-full px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                     onClick={() => setActiveCat(chip.key)}
                   >
                     {chip.label}
