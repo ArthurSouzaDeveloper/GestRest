@@ -78,10 +78,12 @@ export const printJobService = {
         data: { restaurantId: tenantId, orderId, station, payload: renderTicket(baseTicket) },
       });
 
-      // Entrega/retirada sai em 2 vias — o motoboy/cliente leva uma anexada ao pedido,
-      // a outra fica no restaurante como comprovante (pedido explícito do dono do
-      // restaurante). Mesa não duplica: quem prepara e quem serve estão no mesmo lugar.
-      if (order.orderType !== 'DINE_IN') {
+      // Só entrega sai em 2 vias — o motoboy leva uma anexada ao pedido, a outra fica no
+      // restaurante como comprovante (pedido explícito do dono do restaurante). Mesa não
+      // duplica (quem prepara e quem serve estão no mesmo lugar) e retirada também não
+      // duplica mais — o próprio cliente vem buscar, não precisa de via extra pra ninguém
+      // levar junto.
+      if (order.orderType === 'DELIVERY') {
         await tx.printJob.create({
           data: {
             restaurantId: tenantId,
