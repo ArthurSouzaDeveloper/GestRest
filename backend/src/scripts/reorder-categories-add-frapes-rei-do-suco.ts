@@ -1,17 +1,21 @@
 /**
  * Duas mudanças de cardápio pedidas pelo cliente:
  *
- * 1. Reordena as categorias de comida: Pastéis Salgados, Pastéis Doces, Mini Pizza
- *    Salgada, Mini Pizza Doce, Porções, Sugestões da Casa (nessa ordem) — a ordem de
- *    hoje (Porções, Pastéis Salgados, Sugestões da Casa, Pastéis Doces, Mini Pizza
- *    Salgada, Mini Pizza Doce) vem de import-menu-rei-do-suco.ts.
+ * 1. Reordena as categorias de comida: Sugestões da Casa primeiro, depois Pastéis
+ *    Salgados, Pastéis Doces, Mini Pizza Salgada, Mini Pizza Doce, Porções (nessa
+ *    ordem) — a ordem original (Porções, Pastéis Salgados, Sugestões da Casa, Pastéis
+ *    Doces, Mini Pizza Salgada, Mini Pizza Doce) vem de import-menu-rei-do-suco.ts;
+ *    "Sugestões da Casa" foi ajustada de última pra primeira depois do cliente ver o
+ *    resultado da primeira leva (era pra ter ficado em primeiro desde o início).
  * 2. Cria a categoria "Frapês" (estação Suqueiros) e move os 3 sabores de frapê que
  *    hoje ficam dentro de "Sucos" (Frapê Doce de Leite, Frappuccino, Frapê de
  *    Ovomaltine — ver FRAPES_NOVIDADE em import-menu-rei-do-suco.ts) pra lá, deixando a
  *    aba "Sucos" só com suco de fruta de verdade.
  *
  * Idempotente: reordenar pro mesmo valor não muda nada; mover um produto que já está
- * na categoria nova não faz nada; rodar de novo não recria a categoria "Frapês".
+ * na categoria nova não faz nada; rodar de novo não recria a categoria "Frapês". Seguro
+ * rodar de novo mesmo já tendo rodado a versão anterior deste script (só reaplica os
+ * sortOrder atuais).
  *
  * Uso:
  *   node dist/scripts/reorder-categories-add-frapes-rei-do-suco.js --slug=rei-do-suco
@@ -31,12 +35,12 @@ function parseArgs(argv: string[]): Record<string, string> {
 
 // Só reordena categorias que já existem (não cria nenhuma, exceto Frapês abaixo).
 const NEW_SORT_ORDER: Record<string, number> = {
-  'Pastéis Salgados': 1,
-  'Pastéis Doces': 2,
-  'Mini Pizza Salgada': 3,
-  'Mini Pizza Doce': 4,
-  Porções: 5,
-  'Sugestões da Casa': 6,
+  'Sugestões da Casa': 1,
+  'Pastéis Salgados': 2,
+  'Pastéis Doces': 3,
+  'Mini Pizza Salgada': 4,
+  'Mini Pizza Doce': 5,
+  Porções: 6,
   Sucos: 7,
   'Açaí e Cupuaçu': 9,
   Bebidas: 10,
