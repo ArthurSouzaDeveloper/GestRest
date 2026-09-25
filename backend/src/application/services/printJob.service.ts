@@ -43,6 +43,37 @@ function isHouseSuggestion(categoryName: string): boolean {
     .includes('sugest');
 }
 
+/** Um item de pedido -> item de ticket, com as mesmas regras de conteúdo em qualquer
+ * ticket que o item apareça (via normal por estação, ou a via combinada do motoboy
+ * abaixo) — extraído pra não duplicar (e arriscar desalinhar) essa lógica nos dois
+ * lugares. */
+function toTicketItem(item: CreatedOrderItem): TicketItem {
+  // "Monte o Seu Pastel"/"Monte o Seu Pastel Doce": o nome do produto não diz nada pra
+  // quem prepara — o que importa é o que o cliente escolheu por dentro. Pedido explícito
+  // do cliente: no lugar do nome genérico, o título vira a lista de ingredientes
+  // escolhidos em CAIXA ALTA, sem tipo/descrição (ambos genéricos aqui).
+  if (item.product.isCustom) {
+    return {
+      name: item.additionals.map((a) => a.name.toUpperCase()).join(', '),
+      typeLabel: null,
+      description: null,
+      quantity: item.quantity,
+      unitPrice: Number(item.unitPrice),
+      notes: item.notes,
+      additionals: [],
+    };
+  }
+  return {
+    name: itemDisplayName(item.product.name, item.comboLabel),
+    typeLabel: categoryTypeLabel(item.product.category.name),
+    description: isHouseSuggestion(item.product.category.name) ? null : item.product.description,
+    quantity: item.quantity,
+    unitPrice: Number(item.unitPrice),
+    notes: item.notes,
+    additionals: item.additionals.map((a) => a.name),
+  };
+}
+
 /**
  * Gera um trabalho de impressão por estação tocada, sempre que itens ficam
  * visíveis/acionáveis na fila de produção pela primeira vez — chamado dentro da mesma
@@ -95,65 +126,60 @@ export const printJobService = {
           }
         : null;
 
-    for (const [station, stationItems] of byStation) {
-      const ticketItems: TicketItem[] = stationItems.map((item) => {
-        // "Monte o Seu Pastel"/"Monte o Seu Pastel Doce": o nome do produto não diz nada
-        // pra quem prepara — o que importa é o que o cliente escolheu por dentro. Pedido
-        // explícito do cliente: no lugar do nome genérico, o título vira a lista de
-        // ingredientes escolhidos em CAIXA ALTA, sem tipo/descrição (ambos genéricos aqui).
-        if (item.product.isCustom) {
-          return {
-            name: item.additionals.map((a) => a.name.toUpperCase()).join(', '),
-            typeLabel: null,
-            description: null,
-            quantity: item.quantity,
-            unitPrice: Number(item.unitPrice),
-            notes: item.notes,
-            additionals: [],
-          };
-        }
-        return {
-          name: itemDisplayName(item.product.name, item.comboLabel),
-          typeLabel: categoryTypeLabel(item.product.category.name),
-          description: isHouseSuggestion(item.product.category.name) ? null : item.product.description,
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice),
-          notes: item.notes,
-          additionals: item.additionals.map((a) => a.name),
-        };
-      });
-      const baseTicket = {
-        station,
-        tableNumber: order.table?.number ?? null,
-        orderType: order.orderType,
-        orderNumber: order.number,
-        customerName: order.customer?.name ?? null,
-        customerPhone: order.customer?.phone ?? null,
-        deliveryAddress,
-        placedAt: order.openedAt,
-        items: ticketItems,
-        paymentMethod: order.declaredPaymentMethod,
-        changeFor: order.changeFor !== null ? Number(order.changeFor) : null,
-      };
-      await tx.printJob.create({
-        data: { restaurantId: tenantId, orderId, station, payload: renderTicket(baseTicket) },
-      });
+    const commonTicketFields = {
+      tableNumber: order.table?.number ?? null,
+      orderType: order.orderType,
+      orderNumber: order.number,
+      customerName: order.customer?.name ?? null,
+      customerPhone: order.customer?.phone ?? null,
+      deliveryAddress,
+      placedAt: order.openedAt,
+      paymentMethod: order.declaredPaymentMethod,
+      changeFor: order.changeFor !== null ? Number(order.changeFor) : null,
+    };
 
-      // Só entrega sai em 2 vias — o motoboy leva uma anexada ao pedido, a outra fica no
-      // restaurante como comprovante (pedido explícito do dono do restaurante). Mesa não
-      // duplica (quem prepara e quem serve estão no mesmo lugar) e retirada também não
-      // duplica mais — o próprio cliente vem buscar, não precisa de via extra pra ninguém
-      // levar junto.
-      if (order.orderType === 'DELIVERY') {
-        await tx.printJob.create({
-          data: {
-            restaurantId: tenantId,
-            orderId,
-            station,
-            payload: renderTicket({ ...baseTicket, copyLabel: '2a VIA' }),
-          },
-        });
-      }
+    // Uma via por estação tocada (COZINHA e/ou SUQUEIROS) — cada uma fica na própria
+    // bancada de produção, só com os itens que aquela estação prepara. Ordem fixa
+    // (cozinha sempre antes de suqueiros), não a ordem em que os itens foram
+    // adicionados ao pedido — pedido do cliente pra sempre sair "PEDIDOS COZINHA,
+    // PEDIDOS SUCOS" nessa sequência, sem depender de qual item o cliente escolheu primeiro.
+    for (const station of [Station.KITCHEN, Station.JUICE_BAR]) {
+      const stationItems = byStation.get(station);
+      if (!stationItems) continue;
+      await tx.printJob.create({
+        data: {
+          restaurantId: tenantId,
+          orderId,
+          station,
+          payload: renderTicket({ ...commonTicketFields, station, items: stationItems.map(toTicketItem) }),
+        },
+      });
+    }
+
+    // Entrega sai com mais uma via, além das de produção: uma via ÚNICA com TODOS os
+    // itens do pedido (cozinha + suqueiros juntos), pra dar pro motoboy uma coisa só em
+    // vez de uma cópia por estação que ele precisaria juntar sozinho (pedido explícito do
+    // cliente). Mesa não ganha via extra (quem prepara e quem serve estão no mesmo
+    // lugar) e retirada também não (o próprio cliente vem buscar).
+    if (order.orderType === 'DELIVERY') {
+      // Fica na estação da cozinha quando ela participa do pedido (mesmo critério de
+      // "estação principal" usado em outras telas do sistema); só cai pra suqueiros num
+      // pedido de puro suco, sem nenhum item de cozinha.
+      const deliveryStation = byStation.has(Station.KITCHEN) ? Station.KITCHEN : Station.JUICE_BAR;
+      await tx.printJob.create({
+        data: {
+          restaurantId: tenantId,
+          orderId,
+          station: deliveryStation,
+          payload: renderTicket({
+            ...commonTicketFields,
+            station: deliveryStation,
+            headerOverride: 'PEDIDO COMPLETO',
+            copyLabel: '2a VIA - MOTOBOY',
+            items: items.filter((i) => i.station !== Station.NONE).map(toTicketItem),
+          }),
+        },
+      });
     }
   },
 };

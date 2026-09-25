@@ -375,6 +375,47 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(dineInJobs[0].payload.toString('ascii')).not.toContain('2a VIA');
   });
 
+  it('entrega com item de cozinha E de suco gera 3 vias: cada estação + uma via única combinada pro motoboy', async () => {
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Misto',
+      customerPhone: '11999990006',
+      declaredPaymentMethod: PaymentMethod.PIX,
+      items: [
+        { productId: kitchenProductId, quantity: 1 },
+        { productId: juiceProductId, quantity: 2 },
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    // Ordem de criação = ordem de impressão (o print-agent busca por createdAt asc, ver
+    // printAgent.routes.ts) — pedido do cliente: cozinha, depois sucos, depois a via
+    // combinada do motoboy, nessa sequência, não a ordem em que os itens foram escolhidos.
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id }, orderBy: { createdAt: 'asc' } });
+    expect(jobs).toHaveLength(3);
+    const [kitchenJob, juiceJob, motoboyJob] = jobs.map((j) => j.payload.toString('ascii'));
+
+    expect(kitchenJob).toContain('COZINHA');
+    expect(kitchenJob).toContain('1x Pastel');
+    expect(kitchenJob).not.toContain('Suco');
+    expect(kitchenJob).not.toContain('2a VIA');
+
+    expect(juiceJob).toContain('SUQUEIROS');
+    expect(juiceJob).toContain('2x Suco');
+    expect(juiceJob).not.toContain('Pastel');
+    expect(juiceJob).not.toContain('2a VIA');
+
+    // A via do motoboy não estampa "COZINHA" nem "SUQUEIROS" no topo (reúne as duas) e
+    // traz TODOS os itens do pedido juntos, numa via só.
+    expect(motoboyJob).toContain('PEDIDO COMPLETO');
+    expect(motoboyJob).toContain('2a VIA - MOTOBOY');
+    expect(motoboyJob).toContain('1x Pastel');
+    expect(motoboyJob).toContain('2x Suco');
+    expect(motoboyJob).not.toContain('COZINHA');
+    expect(motoboyJob).not.toContain('SUQUEIROS');
+  });
+
   it('verifyAgentKey() só valida a chave certa do tenant certo', async () => {
     const { key } = await printerSettingsService.generateAgentKey(restaurantId, { userId: waiterId });
 

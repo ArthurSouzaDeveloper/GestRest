@@ -70,9 +70,13 @@ export interface TicketInput {
   deliveryAddress: TicketDeliveryAddress | null;
   placedAt: Date;
   items: TicketItem[];
-  /** "2a VIA" na segunda cópia de pedidos de entrega/retirada (ver printJob.service.ts) —
-   * null na via normal, pra não confundir a equipe com o que pareceria um pedido duplicado. */
+  /** "2a VIA - MOTOBOY" na via combinada de entrega (ver printJob.service.ts) — null na
+   * via normal, pra não confundir a equipe com o que pareceria um pedido duplicado. */
   copyLabel?: string | null;
+  /** Sobrescreve o texto do cabeçalho grande (normalmente "COZINHA"/"SUQUEIROS", ver
+   * STATION_LABEL) — usado só na via combinada de entrega pro motoboy, que reúne itens de
+   * mais de uma estação e não devia estampar o nome de só uma delas no topo. */
+  headerOverride?: string;
   /** Forma de pagamento declarada pelo cliente no site (delivery/retirada — pagamento na
    * entrega/retirada). null pra pedido de mesa, que paga no caixa depois de pronto e não
    * declara forma de pagamento antecipada. Pedido do dono do restaurante: quem entrega
@@ -117,7 +121,8 @@ function formatCurrency(value: number): string {
  * documentada.
  */
 export function renderTicket(input: TicketInput): Buffer {
-  const parts: Buffer[] = [INIT, HEADER_MODE_ON, line(STATION_LABEL[input.station]), BODY_MODE_ON];
+  const headerText = input.headerOverride ?? STATION_LABEL[input.station];
+  const parts: Buffer[] = [INIT, HEADER_MODE_ON, line(headerText), BODY_MODE_ON];
 
   if (input.copyLabel) {
     parts.push(HEADER_MODE_ON, line(`*** ${input.copyLabel} ***`), BODY_MODE_ON);
