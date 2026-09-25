@@ -36,7 +36,7 @@ function formatClock(iso: string): string {
 function EtaNote({ eta }: { eta?: EtaEstimate }) {
   if (!eta) return null;
   return (
-    <div className="flex items-center gap-2 rounded-[6px] bg-brand-100 px-3 py-2 text-xs font-medium text-brand">
+    <div className="flex items-center gap-2 rounded-2xl bg-[#F29A1F] px-4 py-3 text-sm font-bold text-[#1E1024]">
       <Clock size={14} className="shrink-0" />
       <span>
         Previsão agora: até {eta.minutes} min
@@ -46,19 +46,19 @@ function EtaNote({ eta }: { eta?: EtaEstimate }) {
   );
 }
 
-// ─── Tokens visuais do site público — direção "Modernist" azul aprovada na prévia:
-// cantos mais retos, divisórias grossas, tipografia pesada, azul do sistema principal
-// no lugar do roxo antigo. Espelham 1:1 as classes do preview. ───────────────
-const FIELD_LABEL = 'mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#5A6072]';
+// ─── Tokens visuais do site público — direção "Fresco" aprovada na prévia (Rei do Suco):
+// formas arredondadas, botões em pílula com sombra sólida, títulos em Bricolage Grotesque
+// e texto em DM Sans, fundo lavanda derivado da cor da marca (brand-50). ───────────────
+const FIELD_LABEL = 'mb-1 block text-[13px] font-bold text-[#1E1024]';
 // Fonte >= 16px de propósito: abaixo disso, o Safari do iPhone dá zoom automático
 // assim que o campo ganha foco (pra deixar o texto legível) e não volta sozinho — é
 // esse zoom "grudado" que fazia o site parecer instável no celular.
 const FIELD_INPUT =
-  'w-full rounded-[6px] border border-[#14161C]/[0.18] bg-white px-3.5 py-2.5 text-[16px] text-[#14161C] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20';
+  'w-full rounded-2xl border-2 border-brand-100 bg-white px-4 py-3 text-[16px] text-[#1E1024] outline-none transition focus:border-brand';
 const PRIMARY_CTA =
-  'block w-full rounded-[6px] bg-gradient-to-br from-brand to-brand-700 px-4 py-3.5 text-center text-[13.5px] font-extrabold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] transition disabled:cursor-not-allowed disabled:opacity-50';
-const STEP_TITLE = 'mb-[18px] text-[18px] font-extrabold tracking-tight text-[#14161C]';
-const CARD = 'rounded-[6px] border border-[#14161C]/[0.1] bg-white';
+  'block w-full rounded-full bg-brand px-6 py-4 text-center text-[17px] font-extrabold text-white shadow-[0_6px_0_var(--brand-700,#5e0f78)] transition active:translate-y-[3px] active:shadow-[0_3px_0_var(--brand-700,#5e0f78)] disabled:cursor-not-allowed disabled:opacity-50';
+const STEP_TITLE = 'mb-[18px] font-display text-[26px] font-extrabold tracking-tight text-[#1E1024]';
+const CARD = 'rounded-3xl bg-white';
 
 /** Barra fixa no rodapé (Cardápio/Carrinho/Revisão) — igual ao .cart-bar do preview. */
 function CartBar({
@@ -73,9 +73,9 @@ function CartBar({
   disabled?: boolean;
 }) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 border-t-2 border-[#14161C]/10 bg-[#F4F6FA] p-2 pb-2.5">
+    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-brand-50 via-brand-50 to-transparent p-4 pt-6">
       <button
-        className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-[6px] bg-gradient-to-br from-brand to-brand-700 px-3.5 py-2.5 text-[12.5px] font-bold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-full bg-brand px-6 py-4 text-[16px] font-extrabold text-white shadow-[0_6px_0_var(--brand-700,#5e0f78)] disabled:cursor-not-allowed disabled:opacity-60"
         onClick={onClick}
         disabled={disabled}
       >
@@ -346,7 +346,7 @@ export default function PublicOrder() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6FA]" style={deriveBrandVars(restaurant.brandColor)}>
+    <div className="min-h-screen bg-brand-50 font-cliente" style={deriveBrandVars(restaurant.brandColor)}>
       {!introOrConfirmation && (
         <PublicHeader
           title={headerTitle[step as Exclude<Step, 'intro' | 'confirmation'>]}
@@ -543,12 +543,12 @@ function PublicHeader({
   onBack: () => void;
 }) {
   return (
-    <div className="sticky top-0 z-10 bg-gradient-to-br from-brand to-brand-700">
-      <div className={`mx-auto flex items-center gap-2.5 px-4 py-3 ${title === 'Cardápio' ? 'max-w-3xl' : 'max-w-md'}`}>
-        <button onClick={onBack} className="-m-2.5 flex p-2.5 text-white/85 hover:text-white" title="Voltar">
-          <ChevronLeft size={20} strokeWidth={2.3} />
+    <div className="sticky top-0 z-10 bg-brand-50/95 backdrop-blur">
+      <div className={`mx-auto flex items-center gap-3.5 px-4 py-4 ${title === 'Cardápio' ? 'max-w-3xl' : 'max-w-md'}`}>
+        <button onClick={onBack} className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1E1024]" title="Voltar">
+          <ChevronLeft size={22} strokeWidth={2.3} />
         </button>
-        <span className="text-sm font-extrabold uppercase tracking-wide text-white">{title}</span>
+        <span className="font-display text-[26px] font-extrabold tracking-tight text-[#1E1024]">{title}</span>
       </div>
     </div>
   );
@@ -580,15 +580,16 @@ function IntroStep({
   });
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-[#F4F6FA] px-7 pt-12 dark:bg-[#F4F6FA]">
-      <div className="w-full max-w-md overflow-hidden rounded-[6px] border border-[#14161C]/[0.08] bg-white">
+    <div className="flex min-h-screen flex-col items-center bg-brand-50 dark:bg-brand-50">
+      <div className="w-full max-w-md">
         {/* Topo do card: a logo do restaurante (subida pela tela de Identidade Visual, ver
             branding.service.ts), centralizada num fundo levemente tingido da cor da marca.
             Sem logo configurada ainda, cai no mesmo placeholder de "foto do restaurante" de
             antes — pensado pra virar uma foto de verdade do balcão quando existir esse campo. */}
         {logoUrl ? (
-          <div className="flex h-40 w-full items-center justify-center bg-brand-50">
-            <img src={logoUrl} alt={restaurantName} className="h-32 w-32 object-contain" />
+          <div className="relative flex h-[300px] w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-b-[44px] bg-brand-100">
+            <div className="absolute -right-12 -top-10 h-44 w-44 rounded-full bg-[#F29A1F]" />
+            <img src={logoUrl} alt={restaurantName} className="relative h-40 w-40 rounded-full object-cover shadow-[0_10px_0_var(--brand-700,#5e0f78)]" />
           </div>
         ) : (
           <div
@@ -603,24 +604,24 @@ function IntroStep({
           </div>
         )}
 
-        <div className="p-4">
-          <h6 className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">Pastelaria &amp; Sucaria</h6>
-          <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight text-[#14161C]">{restaurantName}</h1>
+        <div className="px-6 pt-6">
+          <h6 className="text-center text-[12px] font-bold uppercase tracking-[0.08em] text-brand">Pastelaria &amp; Sucaria</h6>
+          <h1 className="mt-0.5 text-center font-display text-[38px] font-extrabold leading-none tracking-tight text-[#1E1024]">{restaurantName}</h1>
 
-          <div className="mt-4 border-t-2 border-[#14161C]/[0.08] pt-4">
-            <h6 className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#5A6072]">Como você quer receber?</h6>
-            <div className="flex gap-1 rounded-[6px] border border-[#14161C]/10 bg-[#F4F6FA] p-1">
+          <div className="mt-6">
+            <h6 className="mb-2 text-[15px] font-bold text-[#1E1024]">Como você quer receber?</h6>
+            <div className="flex gap-1.5 rounded-full bg-white p-1.5">
               <button
-                className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-                  kind === 'DELIVERY' ? 'bg-brand text-white' : 'text-[#5A6072]'
+                className={`flex-1 rounded-full py-3 text-[15px] font-bold transition ${
+                  kind === 'DELIVERY' ? 'bg-brand text-white' : 'text-[#1E1024]'
                 }`}
                 onClick={() => setKind('DELIVERY')}
               >
                 Entrega
               </button>
               <button
-                className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-                  kind === 'PICKUP' ? 'bg-brand text-white' : 'text-[#5A6072]'
+                className={`flex-1 rounded-full py-3 text-[15px] font-bold transition ${
+                  kind === 'PICKUP' ? 'bg-brand text-white' : 'text-[#1E1024]'
                 }`}
                 onClick={() => setKind('PICKUP')}
               >
@@ -633,10 +634,10 @@ function IntroStep({
             </div>
 
             <button className={`${PRIMARY_CTA} mt-4`} onClick={() => onPick(kind)}>
-              Ver cardápio completo
+              Começar pedido
             </button>
             <button
-              className="mt-2.5 w-full text-center text-[11.5px] font-semibold text-[#5A6072] underline underline-offset-2"
+              className="mt-4 w-full text-center text-[14px] font-bold text-[#1E1024] underline underline-offset-2"
               onClick={() => onPick('MENU')}
             >
               Só quero ver o cardápio
@@ -659,7 +660,7 @@ function IntroStep({
             target="_blank"
             rel="noreferrer"
             title="Instagram"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#14161C]/15 bg-white text-[#14161C]"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#1E1024]/15 bg-white text-[#1E1024]"
           >
             <Instagram size={15} />
           </a>
@@ -668,7 +669,7 @@ function IntroStep({
             target="_blank"
             rel="noreferrer"
             title="WhatsApp"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#14161C]/15 bg-white text-[#14161C]"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#1E1024]/15 bg-white text-[#1E1024]"
           >
             <MessageCircle size={15} />
           </a>
@@ -677,7 +678,7 @@ function IntroStep({
             target="_blank"
             rel="noreferrer"
             title="Localização"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#14161C]/15 bg-white text-[#14161C]"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#1E1024]/15 bg-white text-[#1E1024]"
           >
             <MapPin size={15} />
           </a>
@@ -725,8 +726,8 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
   return (
     <div className="mt-3 w-full max-w-md">
       {!open && saved && !result && (
-        <div className="flex items-center justify-between rounded-[6px] border border-[#14161C]/10 bg-white px-3.5 py-2.5">
-          <span className="text-[12px] font-semibold text-[#14161C]">Bem-vindo de volta, {saved.name.split(' ')[0]}</span>
+        <div className="flex items-center justify-between rounded-2xl border border-[#1E1024]/10 bg-white px-3.5 py-2.5">
+          <span className="text-[12px] font-semibold text-[#1E1024]">Bem-vindo de volta, {saved.name.split(' ')[0]}</span>
           <button
             className="text-[11.5px] font-bold text-brand disabled:opacity-50"
             disabled={login.isPending}
@@ -738,8 +739,8 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
       )}
 
       {open && !result && (
-        <div className="rounded-[6px] border border-[#14161C]/10 bg-white p-3.5">
-          <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-[#5A6072]">Entrar</p>
+        <div className="rounded-2xl border border-[#1E1024]/10 bg-white p-3.5">
+          <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Entrar</p>
           <div className="flex flex-col gap-2">
             <input className={FIELD_INPUT} value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" />
             <input
@@ -750,7 +751,7 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
               inputMode="tel"
             />
             <button
-              className="rounded-[6px] bg-brand py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
+              className="rounded-2xl bg-brand py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
               disabled={login.isPending || name.trim().length < 2 || phone.trim().length < 8}
               onClick={() => login.mutate()}
             >
@@ -761,28 +762,28 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
       )}
 
       {result && (
-        <div className="rounded-[6px] border border-[#14161C]/10 bg-white p-3.5">
+        <div className="rounded-2xl border border-[#1E1024]/10 bg-white p-3.5">
           {result.name === null ? (
             <p className="text-[12px] text-red-600">Nenhum pedido encontrado com esse nome e telefone.</p>
           ) : result.orders.length === 0 ? (
-            <p className="text-[12px] text-[#5A6072]">Você ainda não tem pedidos por aqui.</p>
+            <p className="text-[12px] text-[#6B4A78]">Você ainda não tem pedidos por aqui.</p>
           ) : (
             <div className="flex flex-col gap-2">
-              <p className="text-[11.5px] font-bold uppercase tracking-wide text-[#5A6072]">Seus pedidos</p>
+              <p className="text-[11.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Seus pedidos</p>
               {result.orders.map((o) => (
                 <Link
                   key={o.id}
                   to={`/pedido/${slug}/rastreio/${o.id}`}
-                  className="flex items-center justify-between rounded-[6px] border border-[#14161C]/10 px-3 py-2 text-[12.5px] hover:bg-brand-100"
+                  className="flex items-center justify-between rounded-2xl border border-[#1E1024]/10 px-3 py-2 text-[12.5px] hover:bg-brand-100"
                 >
-                  <span className="font-bold text-[#14161C]">Pedido #{o.number}</span>
+                  <span className="font-bold text-[#1E1024]">Pedido #{o.number}</span>
                   <span className="text-brand">{ORDER_STATUS_LABEL[o.status]}</span>
                 </Link>
               ))}
             </div>
           )}
           <button
-            className="mt-2.5 text-[11px] font-semibold text-[#5A6072] underline underline-offset-2"
+            className="mt-2.5 text-[11px] font-semibold text-[#6B4A78] underline underline-offset-2"
             onClick={() => {
               setResult(null);
               setOpen(false);
@@ -857,17 +858,17 @@ function ZoneAutocomplete({
         disabled={zones.length === 0}
       />
       {open && term.length > 0 && filtered.length > 0 && (
-        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[6px] border border-[#14161C]/[0.15] bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-2xl border border-[#1E1024]/[0.15] bg-white shadow-lg">
           {filtered.map((z) => (
             <button
               key={z.id}
               type="button"
-              className="flex w-full items-center justify-between border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#14161C] last:border-b-0 hover:bg-gray-50"
+              className="flex w-full items-center justify-between border-b border-gray-100 p-2.5 text-left text-[12.5px] text-[#1E1024] last:border-b-0 hover:bg-gray-50"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(z)}
             >
               <span>{splitZoneName(z.name).bairro}</span>
-              <span className="text-[#5A6072]">{brl(z.fee)}</span>
+              <span className="text-[#6B4A78]">{brl(z.fee)}</span>
             </button>
           ))}
         </div>
@@ -956,18 +957,18 @@ function DetailsStep({
     <div className="space-y-4">
       <h2 className={STEP_TITLE}>Pra onde vai o pedido?</h2>
 
-      <div className="mb-[18px] flex gap-1 rounded-[6px] border border-[#14161C]/10 bg-white p-1">
+      <div className="mb-[18px] flex gap-1 rounded-2xl border border-[#1E1024]/10 bg-white p-1">
         <button
-          className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-            orderKind === 'DELIVERY' ? 'bg-brand text-white' : 'text-[#5A6072]'
+          className={`flex-1 rounded-full py-3 text-[15px] font-bold transition ${
+            orderKind === 'DELIVERY' ? 'bg-brand text-white' : 'text-[#6B4A78]'
           }`}
           onClick={() => onChangeKind('DELIVERY')}
         >
           Entrega
         </button>
         <button
-          className={`flex-1 rounded-[4px] py-2 text-[12.5px] font-bold transition ${
-            orderKind === 'PICKUP' ? 'bg-brand text-white' : 'text-[#5A6072]'
+          className={`flex-1 rounded-full py-3 text-[15px] font-bold transition ${
+            orderKind === 'PICKUP' ? 'bg-brand text-white' : 'text-[#6B4A78]'
           }`}
           onClick={() => onChangeKind('PICKUP')}
         >
@@ -976,7 +977,7 @@ function DetailsStep({
       </div>
 
       {!orderKind && (
-        <p className="-mt-3 text-[11.5px] text-[#5A6072]">Escolha Entrega ou Retirada pra continuar.</p>
+        <p className="-mt-3 text-[11.5px] text-[#6B4A78]">Escolha Entrega ou Retirada pra continuar.</p>
       )}
 
       <EtaNote eta={eta} />
@@ -1002,7 +1003,7 @@ function DetailsStep({
             <label className={FIELD_LABEL}>Endereço</label>
             <AddressAutocomplete slug={slug} inputClassName={FIELD_INPUT} placeholder="Digite seu endereço" onSelect={onPickAddress} />
             {deliveryLat !== null && quotingDelivery && (
-              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#5A6072]">
+              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#6B4A78]">
                 <Loader2 size={11} className="animate-spin" /> Calculando frete...
               </p>
             )}
@@ -1010,7 +1011,7 @@ function DetailsStep({
               <p className="mt-1 text-[11px] text-red-600">Esse endereço está fora da nossa área de entrega.</p>
             )}
             {deliveryQuote && !quotingDelivery && (
-              <p className="mt-1 text-[11px] text-[#5A6072]">
+              <p className="mt-1 text-[11px] text-[#6B4A78]">
                 Taxa de entrega: {brl(deliveryQuote.fee)} ({deliveryQuote.distanceKm.toFixed(1)} km)
               </p>
             )}
@@ -1052,7 +1053,7 @@ function DetailsStep({
                     key={city}
                     type="button"
                     className={`rounded-[4px] px-3 py-2 text-[12.5px] font-bold transition ${
-                      deliveryCity === city ? 'bg-brand text-white' : 'border border-[#14161C]/10 text-[#5A6072]'
+                      deliveryCity === city ? 'bg-brand text-white' : 'border border-[#1E1024]/10 text-[#6B4A78]'
                     }`}
                     onClick={() => setDeliveryCity(city)}
                   >
@@ -1065,7 +1066,7 @@ function DetailsStep({
           <div>
             <label className={FIELD_LABEL}>Bairro</label>
             {zoneCities.length > 1 && !deliveryCity ? (
-              <p className={`${FIELD_INPUT} flex items-center text-[#5A6072]`}>Escolha a cidade acima primeiro</p>
+              <p className={`${FIELD_INPUT} flex items-center text-[#6B4A78]`}>Escolha a cidade acima primeiro</p>
             ) : (
               <ZoneAutocomplete
                 key={deliveryCity ?? 'sem-cidade'}
@@ -1074,7 +1075,7 @@ function DetailsStep({
                 onSelect={setDeliveryZoneId}
               />
             )}
-            {selectedFee !== undefined && <p className="mt-1 text-[11px] text-[#5A6072]">Taxa de entrega: {brl(selectedFee)}</p>}
+            {selectedFee !== undefined && <p className="mt-1 text-[11px] text-[#6B4A78]">Taxa de entrega: {brl(selectedFee)}</p>}
           </div>
           <div className="grid grid-cols-[1.4fr_1fr] gap-2.5">
             <div>
@@ -1155,14 +1156,14 @@ function CartStep({
             <div key={i} className={`${CARD} p-3.5 shadow-sm`}>
               <div className="flex items-start justify-between gap-2.5">
                 <div className="min-w-0">
-                  <div className="text-[13.5px] font-bold text-[#14161C]">{item.comboLabel ?? item.product.name}</div>
-                  <div className="mt-0.5 text-[11px] text-[#5A6072]">{brl(draftItemUnitPrice(item))} cada</div>
-                  {item.notes && <div className="mt-0.5 text-[10.5px] text-[#5A6072]">{item.notes}</div>}
+                  <div className="text-[13.5px] font-bold text-[#1E1024]">{item.comboLabel ?? item.product.name}</div>
+                  <div className="mt-0.5 text-[11px] text-[#6B4A78]">{brl(draftItemUnitPrice(item))} cada</div>
+                  {item.notes && <div className="mt-0.5 text-[10.5px] text-[#6B4A78]">{item.notes}</div>}
                   {item.additionalIds.length > 0 && (
-                    <div className="mt-0.5 text-[10.5px] text-[#5A6072]">+ {item.additionalIds.length} adicional(is)</div>
+                    <div className="mt-0.5 text-[10.5px] text-[#6B4A78]">+ {item.additionalIds.length} adicional(is)</div>
                   )}
                 </div>
-                <span className="shrink-0 text-[13.5px] font-extrabold tabular-nums text-[#14161C]">
+                <span className="shrink-0 text-[13.5px] font-extrabold tabular-nums text-[#1E1024]">
                   {brl(draftItemUnitPrice(item) * item.quantity)}
                 </span>
               </div>
@@ -1178,7 +1179,7 @@ function CartStep({
                 >
                   <Minus size={13} />
                 </button>
-                <span className="min-w-[16px] text-center text-[13px] font-extrabold text-[#14161C]">{item.quantity}</span>
+                <span className="min-w-[16px] text-center text-[13px] font-extrabold text-[#1E1024]">{item.quantity}</span>
                 <button
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-white"
                   onClick={() => {
@@ -1199,7 +1200,7 @@ function CartStep({
       )}
 
       <div className={`${CARD} p-3.5 shadow-sm`}>
-        <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
+        <div className="flex justify-between py-1 text-[12.5px] text-[#6B4A78]">
           <span>Subtotal</span>
           <span>{brl(subtotal)}</span>
         </div>
@@ -1209,12 +1210,12 @@ function CartStep({
           </div>
         )}
         {orderKind === 'DELIVERY' && (
-          <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
+          <div className="flex justify-between py-1 text-[12.5px] text-[#6B4A78]">
             <span>Taxa de entrega{deliveryZoneName ? ` · ${deliveryZoneName}` : ''}</span>
             <span>{brl(deliveryFee)}</span>
           </div>
         )}
-        <div className="mt-1.5 flex justify-between border-t-2 border-[#14161C]/[0.1] pt-2.5 text-[15.5px] font-extrabold text-[#14161C]">
+        <div className="mt-1.5 flex justify-between border-t-2 border-[#1E1024]/[0.1] pt-2.5 text-[15.5px] font-extrabold text-[#1E1024]">
           <span>Total</span>
           <span>{brl(total)}</span>
         </div>
@@ -1256,21 +1257,21 @@ function PaymentStep({
         {PAYMENT_OPTIONS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
-            className={`flex flex-col items-center gap-2 rounded-[6px] border-2 p-4 text-center transition ${
-              paymentMethod === key ? 'border-brand bg-brand-100' : 'border-[#14161C]/10 bg-white'
+            className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 text-center transition ${
+              paymentMethod === key ? 'border-brand bg-brand-100' : 'border-[#1E1024]/10 bg-white'
             }`}
             onClick={() => setPaymentMethod(key)}
           >
             <Icon className="text-brand" size={21} />
-            <span className="text-xs font-bold text-[#14161C]">{label}</span>
+            <span className="text-xs font-bold text-[#1E1024]">{label}</span>
           </button>
         ))}
       </div>
 
       {paymentMethod === 'PIX' && (
         <div className={`${CARD} mt-4 p-3.5`}>
-          <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-[#5A6072]">Pagamento via PIX</div>
-          <p className="text-[11.5px] leading-[1.5] text-[#5A6072]">
+          <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Pagamento via PIX</div>
+          <p className="text-[11.5px] leading-[1.5] text-[#6B4A78]">
             A chave PIX aparece na tela de revisão, antes de confirmar.
           </p>
         </div>
@@ -1288,7 +1289,7 @@ function PaymentStep({
             value={changeFor}
             onChange={(e) => setChangeFor(e.target.value)}
           />
-          <div className="mt-[5px] text-[11px] text-[#5A6072]">Total do pedido: {brl(total)}</div>
+          <div className="mt-[5px] text-[11px] text-[#6B4A78]">Total do pedido: {brl(total)}</div>
           {changeFor && Number(changeFor) < total && (
             <p className="mt-1 text-[11px] text-red-600">O valor precisa ser maior ou igual ao total ({brl(total)}).</p>
           )}
@@ -1350,14 +1351,14 @@ function ReviewStep({
         <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-brand">
           {orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada'}
         </h3>
-        <div className="text-[12.5px] leading-[1.55] text-[#14161C]">{customerName} · {customerPhone}</div>
+        <div className="text-[12.5px] leading-[1.55] text-[#1E1024]">{customerName} · {customerPhone}</div>
         {orderKind === 'DELIVERY' && (
           <>
-            <div className="text-[12.5px] leading-[1.55] text-[#14161C]">
+            <div className="text-[12.5px] leading-[1.55] text-[#1E1024]">
               {deliveryStreet}, {deliveryNumber}{deliveryComplement ? ` — ${deliveryComplement}` : ''}
             </div>
-            {deliveryCep && <div className="text-[11.5px] text-[#5A6072]">CEP: {deliveryCep}</div>}
-            {deliveryZoneName && <div className="text-[11.5px] text-[#5A6072]">{deliveryZoneName}</div>}
+            {deliveryCep && <div className="text-[11.5px] text-[#6B4A78]">CEP: {deliveryCep}</div>}
+            {deliveryZoneName && <div className="text-[11.5px] text-[#6B4A78]">{deliveryZoneName}</div>}
           </>
         )}
       </div>
@@ -1365,7 +1366,7 @@ function ReviewStep({
       <div className={`${CARD} p-3.5`}>
         <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-brand">Itens</h3>
         {draft.map((item, i) => (
-          <div key={i} className="text-[12.5px] leading-[1.55] text-[#14161C]">
+          <div key={i} className="text-[12.5px] leading-[1.55] text-[#1E1024]">
             {item.quantity}× {item.comboLabel ?? item.product.name} — {brl(draftItemUnitPrice(item) * item.quantity)}
           </div>
         ))}
@@ -1373,24 +1374,24 @@ function ReviewStep({
 
       <div className={`${CARD} p-3.5`}>
         <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-brand">Pagamento</h3>
-        <div className="text-[12.5px] leading-[1.55] text-[#14161C]">
+        <div className="text-[12.5px] leading-[1.55] text-[#1E1024]">
           {paymentLabel}
           {paymentMethod === 'CASH' && changeFor ? ` · troco pra ${brl(Number(changeFor))}` : ''}
         </div>
       </div>
 
-      <div className="border-t-2 border-[#14161C]/[0.12] pt-3.5">
-        <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
+      <div className="border-t-2 border-[#1E1024]/[0.12] pt-3.5">
+        <div className="flex justify-between py-1 text-[12.5px] text-[#6B4A78]">
           <span>Subtotal</span>
           <span>{brl(subtotal)}</span>
         </div>
         {orderKind === 'DELIVERY' && (
-          <div className="flex justify-between py-1 text-[12.5px] text-[#4A5068]">
+          <div className="flex justify-between py-1 text-[12.5px] text-[#6B4A78]">
             <span>Taxa de entrega</span>
             <span>{brl(deliveryFee)}</span>
           </div>
         )}
-        <div className="flex justify-between pt-2 text-[15.5px] font-extrabold text-[#14161C]">
+        <div className="flex justify-between pt-2 text-[15.5px] font-extrabold text-[#1E1024]">
           <span>Total</span>
           <span>{brl(total)}</span>
         </div>
@@ -1431,22 +1432,22 @@ function ConfirmationStep({
 }) {
   return (
     <div className="flex flex-col items-center gap-3 pt-[54px] text-center">
-      <div className="flex h-[62px] w-[62px] items-center justify-center rounded-[6px] border-2 border-brand text-brand">
-        <Check size={28} strokeWidth={2.6} />
+      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand text-white">
+        <Check size={44} strokeWidth={3} />
       </div>
-      <h1 className="mt-1 text-[18px] font-extrabold text-[#14161C]">Pedido recebido!</h1>
+      <h1 className="mt-1 font-display text-[34px] font-extrabold tracking-tight text-[#1E1024]">Pedido recebido!</h1>
       {orderNumber && (
-        <div className="text-[12.5px] text-[#5A6072]">
-          Número do pedido <b className="text-[14.5px] text-[#14161C]">#{orderNumber}</b>
+        <div className="text-[12.5px] text-[#6B4A78]">
+          Número do pedido <b className="text-[14.5px] text-[#1E1024]">#{orderNumber}</b>
         </div>
       )}
-      <p className="max-w-[26ch] text-[12.5px] leading-[1.5] text-[#4A5068]">
+      <p className="max-w-[26ch] text-[12.5px] leading-[1.5] text-[#6B4A78]">
         {orderKind === 'DELIVERY'
           ? 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo.'
           : 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo — vá até o balcão no horário combinado.'}
       </p>
       {estimatedReadyAt && (
-        <div className="mx-auto flex w-fit items-center gap-2 rounded-[6px] bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
+        <div className="mx-auto flex w-fit items-center gap-2 rounded-2xl bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
           <Clock size={16} />
           {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
         </div>

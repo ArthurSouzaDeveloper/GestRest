@@ -22,6 +22,9 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Site público do cliente (visual "Fresco"): títulos e texto.
+        display: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
+        cliente: ['"DM Sans"', 'system-ui', 'sans-serif'],
       },
     },
   },
