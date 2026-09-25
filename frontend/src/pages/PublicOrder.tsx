@@ -1437,11 +1437,6 @@ function ConfirmationStep({
           Número do pedido <b className="text-[14.5px] text-[#1E1024]">#{orderNumber}</b>
         </div>
       )}
-      <p className="max-w-[26ch] text-[12.5px] leading-[1.5] text-[#6B4A78]">
-        {orderKind === 'DELIVERY'
-          ? 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo.'
-          : 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo — vá até o balcão no horário combinado.'}
-      </p>
       {estimatedReadyAt && (
         <div className="mx-auto flex w-fit items-center gap-2 rounded-2xl bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
           <Clock size={16} />
