@@ -148,8 +148,11 @@ export function renderTicket(input: TicketInput): Buffer {
     // Pedido do dono do restaurante: nome, quantidade, descrição e valor — sem a
     // categoria crua do produto (nem cozinha, nem suqueiros), só o tipo do prato
     // (pastel/mini pizza/porção) quando informado, prefixado ao nome do sabor.
+    // Linha do prato no mesmo tamanho grande do cabeçalho (COZINHA/SUQUEIROS) — pedido
+    // explícito do cliente pra dar pra ler de longe na bancada de produção; o resto do
+    // ticket (descrição, preço, adicionais, obs) fica no tamanho normal de propósito.
     const label = item.typeLabel ? `${item.typeLabel} - ${item.name}` : item.name;
-    parts.push(BOLD_ON, line(`${item.quantity}x ${label}`), BOLD_OFF);
+    parts.push(HEADER_MODE_ON, line(`${item.quantity}x ${label}`), NORMAL_MODE);
     if (item.description) parts.push(line(`  ${item.description}`));
     parts.push(line(`  ${formatCurrency(item.unitPrice)} / un.`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
