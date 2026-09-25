@@ -1253,29 +1253,25 @@ function PaymentStep({
     <div className="space-y-4">
       <h2 className={STEP_TITLE}>Como você vai pagar?</h2>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="flex flex-col gap-2.5">
         {PAYMENT_OPTIONS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
-            className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 text-center transition ${
+            className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${
               paymentMethod === key ? 'border-brand bg-brand-100' : 'border-[#1E1024]/10 bg-white'
             }`}
             onClick={() => setPaymentMethod(key)}
           >
-            <Icon className="text-brand" size={21} />
-            <span className="text-xs font-bold text-[#1E1024]">{label}</span>
+            <Icon className="shrink-0 text-brand" size={22} />
+            <span className="flex-1 text-[14px] font-bold text-[#1E1024]">{label}</span>
+            {paymentMethod === key && (
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+                <Check size={14} strokeWidth={3} />
+              </span>
+            )}
           </button>
         ))}
       </div>
-
-      {paymentMethod === 'PIX' && (
-        <div className={`${CARD} mt-4 p-3.5`}>
-          <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Pagamento via PIX</div>
-          <p className="text-[11.5px] leading-[1.5] text-[#6B4A78]">
-            A chave PIX aparece na tela de revisão, antes de confirmar.
-          </p>
-        </div>
-      )}
 
       {needsChange && (
         <div className="mt-4">
