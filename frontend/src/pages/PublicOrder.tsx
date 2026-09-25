@@ -73,9 +73,9 @@ function CartBar({
   disabled?: boolean;
 }) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 border-t-2 border-[#14161C]/10 bg-[#F4F6FA] p-3 pb-3.5">
+    <div className="fixed bottom-0 left-0 right-0 border-t-2 border-[#14161C]/10 bg-[#F4F6FA] p-2 pb-2.5">
       <button
-        className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-[6px] bg-gradient-to-br from-brand to-brand-700 px-[18px] py-[13px] text-[13.5px] font-bold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mx-auto flex w-full max-w-3xl items-center justify-between rounded-[6px] bg-gradient-to-br from-brand to-brand-700 px-3.5 py-2.5 text-[12.5px] font-bold text-white shadow-[0_10px_20px_-8px_rgba(20,41,94,0.45)] disabled:cursor-not-allowed disabled:opacity-60"
         onClick={onClick}
         disabled={disabled}
       >
@@ -378,7 +378,10 @@ export default function PublicOrder() {
       )}
 
       {step !== 'intro' && (
-      <div className={`mx-auto px-4 pb-28 pt-4 ${step === 'menu' ? 'max-w-3xl' : 'max-w-md'}`}>
+      // A barra fixa do rodapé (CartBar) só existe no Cardápio quando já tem item no
+      // carrinho, e no Carrinho/Revisão sempre — nos outros casos reservar esse espaço
+      // deixava uma sobra vazia embaixo da tela sem nenhuma barra pra preencher ali.
+      <div className={`mx-auto px-4 pt-4 ${(step === 'menu' && itemCount === 0) || step === 'details' || step === 'payment' ? 'pb-6' : 'pb-28'} ${step === 'menu' ? 'max-w-3xl' : 'max-w-md'}`}>
         {step === 'details' && (
           <DetailsStep
             slug={slug}

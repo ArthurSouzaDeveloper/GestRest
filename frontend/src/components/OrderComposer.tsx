@@ -290,13 +290,13 @@ export function OrderComposer({
                 aba própria. */}
             <div className="mb-2 grid grid-cols-2 gap-2">
               <button
-                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
                 onClick={() => setTopGroup('COMIDAS')}
               >
                 <Utensils size={15} className="shrink-0" /> Pastéis e Mini Pizzas
               </button>
               <button
-                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
                 onClick={() => setTopGroup('BEBIDAS')}
               >
                 <CupSoda size={15} className="shrink-0" /> Sucos e Bebidas
@@ -314,7 +314,7 @@ export function OrderComposer({
                 {groupChips.map((chip) => (
                   <button
                     key={chip.key}
-                    className={`h-9 shrink-0 whitespace-nowrap rounded-full px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                    className={`h-9 shrink-0 whitespace-nowrap rounded-full border px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'border-transparent bg-brand text-white' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
                     onClick={() => setActiveCat(chip.key)}
                   >
                     {chip.label}
