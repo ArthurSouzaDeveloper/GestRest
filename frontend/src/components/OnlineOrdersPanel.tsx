@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bike, ShoppingBag, Phone } from 'lucide-react';
+import { Bike, ShoppingBag, Phone, Archive } from 'lucide-react';
 import api, { apiError } from '../lib/api';
-import { brl, time } from '../lib/format';
+import { brl, time, dateTime } from '../lib/format';
 import { Card, ProductionBadge, orderTypeLabels, paymentMethodLabels } from './ui';
 import { useRealtime } from '../hooks/useRealtime';
 import type { Order, OrderType } from '../types';
 
 const QUERY_KEYS: ['online-orders-delivery', 'online-orders-pickup'] = ['online-orders-delivery', 'online-orders-pickup'];
+// Histórico (pedidos arquivados pela rotina noturna de 00:30 — ver
+// archive-stale-online-orders.ts) tem chaves próprias: não deve ser invalidado pelos
+// eventos em tempo real da fila do dia, e um refetch mais espaçado já basta (não muda com
+// frequência, só uma vez por noite).
+const HISTORY_QUERY_KEYS: ['online-orders-delivery-history', 'online-orders-pickup-history'] = [
+  'online-orders-delivery-history',
+  'online-orders-pickup-history',
+];
 
 /**
  * Painel de pedidos online (delivery/retirada), separado da fila normal da Cozinha —
@@ -40,7 +48,7 @@ export function OnlineOrdersPanel({
   useRealtime(['cashier', 'floor'], [[QUERY_KEYS[0]], [QUERY_KEYS[1]]]);
   const qc = useQueryClient();
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'preparing' | 'ready'>(defaultTab);
+  const [tab, setTab] = useState<'preparing' | 'ready' | 'history'>(defaultTab);
 
   const { data: deliveryOrders = [] } = useQuery({
     queryKey: [QUERY_KEYS[0]],
@@ -54,6 +62,24 @@ export function OnlineOrdersPanel({
     refetchInterval: 10000,
     enabled: orderTypes.includes('PICKUP'),
   });
+  // Pedidos arquivados às 00:30 pela rotina noturna (esquecidos de um dia pro outro) — ver
+  // archive-stale-online-orders.ts. Carrega sempre (não só quando a aba está aberta): a
+  // aba "Histórico" precisa aparecer/contar mesmo antes de ser clicada, e sem isso o
+  // painel inteiro sumiria de madrugada (sem pedido ao vivo) mesmo com histórico pra ver.
+  const { data: deliveryHistory = [] } = useQuery({
+    queryKey: [HISTORY_QUERY_KEYS[0]],
+    queryFn: async () =>
+      (await api.get<Order[]>('/orders', { params: { orderType: 'DELIVERY', archived: true } })).data,
+    refetchInterval: 60000,
+    enabled: orderTypes.includes('DELIVERY'),
+  });
+  const { data: pickupHistory = [] } = useQuery({
+    queryKey: [HISTORY_QUERY_KEYS[1]],
+    queryFn: async () =>
+      (await api.get<Order[]>('/orders', { params: { orderType: 'PICKUP', archived: true } })).data,
+    refetchInterval: 60000,
+    enabled: orderTypes.includes('PICKUP'),
+  });
 
   const orders = [...deliveryOrders, ...pickupOrders].filter(
     (o) => o.status !== 'PAID' && o.status !== 'CANCELLED' && (canAccept || o.status !== 'PENDING'),
@@ -65,10 +91,13 @@ export function OnlineOrdersPanel({
   // atrapalhava a visão de quem só quer ver o que ainda está sendo preparado.
   const preparing = orders.filter((o) => o.status === 'OPEN' || o.status === 'IN_PRODUCTION');
   const ready = orders.filter((o) => o.status === 'READY_FOR_PAYMENT');
+  const history = [...deliveryHistory, ...pickupHistory];
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: [QUERY_KEYS[0]] });
     qc.invalidateQueries({ queryKey: [QUERY_KEYS[1]] });
+    qc.invalidateQueries({ queryKey: [HISTORY_QUERY_KEYS[0]] });
+    qc.invalidateQueries({ queryKey: [HISTORY_QUERY_KEYS[1]] });
   };
 
   const accept = useMutation({
@@ -82,7 +111,10 @@ export function OnlineOrdersPanel({
     onError: (e) => setError(apiError(e)),
   });
 
-  if (orders.length === 0) {
+  // "Histórico" é sempre alcançável mesmo sem nenhum pedido ao vivo no momento (ex.: painel
+  // vazio de madrugada, mas com pedidos esquecidos arquivados ontem) — só esconde tudo (ou
+  // mostra emptyMessage) quando não há absolutamente nada, nem ao vivo nem arquivado.
+  if (orders.length === 0 && history.length === 0) {
     if (!emptyMessage) return null;
     return <p className="py-10 text-center text-sm text-gray-400">{emptyMessage}</p>;
   }
@@ -106,6 +138,12 @@ export function OnlineOrdersPanel({
         >
           Prontos{ready.length > 0 ? ` (${ready.length})` : ''}
         </button>
+        <button
+          className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'history' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+          onClick={() => setTab('history')}
+        >
+          Histórico{history.length > 0 ? ` (${history.length})` : ''}
+        </button>
       </div>
 
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
@@ -115,6 +153,11 @@ export function OnlineOrdersPanel({
       )}
       {tab === 'ready' && ready.length === 0 && (
         <p className="py-6 text-center text-sm text-gray-400">Nenhum pedido pronto no momento.</p>
+      )}
+      {tab === 'history' && history.length === 0 && (
+        <p className="py-6 text-center text-sm text-gray-400">
+          Nenhum pedido arquivado. Todo dia às 00:30, pedidos online esquecidos do dia anterior caem aqui automaticamente.
+        </p>
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -137,6 +180,21 @@ export function OnlineOrdersPanel({
             }}
           />
         ))}
+        {tab === 'history' && history.map((o) => (
+          <OnlineOrderCard
+            key={o.id}
+            order={o}
+            action={o.status === 'READY_FOR_PAYMENT' ? {
+              label: 'Marcar Entregue',
+              pending: deliver.isPending,
+              onClick: () => {
+                if (window.confirm(`Confirmar entrega do pedido #${o.number}? Isso registra o pagamento (${o.declaredPaymentMethod ? paymentMethodLabels[o.declaredPaymentMethod] : '—'}).`)) {
+                  deliver.mutate(o.id);
+                }
+              },
+            } : undefined}
+          />
+        ))}
       </div>
     </div>
   );
@@ -150,6 +208,8 @@ function OnlineOrderCard({
   action?: { label: string; pending: boolean; onClick: () => void };
 }) {
   const Icon = order.orderType === 'DELIVERY' ? Bike : ShoppingBag;
+  // Pedido arquivado pode ser de qualquer dia anterior — só a hora (como nas abas ao vivo,
+  // sempre "hoje") ficaria ambígua, por isso mostra data + hora aqui.
   return (
     <Card className="!p-3">
       <div className="flex items-center justify-between">
@@ -157,8 +217,13 @@ function OnlineOrderCard({
           <Icon size={16} className="text-brand" /> {orderTypeLabels[order.orderType]}
           <span className="font-normal text-gray-400">· #{order.number}</span>
         </span>
-        <span className="text-xs text-gray-400">{time(order.openedAt)}</span>
+        <span className="text-xs text-gray-400">{order.archivedAt ? dateTime(order.openedAt) : time(order.openedAt)}</span>
       </div>
+      {order.archivedAt && (
+        <div className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+          <Archive size={11} /> Arquivado em {dateTime(order.archivedAt)}
+        </div>
+      )}
 
       <div className="mt-1.5 text-sm">
         <div className="font-medium">{order.customer?.name ?? '—'}</div>

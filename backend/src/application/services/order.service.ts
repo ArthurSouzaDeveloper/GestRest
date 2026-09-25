@@ -242,12 +242,17 @@ export const orderService = {
       orderType?: OrderType;
       skip?: number;
       take?: number;
+      /** true = só os arquivados pela rotina noturna (aba "Histórico"); por padrão (omitido)
+       * ficam de fora de qualquer listagem — é assim que eles somem das telas do dia a dia
+       * sem precisar apagar nada (ver archive-stale-online-orders.ts). */
+      archived?: boolean;
     } = {},
   ) {
     const where: Prisma.OrderWhereInput = { restaurantId: tenantId };
     if (params.status) where.status = params.status;
     if (params.tableId) where.tableId = params.tableId;
     if (params.orderType) where.orderType = params.orderType;
+    where.archivedAt = params.archived ? { not: null } : null;
     // Sem cota, essa lista crescia sem limite conforme meses de operação se acumulam —
     // qualquer papel autenticado podia pedir o histórico inteiro do tenant de uma vez
     // (payload pesado: itens + produtos + adicionais + pagamentos por pedido). Telas que

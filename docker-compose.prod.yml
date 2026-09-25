@@ -45,6 +45,10 @@ services:
       CORS_ORIGIN: https://${DOMAIN}
       # fatal | error | warn | info | debug
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Fuso horário do processo — usado pelo corte de "meia-noite de hoje" da rotina
+      # noturna de arquivamento (archive-stale-online-orders.ts). Sem isso o container usa
+      # UTC por padrão e o corte fica 3h errado.
+      TZ: America/Sao_Paulo
     volumes:
       - uploads:/app/uploads
     expose:

@@ -437,12 +437,19 @@ model Order {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  // Preenchido pela rotina noturna (archive-stale-online-orders.ts, agendada via cron do
+  // host às 00:30) pra pedidos online (delivery/retirada) que ficaram parados de um dia
+  // pro outro sem serem pagos/cancelados — some das telas normais (Cozinha/Motoboy/Caixa)
+  // sem apagar nada, e continua acessível pela aba "Histórico" do painel de pedidos online.
+  archivedAt DateTime?
+
   items     OrderItem[]
   payments  Payment[]
   printJobs PrintJob[]
 
   @@index([restaurantId, status])
   @@index([restaurantId, orderType, status])
+  @@index([restaurantId, orderType, archivedAt])
   @@index([tableId])
   @@index([waiterId])
   @@map("orders")

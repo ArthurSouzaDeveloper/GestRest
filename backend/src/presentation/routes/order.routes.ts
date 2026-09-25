@@ -48,6 +48,7 @@ router.get(
         orderType: req.query.orderType as OrderType | undefined,
         skip: req.query.skip !== undefined ? Number(req.query.skip) : undefined,
         take: req.query.take !== undefined ? Number(req.query.take) : undefined,
+        archived: req.query.archived === 'true',
       }),
     ),
   ),
