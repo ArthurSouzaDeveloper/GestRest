@@ -8,7 +8,7 @@ import { useRealtime } from '../hooks/useRealtime';
 import type { Order, OrderType } from '../types';
 
 const QUERY_KEYS: ['online-orders-delivery', 'online-orders-pickup'] = ['online-orders-delivery', 'online-orders-pickup'];
-// Histórico (pedidos arquivados pela rotina noturna de 00:30 — ver
+// Histórico (pedidos arquivados pela rotina noturna das 2h da manhã — ver
 // archive-stale-online-orders.ts) tem chaves próprias: não deve ser invalidado pelos
 // eventos em tempo real da fila do dia, e um refetch mais espaçado já basta (não muda com
 // frequência, só uma vez por noite).
@@ -62,7 +62,7 @@ export function OnlineOrdersPanel({
     refetchInterval: 10000,
     enabled: orderTypes.includes('PICKUP'),
   });
-  // Pedidos arquivados às 00:30 pela rotina noturna (esquecidos de um dia pro outro) — ver
+  // Pedidos arquivados às 2h da manhã pela rotina noturna (esquecidos de um dia pro outro) — ver
   // archive-stale-online-orders.ts. Carrega sempre (não só quando a aba está aberta): a
   // aba "Histórico" precisa aparecer/contar mesmo antes de ser clicada, e sem isso o
   // painel inteiro sumiria de madrugada (sem pedido ao vivo) mesmo com histórico pra ver.
@@ -156,7 +156,7 @@ export function OnlineOrdersPanel({
       )}
       {tab === 'history' && history.length === 0 && (
         <p className="py-6 text-center text-sm text-gray-400">
-          Nenhum pedido arquivado. Todo dia às 00:30, pedidos online esquecidos do dia anterior caem aqui automaticamente.
+          Nenhum pedido arquivado. Todo dia às 2h da manhã, pedidos online esquecidos do dia anterior caem aqui automaticamente.
         </p>
       )}
 

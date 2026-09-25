@@ -438,7 +438,7 @@ model Order {
   updatedAt DateTime  @updatedAt
 
   // Preenchido pela rotina noturna (archive-stale-online-orders.ts, agendada via cron do
-  // host às 00:30) pra pedidos online (delivery/retirada) que ficaram parados de um dia
+  // host às 2h da manhã) pra pedidos online (delivery/retirada) que ficaram parados de um dia
   // pro outro sem serem pagos/cancelados — some das telas normais (Cozinha/Motoboy/Caixa)
   // sem apagar nada, e continua acessível pela aba "Histórico" do painel de pedidos online.
   archivedAt DateTime?

@@ -22,8 +22,8 @@
  * Uso (dentro do container backend, imagem já compilada):
  *   node dist/scripts/archive-stale-online-orders.js
  *
- * Cron do host (diariamente às 00:30, mesmo fuso do host — confira com `timedatectl`):
- *   30 0 * * * docker exec gestrest-backend node dist/scripts/archive-stale-online-orders.js >> /var/log/gestrest-archive.log 2>&1
+ * Cron do host (diariamente às 2h da manhã, mesmo fuso do host — confira com `timedatectl`):
+ *   0 2 * * * docker exec gestrest-backend node dist/scripts/archive-stale-online-orders.js >> /var/log/gestrest-archive.log 2>&1
  */
 import { OrderStatus, OrderType, PrismaClient } from '@prisma/client';
 

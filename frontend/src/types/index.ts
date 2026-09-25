@@ -193,7 +193,7 @@ export interface Order {
   acceptedAt?: string | null;
   /** Previsão travada no momento da confirmação (site público) — cálculo em eta.service.ts. */
   estimatedReadyAt?: string | null;
-  /** Preenchido pela rotina noturna (00:30) pra pedidos online esquecidos de um dia pro
+  /** Preenchido pela rotina noturna (2h da manhã) pra pedidos online esquecidos de um dia pro
    * outro — some das telas normais, só aparece na aba "Histórico". */
   archivedAt?: string | null;
 }
