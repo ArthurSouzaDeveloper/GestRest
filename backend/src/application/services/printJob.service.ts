@@ -66,6 +66,8 @@ export const printJobService = {
         deliveryNumber: true,
         deliveryComplement: true,
         deliveryCep: true,
+        declaredPaymentMethod: true,
+        changeFor: true,
       },
     });
     const deliveryAddress =
@@ -99,6 +101,8 @@ export const printJobService = {
         deliveryAddress,
         placedAt: order.openedAt,
         items: ticketItems,
+        paymentMethod: order.declaredPaymentMethod,
+        changeFor: order.changeFor !== null ? Number(order.changeFor) : null,
       };
       await tx.printJob.create({
         data: { restaurantId: tenantId, orderId, station, payload: renderTicket(baseTicket) },

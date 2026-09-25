@@ -1,4 +1,4 @@
-import { OrderType, Station } from '@prisma/client';
+import { OrderType, PaymentMethod, Station } from '@prisma/client';
 
 const ESC = 0x1b;
 const GS = 0x1d;
@@ -23,6 +23,14 @@ const ORDER_TYPE_LABEL: Record<OrderType, string> = {
   DINE_IN: 'MESA',
   DELIVERY: 'ENTREGA',
   PICKUP: 'RETIRADA',
+};
+
+const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  PIX: 'PIX',
+  CASH: 'DINHEIRO',
+  CREDIT: 'CARTAO DE CREDITO',
+  DEBIT: 'CARTAO DE DEBITO',
+  MEAL_VOUCHER: 'VALE REFEICAO',
 };
 
 export interface TicketItem {
@@ -64,6 +72,13 @@ export interface TicketInput {
   /** "2a VIA" na segunda cópia de pedidos de entrega/retirada (ver printJob.service.ts) —
    * null na via normal, pra não confundir a equipe com o que pareceria um pedido duplicado. */
   copyLabel?: string | null;
+  /** Forma de pagamento declarada pelo cliente no site (delivery/retirada — pagamento na
+   * entrega/retirada). null pra pedido de mesa, que paga no caixa depois de pronto e não
+   * declara forma de pagamento antecipada. Pedido do dono do restaurante: quem entrega
+   * precisa saber o que cobrar sem abrir o sistema. */
+  paymentMethod?: PaymentMethod | null;
+  /** "Troco pra quanto" — só relevante (e só chega preenchido) quando paymentMethod é CASH. */
+  changeFor?: number | null;
 }
 
 /**
@@ -116,6 +131,13 @@ export function renderTicket(input: TicketInput): Buffer {
     parts.push(line(`${addr.street}, ${addr.number}${addr.complement ? ` - ${addr.complement}` : ''}`));
     if (addr.zoneName) parts.push(line(addr.zoneName));
     if (addr.cep) parts.push(line(`CEP: ${addr.cep}`));
+  }
+  if (input.paymentMethod) {
+    const changeNote =
+      input.paymentMethod === PaymentMethod.CASH && input.changeFor
+        ? ` (troco p/ ${formatCurrency(input.changeFor)})`
+        : '';
+    parts.push(BOLD_ON, line(`PAGAMENTO: ${PAYMENT_METHOD_LABEL[input.paymentMethod]}${changeNote}`), BOLD_OFF);
   }
   // Horário fixado à zona de São Paulo de propósito — o container do backend roda em
   // UTC, então usar o fuso padrão do processo mostraria uma hora adiantada no ticket.
