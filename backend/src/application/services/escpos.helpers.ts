@@ -4,12 +4,13 @@ const ESC = 0x1b;
 const GS = 0x1d;
 
 const INIT = Buffer.from([ESC, 0x40]);
-// Negrito + altura dupla + largura dupla — cabeçalho da estação, precisa se destacar
-// bem na bancada da produção.
+// Negrito + altura dupla + largura dupla — cabeçalho da estação e o nome de cada prato,
+// os dois precisam se destacar bem (dá pra ler de longe) na bancada da produção.
 const HEADER_MODE_ON = Buffer.from([ESC, 0x21, 0x38]);
-const NORMAL_MODE = Buffer.from([ESC, 0x21, 0x00]);
-const BOLD_ON = Buffer.from([ESC, 0x45, 0x01]);
-const BOLD_OFF = Buffer.from([ESC, 0x45, 0x00]);
+// Negrito + altura dupla (sem largura dupla) — linha de base do resto do ticket (pedido
+// do cliente pra aumentar a fonte de tudo, mas sem perder o destaque do prato acima, que
+// continua maior por ter largura dupla também).
+const BODY_MODE_ON = Buffer.from([ESC, 0x21, 0x18]);
 const feedLines = (n: number) => Buffer.from([ESC, 0x64, n]);
 const PARTIAL_CUT = Buffer.from([GS, 0x56, 0x01]);
 
@@ -116,14 +117,14 @@ function formatCurrency(value: number): string {
  * documentada.
  */
 export function renderTicket(input: TicketInput): Buffer {
-  const parts: Buffer[] = [INIT, HEADER_MODE_ON, line(STATION_LABEL[input.station]), NORMAL_MODE];
+  const parts: Buffer[] = [INIT, HEADER_MODE_ON, line(STATION_LABEL[input.station]), BODY_MODE_ON];
 
   if (input.copyLabel) {
-    parts.push(HEADER_MODE_ON, line(`*** ${input.copyLabel} ***`), NORMAL_MODE);
+    parts.push(HEADER_MODE_ON, line(`*** ${input.copyLabel} ***`), BODY_MODE_ON);
   }
 
   const origin = input.tableNumber != null ? `MESA ${input.tableNumber}` : ORDER_TYPE_LABEL[input.orderType];
-  parts.push(BOLD_ON, line(`${origin} - PEDIDO #${input.orderNumber}`), BOLD_OFF);
+  parts.push(line(`${origin} - PEDIDO #${input.orderNumber}`));
   if (input.customerName) parts.push(line(input.customerName));
   if (input.customerPhone) parts.push(line(`Tel: ${input.customerPhone}`));
   if (input.deliveryAddress) {
@@ -137,7 +138,7 @@ export function renderTicket(input: TicketInput): Buffer {
       input.paymentMethod === PaymentMethod.CASH && input.changeFor
         ? ` (troco p/ ${formatCurrency(input.changeFor)})`
         : '';
-    parts.push(BOLD_ON, line(`PAGAMENTO: ${PAYMENT_METHOD_LABEL[input.paymentMethod]}${changeNote}`), BOLD_OFF);
+    parts.push(line(`PAGAMENTO: ${PAYMENT_METHOD_LABEL[input.paymentMethod]}${changeNote}`));
   }
   // Horário fixado à zona de São Paulo de propósito — o container do backend roda em
   // UTC, então usar o fuso padrão do processo mostraria uma hora adiantada no ticket.
@@ -149,10 +150,10 @@ export function renderTicket(input: TicketInput): Buffer {
     // categoria crua do produto (nem cozinha, nem suqueiros), só o tipo do prato
     // (pastel/mini pizza/porção) quando informado, prefixado ao nome do sabor.
     // Linha do prato no mesmo tamanho grande do cabeçalho (COZINHA/SUQUEIROS) — pedido
-    // explícito do cliente pra dar pra ler de longe na bancada de produção; o resto do
-    // ticket (descrição, preço, adicionais, obs) fica no tamanho normal de propósito.
+    // explícito do cliente pra dar pra ler de longe na bancada de produção; volta pro
+    // BODY_MODE_ON (não pro normal) depois, já que o resto do ticket também é maior agora.
     const label = item.typeLabel ? `${item.typeLabel} - ${item.name}` : item.name;
-    parts.push(HEADER_MODE_ON, line(`${item.quantity}x ${label}`), NORMAL_MODE);
+    parts.push(HEADER_MODE_ON, line(`${item.quantity}x ${label}`), BODY_MODE_ON);
     if (item.description) parts.push(line(`  ${item.description}`));
     parts.push(line(`  ${formatCurrency(item.unitPrice)} / un.`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));

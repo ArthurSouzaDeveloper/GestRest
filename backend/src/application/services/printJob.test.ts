@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { OrderStatus, PaymentMethod, PrintJobStatus, Role, Station } from '@prisma/client';
+import { AdditionalKind, OrderStatus, PaymentMethod, PrintJobStatus, Role, Station } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { orderService } from './order.service';
 import { autoAcceptService } from './autoAccept.service';
@@ -160,6 +160,75 @@ describe('fila de impressão térmica (PrintJob)', () => {
     // famílias — continua sem prefixo nenhum, como já era antes desta mudança.
     expect(juiceText).toContain('1x Suco');
     expect(juiceText).not.toContain('Sucos - Suco');
+  });
+
+  it('categoria "Sugestões da Casa" imprime só o nome do prato, sem a descrição', async () => {
+    const category = await prisma.category.create({
+      data: { name: 'Sugestões da Casa', station: Station.KITCHEN, restaurantId },
+    });
+    const product = await prisma.product.create({
+      data: {
+        name: 'Atum do Rei',
+        description: 'Atum em pedacos, mussarela e cebola.',
+        price: 18,
+        categoryId: category.id,
+        restaurantId,
+      },
+    });
+    const table = await prisma.restaurantTable.create({ data: { number: 521, restaurantId } });
+    const order = await orderService.open({ tableId: table.id }, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
+    await orderService.addItems(
+      order!.id,
+      [{ productId: product.id, quantity: 1 }],
+      { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
+    );
+
+    const job = await prisma.printJob.findFirstOrThrow({ where: { orderId: order!.id } });
+    const text = job.payload.toString('ascii');
+    expect(text).toContain('1x Atum do Rei');
+    // Cozinha já sabe o recheio das Sugestões da Casa de cor — pedido do cliente pra não
+    // repetir a descrição no ticket (ao contrário de uma categoria comum, ver teste acima).
+    expect(text).not.toContain('Atum em pedacos');
+  });
+
+  it('"Monte o Seu Pastel" (produto isCustom) imprime só os ingredientes em CAIXA ALTA', async () => {
+    const category = await prisma.category.create({
+      data: { name: 'Pastéis Salgados', station: Station.KITCHEN, restaurantId },
+    });
+    const customProduct = await prisma.product.create({
+      data: {
+        name: 'Monte o Seu Pastel',
+        description: 'Monte o Seu (escolha os ingredientes)',
+        price: 0,
+        isCustom: true,
+        categoryId: category.id,
+        restaurantId,
+      },
+    });
+    const base = await prisma.additional.create({
+      data: { name: 'Frango', kind: AdditionalKind.BASE, price: 12, restaurantId, categoryId: category.id },
+    });
+    const extra = await prisma.additional.create({
+      data: { name: 'Catupiry', kind: AdditionalKind.ADDON, price: 2, restaurantId, categoryId: category.id },
+    });
+
+    const table = await prisma.restaurantTable.create({ data: { number: 522, restaurantId } });
+    const order = await orderService.open({ tableId: table.id }, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
+    await orderService.addItems(
+      order!.id,
+      [{ productId: customProduct.id, quantity: 1, additionalIds: [base.id, extra.id] }],
+      { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
+    );
+
+    const job = await prisma.printJob.findFirstOrThrow({ where: { orderId: order!.id } });
+    const text = job.payload.toString('ascii');
+    expect(text).toContain('FRANGO');
+    expect(text).toContain('CATUPIRY');
+    // Nem o nome genérico do produto, nem a descrição fixa, nem a linha "+ " separada de
+    // adicional — os ingredientes viraram o próprio título do item (ver printJob.service.ts).
+    expect(text).not.toContain('Monte o Seu Pastel');
+    expect(text).not.toContain('escolha os ingredientes');
+    expect(text).not.toContain('+ Catupiry');
   });
 
   it('aceite manual de pedido online gera o PrintJob no momento do aceite, não antes', async () => {

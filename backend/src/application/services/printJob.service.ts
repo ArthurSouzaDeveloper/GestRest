@@ -30,6 +30,20 @@ export function categoryTypeLabel(categoryName: string): string | null {
 }
 
 /**
+ * "Sugestões da Casa" (doce ou salgada) tem sabores fixos/curados — a cozinha já sabe de
+ * cor o que leva dentro, então repetir a descrição do produto no ticket só ocupa espaço.
+ * Pedido explícito do cliente. Comparação por conteúdo (não string exata), mesmo motivo
+ * de categoryTypeLabel acima: sobrevive a uma renomeação da categoria no cardápio.
+ */
+function isHouseSuggestion(categoryName: string): boolean {
+  return categoryName
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .includes('sugest');
+}
+
+/**
  * Gera um trabalho de impressão por estação tocada, sempre que itens ficam
  * visíveis/acionáveis na fila de produção pela primeira vez — chamado dentro da mesma
  * transação que cria/libera esses itens (addItems, accept, openPublic com aceite
@@ -82,15 +96,32 @@ export const printJobService = {
         : null;
 
     for (const [station, stationItems] of byStation) {
-      const ticketItems: TicketItem[] = stationItems.map((item) => ({
-        name: itemDisplayName(item.product.name, item.comboLabel),
-        typeLabel: categoryTypeLabel(item.product.category.name),
-        description: item.product.description,
-        quantity: item.quantity,
-        unitPrice: Number(item.unitPrice),
-        notes: item.notes,
-        additionals: item.additionals.map((a) => a.name),
-      }));
+      const ticketItems: TicketItem[] = stationItems.map((item) => {
+        // "Monte o Seu Pastel"/"Monte o Seu Pastel Doce": o nome do produto não diz nada
+        // pra quem prepara — o que importa é o que o cliente escolheu por dentro. Pedido
+        // explícito do cliente: no lugar do nome genérico, o título vira a lista de
+        // ingredientes escolhidos em CAIXA ALTA, sem tipo/descrição (ambos genéricos aqui).
+        if (item.product.isCustom) {
+          return {
+            name: item.additionals.map((a) => a.name.toUpperCase()).join(', '),
+            typeLabel: null,
+            description: null,
+            quantity: item.quantity,
+            unitPrice: Number(item.unitPrice),
+            notes: item.notes,
+            additionals: [],
+          };
+        }
+        return {
+          name: itemDisplayName(item.product.name, item.comboLabel),
+          typeLabel: categoryTypeLabel(item.product.category.name),
+          description: isHouseSuggestion(item.product.category.name) ? null : item.product.description,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+          notes: item.notes,
+          additionals: item.additionals.map((a) => a.name),
+        };
+      });
       const baseTicket = {
         station,
         tableNumber: order.table?.number ?? null,
