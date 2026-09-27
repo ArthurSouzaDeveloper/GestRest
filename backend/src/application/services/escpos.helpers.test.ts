@@ -288,7 +288,7 @@ describe('renderTicket', () => {
     expect(bytes).not.toContain('null - Suco de Laranja');
   });
 
-  it('marca a 2a via com destaque quando copyLabel é passado; não marca nada quando ausente', () => {
+  it('marca a via combinada com um tracejado + rótulo (tamanho normal, sem gastar papel) quando copyLabel é passado; nada quando ausente', () => {
     const semVia = renderTicket({
       station: Station.KITCHEN,
       tableNumber: null,
@@ -311,10 +311,11 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      copyLabel: '2a VIA',
+      copyLabel: 'SEGUNDA VIA MOTOBOY',
       items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
-    expect(comVia).toContain('*** 2a VIA ***');
+    expect(comVia).toContain('SEGUNDA VIA MOTOBOY');
+    expect(comVia).not.toContain('***');
   });
 
   it('headerOverride substitui o nome da estação no topo (usado na via combinada do motoboy)', () => {
@@ -345,6 +346,25 @@ describe('renderTicket', () => {
     }).toString('ascii');
     expect(comOverride).toContain('PEDIDO COMPLETO');
     expect(comOverride).not.toContain('COZINHA');
+  });
+
+  it('headerOverride vazio ("") omite a linha de cabeçalho por completo, economizando papel', () => {
+    const bytes = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      headerOverride: '',
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(bytes).not.toContain('COZINHA');
+    // Sem cabeçalho, a primeira coisa impressa (depois da inicialização da impressora) já
+    // é a linha do pedido — não sobra uma linha em branco no lugar do cabeçalho.
+    expect(bytes.indexOf('PEDIDO #1')).toBeLessThan(20);
   });
 
   it('hasBeverages liga o aviso "PEDIDO COM BEBIDAS" logo abaixo do cabeçalho; sem bebida, não imprime nada', () => {

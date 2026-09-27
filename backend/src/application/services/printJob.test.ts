@@ -347,8 +347,8 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const deliveryJobs = await prisma.printJob.findMany({ where: { orderId: delivery.id } });
     expect(deliveryJobs).toHaveLength(2);
     const texts = deliveryJobs.map((j) => j.payload.toString('ascii'));
-    expect(texts.filter((t) => t.includes('2a VIA'))).toHaveLength(1);
-    expect(texts.filter((t) => !t.includes('2a VIA'))).toHaveLength(1);
+    expect(texts.filter((t) => t.includes('SEGUNDA VIA MOTOBOY'))).toHaveLength(1);
+    expect(texts.filter((t) => !t.includes('SEGUNDA VIA MOTOBOY'))).toHaveLength(1);
 
     await autoAcceptService.update(restaurantId, { enabled: true });
     const pickup = await orderService.openPublic(restaurantId, {
@@ -361,7 +361,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     await autoAcceptService.update(restaurantId, { enabled: false });
     const pickupJobs = await prisma.printJob.findMany({ where: { orderId: pickup.id } });
     expect(pickupJobs).toHaveLength(1);
-    expect(pickupJobs[0].payload.toString('ascii')).not.toContain('2a VIA');
+    expect(pickupJobs[0].payload.toString('ascii')).not.toContain('SEGUNDA VIA MOTOBOY');
 
     const table = await prisma.restaurantTable.create({ data: { number: 502, restaurantId } });
     const dineIn = await orderService.open({ tableId: table.id }, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
@@ -372,7 +372,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     );
     const dineInJobs = await prisma.printJob.findMany({ where: { orderId: dineIn!.id } });
     expect(dineInJobs).toHaveLength(1);
-    expect(dineInJobs[0].payload.toString('ascii')).not.toContain('2a VIA');
+    expect(dineInJobs[0].payload.toString('ascii')).not.toContain('SEGUNDA VIA MOTOBOY');
   });
 
   it('entrega com item de cozinha E de suco gera 3 vias: cada estação + uma via única combinada pro motoboy', async () => {
@@ -405,22 +405,22 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(kitchenJob).toContain('COZINHA');
     expect(kitchenJob).toContain('1- Pastel');
     expect(kitchenJob).not.toContain('Suco');
-    expect(kitchenJob).not.toContain('2a VIA');
+    expect(kitchenJob).not.toContain('SEGUNDA VIA MOTOBOY');
     expect(kitchenJob).not.toContain('PEDIDO COM BEBIDAS');
     expect(kitchenJob).not.toContain('TOTAL DO PEDIDO');
 
     expect(juiceJob).toContain('SUQUEIROS');
     expect(juiceJob).toContain('2- Suco');
     expect(juiceJob).not.toContain('Pastel');
-    expect(juiceJob).not.toContain('2a VIA');
+    expect(juiceJob).not.toContain('SEGUNDA VIA MOTOBOY');
     expect(juiceJob).not.toContain('PEDIDO COM BEBIDAS');
     expect(juiceJob).not.toContain('TOTAL DO PEDIDO');
 
-    // A via do motoboy não estampa "COZINHA" nem "SUQUEIROS" no topo (reúne as duas), traz
-    // TODOS os itens do pedido juntos numa via só, avisa que tem bebida e mostra o total
-    // (10 do pastel + 2×8 dos sucos + 5 de taxa de entrega, sem serviço em pedido online).
-    expect(motoboyJob).toContain('PEDIDO COMPLETO');
-    expect(motoboyJob).toContain('2a VIA - MOTOBOY');
+    // A via do motoboy não estampa "COZINHA" nem "SUQUEIROS" no topo (reúne as duas), nem
+    // um cabeçalho grande próprio (removido a pedido do cliente pra economizar papel) —
+    // traz TODOS os itens do pedido juntos numa via só, avisa que tem bebida e mostra o
+    // total (10 do pastel + 2×8 dos sucos + 5 de taxa de entrega, sem serviço em online).
+    expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
     expect(motoboyJob).toContain('PEDIDO COM BEBIDAS');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 31,00');
     expect(motoboyJob).toContain('1- Pastel');
@@ -449,7 +449,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const motoboyJob = (
       await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } })
     ).payload.toString('ascii');
-    expect(motoboyJob).toContain('2a VIA - MOTOBOY');
+    expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 10,00');
     expect(motoboyJob).not.toContain('PEDIDO COM BEBIDAS');
   });

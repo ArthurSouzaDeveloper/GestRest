@@ -70,12 +70,15 @@ export interface TicketInput {
   deliveryAddress: TicketDeliveryAddress | null;
   placedAt: Date;
   items: TicketItem[];
-  /** "2a VIA - MOTOBOY" na via combinada de entrega (ver printJob.service.ts) — null na
-   * via normal, pra não confundir a equipe com o que pareceria um pedido duplicado. */
+  /** "SEGUNDA VIA MOTOBOY" na via combinada de entrega (ver printJob.service.ts) — null na
+   * via normal, pra não confundir a equipe com o que pareceria um pedido duplicado. Sai em
+   * tamanho normal (não o grande do cabeçalho), com um tracejado antes — pedido do cliente
+   * pra economizar papel. */
   copyLabel?: string | null;
   /** Sobrescreve o texto do cabeçalho grande (normalmente "COZINHA"/"SUQUEIROS", ver
-   * STATION_LABEL) — usado só na via combinada de entrega pro motoboy, que reúne itens de
-   * mais de uma estação e não devia estampar o nome de só uma delas no topo. */
+   * STATION_LABEL); string vazia ('') omite a linha inteira. Usado só na via combinada de
+   * entrega pro motoboy — pedido do cliente pra tirar de vez o "PEDIDO COMPLETO" gigante
+   * que tinha ali antes, gastando papel à toa. */
   headerOverride?: string;
   /** Forma de pagamento declarada pelo cliente no site (delivery/retirada — pagamento na
    * entrega/retirada). null pra pedido de mesa, que paga no caixa depois de pronto e não
@@ -133,17 +136,28 @@ function formatCurrency(value: number): string {
  * documentada.
  */
 export function renderTicket(input: TicketInput): Buffer {
+  // headerOverride === '' (não undefined) omite a linha de cabeçalho por completo — usado
+  // só na via combinada do motoboy: o cliente achou "PEDIDO COMPLETO" grande demais,
+  // gastando papel à toa, e prefere começar direto pelo aviso de bebida (se houver).
   const headerText = input.headerOverride ?? STATION_LABEL[input.station];
-  const parts: Buffer[] = [INIT, HEADER_MODE_ON, line(headerText), BODY_MODE_ON];
+  const parts: Buffer[] = [INIT];
+  if (headerText) {
+    parts.push(HEADER_MODE_ON, line(headerText), BODY_MODE_ON);
+  } else {
+    parts.push(BODY_MODE_ON);
+  }
 
-  // Logo abaixo do cabeçalho, antes de qualquer outra informação — pedido explícito do
-  // cliente pra ser a primeira coisa que o motoboy vê ao pegar a via.
+  // Logo no topo (antes de qualquer outra informação) — pedido explícito do cliente pra
+  // ser a primeira coisa que o motoboy vê ao pegar a via.
   if (input.hasBeverages) {
     parts.push(HEADER_MODE_ON, line('================================'), line('PEDIDO COM BEBIDAS'), line('================================'), BODY_MODE_ON);
   }
 
+  // Tamanho normal do corpo (não o grande do cabeçalho) — pedido do cliente pra
+  // economizar papel; um tracejado antes já deixa claro que é uma via à parte, sem
+  // precisar do destaque gigante de antes.
   if (input.copyLabel) {
-    parts.push(HEADER_MODE_ON, line(`*** ${input.copyLabel} ***`), BODY_MODE_ON);
+    parts.push(line('--------------------------------'), line(input.copyLabel));
   }
 
   const origin = input.tableNumber != null ? `MESA ${input.tableNumber}` : ORDER_TYPE_LABEL[input.orderType];

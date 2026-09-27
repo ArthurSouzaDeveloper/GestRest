@@ -244,8 +244,11 @@ export const printJobService = {
           payload: renderTicket({
             ...commonTicketFields,
             station: deliveryStation,
-            headerOverride: 'PEDIDO COMPLETO',
-            copyLabel: '2a VIA - MOTOBOY',
+            // Sem cabeçalho grande aqui de propósito (pedido do cliente: "PEDIDO COMPLETO"
+            // gastava papel demais) — começa direto pelo aviso de bebida (se houver) e o
+            // tracejado + "SEGUNDA VIA MOTOBOY" em tamanho normal.
+            headerOverride: '',
+            copyLabel: 'SEGUNDA VIA MOTOBOY',
             hasBeverages,
             orderTotal,
             items: [...kitchenItems, ...juiceItems].map(toTicketItem),
