@@ -37,7 +37,7 @@ const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
 export interface TicketItem {
   name: string;
   /** "Pastel", "Mini Pizza" ou "Porção" — pedido do cliente pra distinguir o tipo do
-   * prato de cara no ticket (ex.: "1x Pastel - Mussarela"), sem reintroduzir a categoria
+   * prato de cara no ticket (ex.: "1- Pastel - Mussarela"), sem reintroduzir a categoria
    * crua do produto na impressão (a soletrada "SUCOS" nos tickets de suco, removida a
    * pedido do próprio cliente, continua fora — ver printJob.service.ts). null/undefined
    * não imprime prefixo nenhum. */
@@ -84,6 +84,18 @@ export interface TicketInput {
   paymentMethod?: PaymentMethod | null;
   /** "Troco pra quanto" — só relevante (e só chega preenchido) quando paymentMethod é CASH. */
   changeFor?: number | null;
+  /** Valor total do pedido inteiro (não só os itens desta via) — impresso só quando
+   * presente, logo antes da forma de pagamento. Hoje só a via combinada do motoboy usa
+   * isso; pedido explícito do cliente pra ele conferir o valor sem abrir o sistema. */
+  orderTotal?: number | null;
+  /** true liga o aviso "PEDIDO COM BEBIDAS" logo abaixo do cabeçalho — usado só na via do
+   * motoboy quando o pedido tem algum item de suco/frapê/açaí/bebida (estação SUQUEIROS).
+   * Sem bebida nenhuma, não imprime nada (nem aviso vazio). */
+  hasBeverages?: boolean;
+  /** true imprime uma linha divisória depois de cada item (nome+descrição+preço+
+   * adicionais+obs) — hoje só a via da cozinha usa isso; suco e a via do motoboy
+   * continuam sem, pra não mudar o visual deles além do pedido pelo cliente. */
+  itemSeparator?: boolean;
 }
 
 /**
@@ -124,6 +136,12 @@ export function renderTicket(input: TicketInput): Buffer {
   const headerText = input.headerOverride ?? STATION_LABEL[input.station];
   const parts: Buffer[] = [INIT, HEADER_MODE_ON, line(headerText), BODY_MODE_ON];
 
+  // Logo abaixo do cabeçalho, antes de qualquer outra informação — pedido explícito do
+  // cliente pra ser a primeira coisa que o motoboy vê ao pegar a via.
+  if (input.hasBeverages) {
+    parts.push(HEADER_MODE_ON, line('================================'), line('PEDIDO COM BEBIDAS'), line('================================'), BODY_MODE_ON);
+  }
+
   if (input.copyLabel) {
     parts.push(HEADER_MODE_ON, line(`*** ${input.copyLabel} ***`), BODY_MODE_ON);
   }
@@ -137,6 +155,9 @@ export function renderTicket(input: TicketInput): Buffer {
     parts.push(line(`${addr.street}, ${addr.number}${addr.complement ? ` - ${addr.complement}` : ''}`));
     if (addr.zoneName) parts.push(line(addr.zoneName));
     if (addr.cep) parts.push(line(`CEP: ${addr.cep}`));
+  }
+  if (input.orderTotal != null) {
+    parts.push(line(`TOTAL DO PEDIDO: ${formatCurrency(input.orderTotal)}`));
   }
   if (input.paymentMethod) {
     const changeNote =
@@ -158,11 +179,13 @@ export function renderTicket(input: TicketInput): Buffer {
     // explícito do cliente pra dar pra ler de longe na bancada de produção; volta pro
     // BODY_MODE_ON (não pro normal) depois, já que o resto do ticket também é maior agora.
     const label = item.typeLabel ? `${item.typeLabel} - ${item.name}` : item.name;
-    parts.push(HEADER_MODE_ON, line(`${item.quantity}x ${label}`), BODY_MODE_ON);
+    // "1-" em vez de "1x" — pedido explícito do cliente, em toda categoria e toda via.
+    parts.push(HEADER_MODE_ON, line(`${item.quantity}- ${label}`), BODY_MODE_ON);
     if (item.description) parts.push(line(`  ${item.description}`));
     parts.push(line(`  ${formatCurrency(item.unitPrice)} / un.`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
+    if (input.itemSeparator) parts.push(line('----------------------------'));
   }
 
   parts.push(line('--------------------------------'), feedLines(4), PARTIAL_CUT);

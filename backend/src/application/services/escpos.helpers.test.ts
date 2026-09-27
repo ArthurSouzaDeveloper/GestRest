@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OrderType, Station } from '@prisma/client';
+import { OrderType, PaymentMethod, Station } from '@prisma/client';
 import { renderTicket } from './escpos.helpers';
 
 const PLACED_AT = new Date('2026-09-17T12:00:00Z');
@@ -60,7 +60,7 @@ describe('renderTicket', () => {
     expect(text).toContain('SUQUEIROS');
     expect(text).toContain('ENTREGA - PEDIDO #42');
     expect(text).toContain('Maria');
-    expect(text).toContain('2x Suco de Laranja');
+    expect(text).toContain('2- Suco de Laranja');
     expect(text).toContain('+ Adocante');
     expect(text).toContain('obs: sem gelo');
   });
@@ -184,7 +184,7 @@ describe('renderTicket', () => {
       placedAt: PLACED_AT,
       items: [{ name: 'Mussarela', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
-    expect(kitchen).toContain('1x Mussarela');
+    expect(kitchen).toContain('1- Mussarela');
     expect(kitchen).not.toContain('[');
     expect(kitchen).not.toContain('PASTEIS');
     expect(kitchen).not.toContain('PIZZA');
@@ -200,7 +200,7 @@ describe('renderTicket', () => {
       placedAt: PLACED_AT,
       items: [{ name: 'Manga (Agua)', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
-    expect(juiceBar).toContain('1x Manga (Agua)');
+    expect(juiceBar).toContain('1- Manga (Agua)');
     expect(juiceBar).not.toContain('[');
     expect(juiceBar).not.toContain('SUCOS');
   });
@@ -225,7 +225,7 @@ describe('renderTicket', () => {
         },
       ],
     }).toString('ascii');
-    expect(comDescricao).toContain('1x Frango Premium');
+    expect(comDescricao).toContain('1- Frango Premium');
     expect(comDescricao).toContain('Frango, geleia de pimenta, bacon, queijo e cream cheese.');
 
     const semDescricao = renderTicket({
@@ -239,7 +239,7 @@ describe('renderTicket', () => {
       placedAt: PLACED_AT,
       items: [{ name: 'Mussarela', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
-    expect(semDescricao).toContain('1x Mussarela');
+    expect(semDescricao).toContain('1- Mussarela');
   });
 
   it('imprime o preço unitário de cada item, em reais, sem usar caractere não-ASCII', () => {
@@ -281,10 +281,10 @@ describe('renderTicket', () => {
         { name: 'Suco de Laranja', typeLabel: null, description: null, unitPrice: 8, quantity: 1, additionals: [] },
       ],
     }).toString('ascii');
-    expect(bytes).toContain('1x Pastel - Mussarela');
-    expect(bytes).toContain('2x Mini Pizza - Calabresa');
-    expect(bytes).toContain('1x Porcao - Batata Frita');
-    expect(bytes).toContain('1x Suco de Laranja');
+    expect(bytes).toContain('1- Pastel - Mussarela');
+    expect(bytes).toContain('2- Mini Pizza - Calabresa');
+    expect(bytes).toContain('1- Porcao - Batata Frita');
+    expect(bytes).toContain('1- Suco de Laranja');
     expect(bytes).not.toContain('null - Suco de Laranja');
   });
 
@@ -315,5 +315,141 @@ describe('renderTicket', () => {
       items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(comVia).toContain('*** 2a VIA ***');
+  });
+
+  it('headerOverride substitui o nome da estação no topo (usado na via combinada do motoboy)', () => {
+    const semOverride = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(semOverride).toContain('COZINHA');
+
+    const comOverride = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      headerOverride: 'PEDIDO COMPLETO',
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(comOverride).toContain('PEDIDO COMPLETO');
+    expect(comOverride).not.toContain('COZINHA');
+  });
+
+  it('hasBeverages liga o aviso "PEDIDO COM BEBIDAS" logo abaixo do cabeçalho; sem bebida, não imprime nada', () => {
+    const semBebida = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(semBebida).not.toContain('BEBIDAS');
+
+    const comBebida = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      hasBeverages: true,
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(comBebida).toContain('PEDIDO COM BEBIDAS');
+    // Logo abaixo do cabeçalho — antes de qualquer outra informação do pedido.
+    expect(comBebida.indexOf('PEDIDO COM BEBIDAS')).toBeLessThan(comBebida.indexOf('PEDIDO #1'));
+  });
+
+  it('orderTotal imprime "TOTAL DO PEDIDO" logo antes da forma de pagamento; ausente, não imprime nada', () => {
+    const semTotal = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      paymentMethod: PaymentMethod.PIX,
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(semTotal).not.toContain('TOTAL DO PEDIDO');
+
+    const comTotal = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      paymentMethod: PaymentMethod.PIX,
+      orderTotal: 67.5,
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(comTotal).toContain('TOTAL DO PEDIDO: R$ 67,50');
+    expect(comTotal.indexOf('TOTAL DO PEDIDO')).toBeLessThan(comTotal.indexOf('PAGAMENTO'));
+  });
+
+  it('itemSeparator imprime uma linha divisória depois de cada item (nome+preço+adicionais+obs); sem a opção, não imprime nada extra', () => {
+    const semSeparador = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [
+        { name: 'Carne', description: null, unitPrice: 10, quantity: 1, additionals: [] },
+        { name: 'Chocolate', description: null, unitPrice: 12, quantity: 1, additionals: [] },
+      ],
+    }).toString('ascii');
+    // Conta LINHAS exatas (não substring) pra não confundir com a moldura do ticket
+    // (abre/fecha com uma linha de 32 traços, mais longa que a do item, mas que também
+    // "contém" a de 28 como substring).
+    const itemSeparatorLine = '-'.repeat(28);
+    expect(semSeparador.split('\n').filter((l) => l === itemSeparatorLine)).toHaveLength(0);
+
+    const comSeparador = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      itemSeparator: true,
+      items: [
+        { name: 'Carne', description: null, unitPrice: 10, quantity: 1, additionals: ['Catupiry'], notes: 'sem cebola' },
+        { name: 'Chocolate', description: null, unitPrice: 12, quantity: 1, additionals: [] },
+      ],
+    }).toString('ascii');
+    // Uma linha por item (2 itens = 2 separadores), cada um depois de tudo daquele item.
+    expect(comSeparador.split('\n').filter((l) => l === itemSeparatorLine)).toHaveLength(2);
+    const separatorAfterObs = comSeparador.indexOf('obs: sem cebola');
+    const separatorLine = comSeparador.indexOf(itemSeparatorLine, separatorAfterObs);
+    expect(separatorLine).toBeGreaterThan(separatorAfterObs);
   });
 });

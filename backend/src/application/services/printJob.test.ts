@@ -90,7 +90,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
 
     const job = await prisma.printJob.findFirstOrThrow({ where: { orderId: order!.id } });
     const text = job.payload.toString('ascii');
-    expect(text).toContain('1x Frango Premium');
+    expect(text).toContain('1- Frango Premium');
     expect(text).toContain('Frango, geleia de pimenta, bacon, queijo e cream cheese.');
     // Sem colchetes de categoria em lugar nenhum do ticket (ver renderTicket).
     expect(text).not.toContain('[');
@@ -151,14 +151,14 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const kitchenText = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
     const juiceText = jobs.find((j) => j.station === Station.JUICE_BAR)!.payload.toString('ascii');
 
-    expect(kitchenText).toContain('1x Pastel Salgado - Mussarela');
-    expect(kitchenText).toContain('1x Pastel Doce - Chocolate');
-    expect(kitchenText).toContain('1x Mini Pizza Salgada - Calabresa');
-    expect(kitchenText).toContain('1x Mini Pizza Doce - Banana com Canela');
-    expect(kitchenText).toContain('1x Porcao - Batata Frita');
+    expect(kitchenText).toContain('1- Pastel Salgado - Mussarela');
+    expect(kitchenText).toContain('1- Pastel Doce - Chocolate');
+    expect(kitchenText).toContain('1- Mini Pizza Salgada - Calabresa');
+    expect(kitchenText).toContain('1- Mini Pizza Doce - Banana com Canela');
+    expect(kitchenText).toContain('1- Porcao - Batata Frita');
     // "Sucos" (categoria do juiceProductId, ver beforeAll) não bate em nenhuma das 3
     // famílias — continua sem prefixo nenhum, como já era antes desta mudança.
-    expect(juiceText).toContain('1x Suco');
+    expect(juiceText).toContain('1- Suco');
     expect(juiceText).not.toContain('Sucos - Suco');
   });
 
@@ -185,7 +185,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
 
     const job = await prisma.printJob.findFirstOrThrow({ where: { orderId: order!.id } });
     const text = job.payload.toString('ascii');
-    expect(text).toContain('1x Atum do Rei');
+    expect(text).toContain('1- Atum do Rei');
     // Cozinha já sabe o recheio das Sugestões da Casa de cor — pedido do cliente pra não
     // repetir a descrição no ticket (ao contrário de uma categoria comum, ver teste acima).
     expect(text).not.toContain('Atum em pedacos');
@@ -376,15 +376,21 @@ describe('fila de impressão térmica (PrintJob)', () => {
   });
 
   it('entrega com item de cozinha E de suco gera 3 vias: cada estação + uma via única combinada pro motoboy', async () => {
+    const zone = await prisma.deliveryZone.create({
+      data: { name: 'Zona Via Combinada', fee: 5, restaurantId },
+    });
     await autoAcceptService.update(restaurantId, { enabled: true });
     const order = await orderService.openPublic(restaurantId, {
       orderType: 'DELIVERY',
       customerName: 'Cliente Misto',
       customerPhone: '11999990006',
       declaredPaymentMethod: PaymentMethod.PIX,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua Mista',
+      deliveryNumber: '10',
       items: [
-        { productId: kitchenProductId, quantity: 1 },
-        { productId: juiceProductId, quantity: 2 },
+        { productId: kitchenProductId, quantity: 1 }, // Pastel, R$10
+        { productId: juiceProductId, quantity: 2 }, // Suco, R$8 cada
       ],
     });
     await autoAcceptService.update(restaurantId, { enabled: false });
@@ -397,23 +403,55 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const [kitchenJob, juiceJob, motoboyJob] = jobs.map((j) => j.payload.toString('ascii'));
 
     expect(kitchenJob).toContain('COZINHA');
-    expect(kitchenJob).toContain('1x Pastel');
+    expect(kitchenJob).toContain('1- Pastel');
     expect(kitchenJob).not.toContain('Suco');
     expect(kitchenJob).not.toContain('2a VIA');
+    expect(kitchenJob).not.toContain('PEDIDO COM BEBIDAS');
+    expect(kitchenJob).not.toContain('TOTAL DO PEDIDO');
 
     expect(juiceJob).toContain('SUQUEIROS');
-    expect(juiceJob).toContain('2x Suco');
+    expect(juiceJob).toContain('2- Suco');
     expect(juiceJob).not.toContain('Pastel');
     expect(juiceJob).not.toContain('2a VIA');
+    expect(juiceJob).not.toContain('PEDIDO COM BEBIDAS');
+    expect(juiceJob).not.toContain('TOTAL DO PEDIDO');
 
-    // A via do motoboy não estampa "COZINHA" nem "SUQUEIROS" no topo (reúne as duas) e
-    // traz TODOS os itens do pedido juntos, numa via só.
+    // A via do motoboy não estampa "COZINHA" nem "SUQUEIROS" no topo (reúne as duas), traz
+    // TODOS os itens do pedido juntos numa via só, avisa que tem bebida e mostra o total
+    // (10 do pastel + 2×8 dos sucos + 5 de taxa de entrega, sem serviço em pedido online).
     expect(motoboyJob).toContain('PEDIDO COMPLETO');
     expect(motoboyJob).toContain('2a VIA - MOTOBOY');
-    expect(motoboyJob).toContain('1x Pastel');
-    expect(motoboyJob).toContain('2x Suco');
+    expect(motoboyJob).toContain('PEDIDO COM BEBIDAS');
+    expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 31,00');
+    expect(motoboyJob).toContain('1- Pastel');
+    expect(motoboyJob).toContain('2- Suco');
     expect(motoboyJob).not.toContain('COZINHA');
     expect(motoboyJob).not.toContain('SUQUEIROS');
+  });
+
+  it('entrega só com item de cozinha (sem bebida) não mostra o aviso de bebidas na via do motoboy', async () => {
+    const zone = await prisma.deliveryZone.create({
+      data: { name: 'Zona Sem Bebida', fee: 0, restaurantId },
+    });
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Só Comida',
+      customerPhone: '11999990007',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua Sem Bebida',
+      deliveryNumber: '20',
+      items: [{ productId: kitchenProductId, quantity: 1 }],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const motoboyJob = (
+      await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } })
+    ).payload.toString('ascii');
+    expect(motoboyJob).toContain('2a VIA - MOTOBOY');
+    expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 10,00');
+    expect(motoboyJob).not.toContain('PEDIDO COM BEBIDAS');
   });
 
   it('verifyAgentKey() só valida a chave certa do tenant certo', async () => {
