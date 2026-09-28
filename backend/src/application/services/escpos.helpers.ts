@@ -91,10 +91,11 @@ export interface TicketInput {
    * presente, logo antes da forma de pagamento. Hoje só a via combinada do motoboy usa
    * isso; pedido explícito do cliente pra ele conferir o valor sem abrir o sistema. */
   orderTotal?: number | null;
-  /** true liga o aviso "PEDIDO COM BEBIDAS" logo abaixo do cabeçalho — usado só na via do
-   * motoboy quando o pedido tem algum item de suco/frapê/açaí/bebida (estação SUQUEIROS).
-   * Sem bebida nenhuma, não imprime nada (nem aviso vazio). */
-  hasBeverages?: boolean;
+  /** Aviso em destaque logo abaixo do cabeçalho (ex.: "PEDIDO COM BEBIDAS", "PEDIDO
+   * TAMBEM TEM BEBIDA") — pra quem só vê ESTA via não esquecer que o pedido tem mais
+   * coisa em outra estação/via. null/undefined não imprime nada (pedido comum, sem
+   * outra estação envolvida). Ver printJob.service.ts. */
+  crossStationNotice?: string | null;
   /** true imprime uma linha divisória depois de cada item (nome+descrição+preço+
    * adicionais+obs) — hoje só a via da cozinha usa isso; suco e a via do motoboy
    * continuam sem, pra não mudar o visual deles além do pedido pelo cliente. */
@@ -148,9 +149,16 @@ export function renderTicket(input: TicketInput): Buffer {
   }
 
   // Logo no topo (antes de qualquer outra informação) — pedido explícito do cliente pra
-  // ser a primeira coisa que o motoboy vê ao pegar a via.
-  if (input.hasBeverages) {
-    parts.push(HEADER_MODE_ON, line('================================'), line('PEDIDO COM BEBIDAS'), line('================================'), BODY_MODE_ON);
+  // ser a primeira coisa que quem pega a via vê, e não esquecer de buscar o resto do
+  // pedido que está em outra estação/via.
+  if (input.crossStationNotice) {
+    parts.push(
+      HEADER_MODE_ON,
+      line('================================'),
+      line(input.crossStationNotice),
+      line('================================'),
+      BODY_MODE_ON,
+    );
   }
 
   // Tamanho normal do corpo (não o grande do cabeçalho) — pedido do cliente pra

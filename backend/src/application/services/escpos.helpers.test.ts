@@ -367,8 +367,8 @@ describe('renderTicket', () => {
     expect(bytes.indexOf('PEDIDO #1')).toBeLessThan(20);
   });
 
-  it('hasBeverages liga o aviso "PEDIDO COM BEBIDAS" logo abaixo do cabeçalho; sem bebida, não imprime nada', () => {
-    const semBebida = renderTicket({
+  it('crossStationNotice liga um aviso em destaque logo abaixo do cabeçalho; ausente, não imprime nada', () => {
+    const semAviso = renderTicket({
       station: Station.KITCHEN,
       tableNumber: null,
       orderType: OrderType.DELIVERY,
@@ -379,9 +379,9 @@ describe('renderTicket', () => {
       placedAt: PLACED_AT,
       items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
-    expect(semBebida).not.toContain('BEBIDAS');
+    expect(semAviso).not.toContain('====');
 
-    const comBebida = renderTicket({
+    const comAviso = renderTicket({
       station: Station.KITCHEN,
       tableNumber: null,
       orderType: OrderType.DELIVERY,
@@ -390,12 +390,28 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      hasBeverages: true,
+      crossStationNotice: 'PEDIDO COM BEBIDAS',
       items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
-    expect(comBebida).toContain('PEDIDO COM BEBIDAS');
+    expect(comAviso).toContain('PEDIDO COM BEBIDAS');
     // Logo abaixo do cabeçalho — antes de qualquer outra informação do pedido.
-    expect(comBebida.indexOf('PEDIDO COM BEBIDAS')).toBeLessThan(comBebida.indexOf('PEDIDO #1'));
+    expect(comAviso.indexOf('PEDIDO COM BEBIDAS')).toBeLessThan(comAviso.indexOf('PEDIDO #1'));
+
+    // Texto livre — usado também pras vias de cozinha/suco avisando da OUTRA estação
+    // (ver printJob.service.ts), não só "PEDIDO COM BEBIDAS" da via do motoboy.
+    const outroTexto = renderTicket({
+      station: Station.JUICE_BAR,
+      tableNumber: null,
+      orderType: OrderType.PICKUP,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      crossStationNotice: 'PEDIDO TAMBEM TEM: PASTEL, PORCAO',
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(outroTexto).toContain('PEDIDO TAMBEM TEM: PASTEL, PORCAO');
   });
 
   it('orderTotal imprime "TOTAL DO PEDIDO" logo antes da forma de pagamento; ausente, não imprime nada', () => {

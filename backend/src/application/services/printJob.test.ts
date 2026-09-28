@@ -408,6 +408,9 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(kitchenJob).not.toContain('SEGUNDA VIA MOTOBOY');
     expect(kitchenJob).not.toContain('PEDIDO COM BEBIDAS');
     expect(kitchenJob).not.toContain('TOTAL DO PEDIDO');
+    // Pedido também tem suco (via do suqueiros) — avisa quem só vê a via da cozinha, pra
+    // não esquecer de buscar o resto do pedido (pedido explícito do cliente).
+    expect(kitchenJob).toContain('PEDIDO TAMBEM TEM BEBIDA');
 
     expect(juiceJob).toContain('SUQUEIROS');
     expect(juiceJob).toContain('2- Suco');
@@ -415,6 +418,9 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(juiceJob).not.toContain('SEGUNDA VIA MOTOBOY');
     expect(juiceJob).not.toContain('PEDIDO COM BEBIDAS');
     expect(juiceJob).not.toContain('TOTAL DO PEDIDO');
+    // Mesmo aviso na direção contrária — categoria de teste é "Cozinha" (genérica, ver
+    // beforeAll), então cai no fallback "COMIDA" (não bate pastel/mini pizza/porção).
+    expect(juiceJob).toContain('PEDIDO TAMBEM TEM: COMIDA');
 
     // A via do motoboy não estampa "COZINHA" nem "SUQUEIROS" no topo (reúne as duas), nem
     // um cabeçalho grande próprio (removido a pedido do cliente pra economizar papel) —
@@ -452,6 +458,39 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 10,00');
     expect(motoboyJob).not.toContain('PEDIDO COM BEBIDAS');
+  });
+
+  it('retirada com pastel E suco: cada via avisa da outra (sem via de motoboy, que é só de entrega)', async () => {
+    // Categorias com nome de verdade (não a "Cozinha" genérica do beforeAll) pra testar o
+    // resumo específico do aviso ("PASTEL", não o fallback genérico "COMIDA").
+    const pasteisSalgados = await prisma.category.create({
+      data: { name: 'Pastéis Salgados', station: Station.KITCHEN, restaurantId },
+    });
+    const pastel = await prisma.product.create({
+      data: { name: 'Calabresa', price: 12, categoryId: pasteisSalgados.id, restaurantId },
+    });
+
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente Retirada Mista',
+      customerPhone: '11999990008',
+      declaredPaymentMethod: PaymentMethod.PIX,
+      items: [
+        { productId: pastel.id, quantity: 1 },
+        { productId: juiceProductId, quantity: 1 },
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    // Retirada não ganha via de motoboy (só entrega ganha) — só as 2 vias de produção.
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    expect(jobs).toHaveLength(2);
+    const kitchenJob = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
+    const juiceJob = jobs.find((j) => j.station === Station.JUICE_BAR)!.payload.toString('ascii');
+
+    expect(kitchenJob).toContain('PEDIDO TAMBEM TEM BEBIDA');
+    expect(juiceJob).toContain('PEDIDO TAMBEM TEM: PASTEL');
   });
 
   it('verifyAgentKey() só valida a chave certa do tenant certo', async () => {

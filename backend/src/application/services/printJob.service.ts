@@ -63,6 +63,24 @@ function kitchenSortPriority(categoryName: string): number {
   return 4;
 }
 
+/**
+ * Versão curta do tipo do prato (sem doce/salgado) pro aviso "PEDIDO TAMBEM TEM: ..." na
+ * via dos suqueiros — pedido explícito do cliente: às vezes quem faz o pedido não é quem
+ * vem buscar, e sem esse aviso a pessoa que só vê a via do suco não sabe que também tem
+ * comida esperando na cozinha (ou vice-versa).
+ */
+function kitchenTypeSummary(categoryName: string): string {
+  const name = categoryName
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+  if (name.includes('sugest')) return 'SUGESTAO DA CASA';
+  if (name.includes('mini pizza')) return 'MINI PIZZA';
+  if (name.includes('pastel') || name.includes('pasteis')) return 'PASTEL';
+  if (name.includes('porcao') || name.includes('porcoes')) return 'PORCAO';
+  return 'COMIDA';
+}
+
 /** Um item de pedido -> item de ticket, com as mesmas regras de conteúdo em qualquer
  * ticket que o item apareça (via normal por estação, ou a via combinada do motoboy
  * abaixo) — extraído pra não duplicar (e arriscar desalinhar) essa lógica nos dois
@@ -146,26 +164,38 @@ export const printJobService = {
           }
         : null;
 
-    // Total do pedido e aviso de bebidas na via do motoboy: os dois precisam refletir o
-    // pedido INTEIRO (não só os itens desta leva), então busca à parte só quando
-    // necessário (entrega) — evita essa consulta extra em toda comanda de mesa, que é o
-    // caso mais comum e não usa nenhum dos dois campos.
-    let orderTotal: number | null = null;
-    let hasBeverages = false;
-    if (order.orderType === 'DELIVERY') {
-      const full = await tx.order.findUniqueOrThrow({
-        where: { id: orderId },
-        select: {
-          discount: true,
-          deliveryFee: true,
-          serviceRate: true,
-          items: {
-            where: { status: { not: 'CANCELLED' } },
-            select: { quantity: true, unitPrice: true, station: true, additionals: { select: { price: true } } },
+    // Avisos "PEDIDO TAMBEM TEM ..." (pra quem só vê UMA via não esquecer que o pedido
+    // tem mais coisa em outra estação — pedido explícito do cliente, ver
+    // kitchenTypeSummary acima) e o total na via do motoboy precisam refletir o pedido
+    // INTEIRO, não só os itens desta leva (um pedido de mesa pode ganhar item de cozinha
+    // e suco em pedidos (addItems) separados ao longo do atendimento) — por isso busca à
+    // parte em vez de reaproveitar só o parâmetro `items`.
+    const full = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: {
+        discount: true,
+        deliveryFee: true,
+        serviceRate: true,
+        items: {
+          where: { status: { not: 'CANCELLED' } },
+          select: {
+            quantity: true,
+            unitPrice: true,
+            station: true,
+            additionals: { select: { price: true } },
+            product: { select: { category: { select: { name: true } } } },
           },
         },
-      });
-      hasBeverages = full.items.some((i) => i.station === Station.JUICE_BAR);
+      },
+    });
+    const hasBeverages = full.items.some((i) => i.station === Station.JUICE_BAR);
+    const fullKitchenItems = full.items.filter((i) => i.station === Station.KITCHEN);
+    const kitchenSummary = [...new Set(fullKitchenItems.map((i) => kitchenTypeSummary(i.product.category.name)))].join(
+      ', ',
+    );
+
+    let orderTotal: number | null = null;
+    if (order.orderType === 'DELIVERY') {
       // Mesma fórmula de order.helpers.ts#computeTotals (subtotal - desconto + serviço +
       // entrega) — não dá pra chamar a função direto aqui porque ela espera o payload
       // completo do pedido (orderInclude, com produto/pagamentos etc.), e aqui só
@@ -205,9 +235,16 @@ export const printJobService = {
     // (cozinha sempre antes de suqueiros), não a ordem em que os itens foram
     // adicionados ao pedido — pedido do cliente pra sempre sair "PEDIDOS COZINHA,
     // PEDIDOS SUCOS" nessa sequência, sem depender de qual item o cliente escolheu primeiro.
-    for (const [station, stationItems, itemSeparator] of [
-      [Station.KITCHEN, kitchenItems, true],
-      [Station.JUICE_BAR, juiceItems, false],
+    // Cada via também avisa quando o pedido tem coisa na OUTRA estação, pra quem só vê
+    // essa via (ex.: quem vem buscar no caixa, sem ter feito o pedido) não esquecer.
+    for (const [station, stationItems, itemSeparator, crossStationNotice] of [
+      [Station.KITCHEN, kitchenItems, true, hasBeverages ? 'PEDIDO TAMBEM TEM BEBIDA' : null],
+      [
+        Station.JUICE_BAR,
+        juiceItems,
+        false,
+        fullKitchenItems.length > 0 ? `PEDIDO TAMBEM TEM: ${kitchenSummary}` : null,
+      ],
     ] as const) {
       if (stationItems.length === 0) continue;
       await tx.printJob.create({
@@ -219,6 +256,7 @@ export const printJobService = {
             ...commonTicketFields,
             station,
             itemSeparator,
+            crossStationNotice,
             items: stationItems.map(toTicketItem),
           }),
         },
@@ -249,7 +287,7 @@ export const printJobService = {
             // tracejado + "SEGUNDA VIA MOTOBOY" em tamanho normal.
             headerOverride: '',
             copyLabel: 'SEGUNDA VIA MOTOBOY',
-            hasBeverages,
+            crossStationNotice: hasBeverages ? 'PEDIDO COM BEBIDAS' : null,
             orderTotal,
             items: [...kitchenItems, ...juiceItems].map(toTicketItem),
           }),
