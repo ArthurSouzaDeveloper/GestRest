@@ -5,6 +5,13 @@
  * existia ainda (ao contrário de "Pastéis Salgados", que já tem sua própria lista de
  * adicionais salgados).
  *
+ * Também replica os mesmos 32 adicionais na categoria "Mini Pizza Doce" — pedido
+ * explícito do cliente pra dar pra customizar a mini pizza doce já montada com os mesmos
+ * ingredientes do pastel doce (mesma lógica já usada pro "Sorvete Adicional", que também
+ * está nas duas categorias). O lado salgado já cobre isso: ADICIONAIS_SALGADOS em
+ * import-menu-rei-do-suco.ts já aplica em Pastéis Salgados E Mini Pizza Salgada desde a
+ * importação original do cardápio — nada a fazer nesse lado.
+ *
  * Idempotente: cada adicional é identificado por (restaurantId, categoryId, name, kind) —
  * mesmo critério já usado em import-menu-rei-do-suco.ts#ensureAdditional. Rodar de novo
  * não duplica nada; só cria o que ainda não existe.
@@ -61,6 +68,8 @@ const ADICIONAIS_DOCES: [string, number][] = [
   ['Suspiro', 2.0],
 ];
 
+const CATEGORY_NAMES = ['Pastéis Doces', 'Mini Pizza Doce'];
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const slug = args.slug;
@@ -76,26 +85,27 @@ async function main() {
   }
   const rid = restaurant.id;
 
-  const category = await prisma.category.findFirst({ where: { restaurantId: rid, name: 'Pastéis Doces' } });
-  if (!category) {
-    console.error('Categoria "Pastéis Doces" não encontrada.');
-    process.exit(1);
-  }
-
   let created = 0;
   let skipped = 0;
-  for (const [name, price] of ADICIONAIS_DOCES) {
-    const existing = await prisma.additional.findFirst({
-      where: { restaurantId: rid, categoryId: category.id, name, kind: AdditionalKind.ADDON },
-    });
-    if (existing) {
-      skipped++;
+  for (const categoryName of CATEGORY_NAMES) {
+    const category = await prisma.category.findFirst({ where: { restaurantId: rid, name: categoryName } });
+    if (!category) {
+      console.warn(`[aviso] Categoria "${categoryName}" não encontrada — pulei.`);
       continue;
     }
-    await prisma.additional.create({
-      data: { restaurantId: rid, categoryId: category.id, name, price, kind: AdditionalKind.ADDON },
-    });
-    created++;
+    for (const [name, price] of ADICIONAIS_DOCES) {
+      const existing = await prisma.additional.findFirst({
+        where: { restaurantId: rid, categoryId: category.id, name, kind: AdditionalKind.ADDON },
+      });
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      await prisma.additional.create({
+        data: { restaurantId: rid, categoryId: category.id, name, price, kind: AdditionalKind.ADDON },
+      });
+      created++;
+    }
   }
 
   console.log(`${created} adicional(is) criado(s), ${skipped} já existia(m) — nada duplicado.`);
