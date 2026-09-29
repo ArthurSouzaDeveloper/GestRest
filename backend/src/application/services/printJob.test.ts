@@ -410,7 +410,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(kitchenJob).not.toContain('TOTAL DO PEDIDO');
     // Pedido também tem suco (via do suqueiros) — avisa quem só vê a via da cozinha, pra
     // não esquecer de buscar o resto do pedido (pedido explícito do cliente).
-    expect(kitchenJob).toContain('PEDIDO TAMBEM TEM BEBIDA');
+    expect(kitchenJob).toContain('PEDIDO COM BEBIDA');
 
     expect(juiceJob).toContain('SUQUEIROS');
     expect(juiceJob).toContain('2- Suco');
@@ -489,7 +489,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const kitchenJob = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
     const juiceJob = jobs.find((j) => j.station === Station.JUICE_BAR)!.payload.toString('ascii');
 
-    expect(kitchenJob).toContain('PEDIDO TAMBEM TEM BEBIDA');
+    expect(kitchenJob).toContain('PEDIDO COM BEBIDA');
     expect(juiceJob).toContain('PEDIDO TAMBEM TEM: PASTEL');
   });
 

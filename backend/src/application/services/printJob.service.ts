@@ -238,7 +238,7 @@ export const printJobService = {
     // Cada via também avisa quando o pedido tem coisa na OUTRA estação, pra quem só vê
     // essa via (ex.: quem vem buscar no caixa, sem ter feito o pedido) não esquecer.
     for (const [station, stationItems, itemSeparator, crossStationNotice] of [
-      [Station.KITCHEN, kitchenItems, true, hasBeverages ? 'PEDIDO TAMBEM TEM BEBIDA' : null],
+      [Station.KITCHEN, kitchenItems, true, hasBeverages ? 'PEDIDO COM BEBIDA' : null],
       [
         Station.JUICE_BAR,
         juiceItems,

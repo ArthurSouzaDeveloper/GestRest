@@ -91,8 +91,8 @@ export interface TicketInput {
    * presente, logo antes da forma de pagamento. Hoje só a via combinada do motoboy usa
    * isso; pedido explícito do cliente pra ele conferir o valor sem abrir o sistema. */
   orderTotal?: number | null;
-  /** Aviso em destaque logo abaixo do cabeçalho (ex.: "PEDIDO COM BEBIDAS", "PEDIDO
-   * TAMBEM TEM BEBIDA") — pra quem só vê ESTA via não esquecer que o pedido tem mais
+  /** Aviso em destaque logo abaixo do cabeçalho (ex.: "PEDIDO COM BEBIDA", "PEDIDO
+   * TAMBEM TEM: PASTEL") — pra quem só vê ESTA via não esquecer que o pedido tem mais
    * coisa em outra estação/via. null/undefined não imprime nada (pedido comum, sem
    * outra estação envolvida). Ver printJob.service.ts. */
   crossStationNotice?: string | null;
@@ -150,15 +150,12 @@ export function renderTicket(input: TicketInput): Buffer {
 
   // Logo no topo (antes de qualquer outra informação) — pedido explícito do cliente pra
   // ser a primeira coisa que quem pega a via vê, e não esquecer de buscar o resto do
-  // pedido que está em outra estação/via.
+  // pedido que está em outra estação/via. Só UM traço separador, em tamanho normal (não
+  // o grande do cabeçalho) — a versão anterior tinha um traço grande ANTES e outro
+  // DEPOIS do aviso, e por serem largura dupla cada um quebrava em 2 linhas na impressora,
+  // gastando papel à toa (pedido do cliente pra economizar).
   if (input.crossStationNotice) {
-    parts.push(
-      HEADER_MODE_ON,
-      line('================================'),
-      line(input.crossStationNotice),
-      line('================================'),
-      BODY_MODE_ON,
-    );
+    parts.push(line('--------------------------------'), HEADER_MODE_ON, line(input.crossStationNotice), BODY_MODE_ON);
   }
 
   // Tamanho normal do corpo (não o grande do cabeçalho) — pedido do cliente pra
