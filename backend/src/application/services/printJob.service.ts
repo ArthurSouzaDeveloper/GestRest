@@ -237,14 +237,9 @@ export const printJobService = {
     // PEDIDOS SUCOS" nessa sequência, sem depender de qual item o cliente escolheu primeiro.
     // Cada via também avisa quando o pedido tem coisa na OUTRA estação, pra quem só vê
     // essa via (ex.: quem vem buscar no caixa, sem ter feito o pedido) não esquecer.
-    for (const [station, stationItems, itemSeparator, crossStationNotice] of [
-      [Station.KITCHEN, kitchenItems, true, hasBeverages ? 'PEDIDO COM BEBIDA' : null],
-      [
-        Station.JUICE_BAR,
-        juiceItems,
-        false,
-        fullKitchenItems.length > 0 ? `PEDIDO TAMBEM TEM: ${kitchenSummary}` : null,
-      ],
+    for (const [station, stationItems, crossStationNotice] of [
+      [Station.KITCHEN, kitchenItems, hasBeverages ? 'PEDIDO COM BEBIDA' : null],
+      [Station.JUICE_BAR, juiceItems, fullKitchenItems.length > 0 ? `PEDIDO TAMBEM TEM: ${kitchenSummary}` : null],
     ] as const) {
       if (stationItems.length === 0) continue;
       await tx.printJob.create({
@@ -255,7 +250,9 @@ export const printJobService = {
           payload: renderTicket({
             ...commonTicketFields,
             station,
-            itemSeparator,
+            // Linha divisória depois de cada item, em qualquer via — pedido explícito do
+            // cliente pra valer pra suco/bebida em geral também, não só comida.
+            itemSeparator: true,
             crossStationNotice,
             items: stationItems.map(toTicketItem),
           }),
@@ -289,6 +286,7 @@ export const printJobService = {
             copyLabel: 'SEGUNDA VIA MOTOBOY',
             crossStationNotice: hasBeverages ? 'PEDIDO COM BEBIDAS' : null,
             orderTotal,
+            itemSeparator: true,
             items: [...kitchenItems, ...juiceItems].map(toTicketItem),
           }),
         },

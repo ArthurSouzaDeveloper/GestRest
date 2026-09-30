@@ -97,8 +97,8 @@ export interface TicketInput {
    * outra estação envolvida). Ver printJob.service.ts. */
   crossStationNotice?: string | null;
   /** true imprime uma linha divisória depois de cada item (nome+descrição+preço+
-   * adicionais+obs) — hoje só a via da cozinha usa isso; suco e a via do motoboy
-   * continuam sem, pra não mudar o visual deles além do pedido pelo cliente. */
+   * adicionais+obs) — pedido explícito do cliente pra valer em toda via (cozinha, suco/
+   * bebida em geral e a via combinada do motoboy), não só comida. */
   itemSeparator?: boolean;
 }
 
