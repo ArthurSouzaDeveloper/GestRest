@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda } from 'lucide-react';
+import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda, Check } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { JuiceBuilder } from './JuiceBuilder';
@@ -484,6 +484,40 @@ export function OrderComposer({
   );
 }
 
+// Agrupa os adicionais do "Monte o Seu" (pastel salgado e pastel doce, únicos 2 produtos
+// isCustom hoje) por afinidade de ingrediente — ex.: CHOCOLATES / FRUTAS / OUTROS, pedido
+// explícito do cliente pra organizar a lista em vez de uma grade solta. Classificação por
+// trecho do nome (acento/maiúscula ignorados), mesma técnica já usada em
+// kitchenTypeSummary()/kitchenSortPriority() no backend (printJob.service.ts) — não tem
+// lista de nomes fixa amarrada a um cardápio específico, então continua funcionando se
+// ganhar novos adicionais dos dois lados (doce ou salgado).
+const ADDITIONAL_GROUPS: [string, RegExp][] = [
+  ['CHOCOLATES', /\bbis\b|bombom|chocolate|confete|ferrero|kit ?kat|negresco|nutella|ovomaltine|suflair/i],
+  ['FRUTAS', /banana|cereja|\bcoco\b|goiabada|maca|morango/i],
+  ['QUEIJOS', /queijo|mussarela|catupiry|cheddar|parmesao|provolone|gorgonzola|cream cheese/i],
+  ['CARNES', /bacon|pepperoni|presunto|calabresa|\bcarne\b/i],
+  ['TEMPEROS E MOLHOS', /molho|guacamole|vinagrete|\balho\b|cebola|oregano|pure/i],
+];
+
+function additionalGroupName(name: string): string {
+  const normalized = name.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  for (const [group, pattern] of ADDITIONAL_GROUPS) {
+    if (pattern.test(normalized)) return group;
+  }
+  return 'OUTROS';
+}
+
+function groupAddons(addons: Additional[]): { group: string; items: Additional[] }[] {
+  const order = [...ADDITIONAL_GROUPS.map(([g]) => g), 'OUTROS'];
+  const byGroup = new Map<string, Additional[]>();
+  for (const a of addons) {
+    const group = additionalGroupName(a.name);
+    if (!byGroup.has(group)) byGroup.set(group, []);
+    byGroup.get(group)!.push(a);
+  }
+  return order.filter((g) => byGroup.has(g)).map((g) => ({ group: g, items: byGroup.get(g)! }));
+}
+
 function ItemConfigModal({
   product,
   current,
@@ -531,24 +565,63 @@ function ItemConfigModal({
         <h3 className="mb-3 font-semibold">{product.name}</h3>
         {bases.length > 0 && (
           <div className="mb-4">
-            <div className="label">Escolha a base (obrigatório)</div>
-            <div className="flex flex-wrap gap-2">
+            <div className="mb-1 flex items-baseline justify-between">
+              <span className="label !mb-0">Escolha a base</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-red-500">Obrigatório</span>
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {bases.map((b) => {
                 const on = selectedBaseId === b.id;
                 return (
-                  <button
-                    key={b.id}
-                    onClick={() => pickBase(b.id)}
-                    className={`rounded-md border px-3 py-1.5 text-xs ${on ? 'border-brand bg-brand text-white' : 'border-gray-300 dark:border-gray-700'}`}
-                  >
-                    {b.name} <span className="opacity-70">{brl(b.price)}</span>
+                  <button key={b.id} onClick={() => pickBase(b.id)} className="flex w-full items-center justify-between py-3 text-left">
+                    <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{b.name}</span>
+                    <span className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400">{brl(b.price)}</span>
+                      <span
+                        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
+                      >
+                        {on && <Check size={12} strokeWidth={3.5} className="text-white" />}
+                      </span>
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
         )}
-        {addons.length > 0 && (
+        {addons.length > 0 && product.isCustom && (
+          <div className="mb-4">
+            <div className="label">Adicionais</div>
+            {groupAddons(addons).map(({ group, items }, idx) => (
+              <div key={group} className={idx > 0 ? 'mt-3 border-t border-gray-100 pt-3 dark:border-gray-800' : ''}>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{group}</div>
+                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {items.map((a) => {
+                    const on = selected.includes(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => setSelected(on ? selected.filter((x) => x !== a.id) : [...selected, a.id])}
+                        className="flex w-full items-center justify-between py-3 text-left"
+                      >
+                        <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
+                        <span className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400">+{brl(a.price)}</span>
+                          <span
+                            className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
+                          >
+                            {on && <Check size={12} strokeWidth={3.5} className="text-white" />}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {addons.length > 0 && !product.isCustom && (
           <div className="mb-4">
             <div className="label">Adicionais</div>
             <div className="flex flex-wrap gap-2">
