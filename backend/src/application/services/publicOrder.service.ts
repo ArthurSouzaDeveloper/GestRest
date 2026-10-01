@@ -89,11 +89,21 @@ export const publicOrderService = {
     const phoneNormalized = normalizePhone(phone);
     const candidates = await prisma.customer.findMany({
       where: { restaurantId: tenantId, phoneNormalized },
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        lastDeliveryZoneId: true,
+        lastDeliveryStreet: true,
+        lastDeliveryNumber: true,
+        lastDeliveryComplement: true,
+        lastDeliveryCep: true,
+        lastDeliveryLat: true,
+        lastDeliveryLng: true,
+      },
     });
     const nameNormalized = name.trim().toLowerCase();
-    const recognized = candidates.some((c) => c.name.trim().toLowerCase() === nameNormalized);
-    if (!recognized) return { name: null, orders: [] };
+    const matched = candidates.find((c) => c.name.trim().toLowerCase() === nameNormalized);
+    if (!matched) return { name: null, orders: [], lastDeliveryAddress: null };
 
     const orders = await prisma.order.findMany({
       where: { restaurantId: tenantId, customerId: { in: candidates.map((c) => c.id) } },
@@ -102,7 +112,7 @@ export const publicOrderService = {
       take: 10,
     });
     return {
-      name: candidates[0].name,
+      name: matched.name,
       orders: orders.map((o) => ({
         id: o.id,
         number: o.number,
@@ -112,6 +122,20 @@ export const publicOrderService = {
         estimatedReadyAt: o.estimatedReadyAt,
         createdAt: o.createdAt,
       })),
+      // Endereço do último pedido de entrega desse cliente (ver order.service.ts#openPublic)
+      // — null quando ele nunca pediu entrega (só retirada) ou quando é cliente novo. O site
+      // público usa isso pra pré-preencher o endereço automaticamente no próximo pedido.
+      lastDeliveryAddress: matched.lastDeliveryStreet
+        ? {
+            zoneId: matched.lastDeliveryZoneId,
+            street: matched.lastDeliveryStreet,
+            number: matched.lastDeliveryNumber,
+            complement: matched.lastDeliveryComplement,
+            cep: matched.lastDeliveryCep,
+            lat: matched.lastDeliveryLat,
+            lng: matched.lastDeliveryLng,
+          }
+        : null,
     };
   },
 };

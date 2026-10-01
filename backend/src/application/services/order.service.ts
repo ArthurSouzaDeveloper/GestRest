@@ -421,6 +421,26 @@ export const orderService = {
           estimatedReadyAt,
         },
       });
+      // Guarda o endereço desta entrega no cadastro do cliente — pedido explícito do
+      // cliente/dono: quem já pediu não precisa redigitar o endereço no pedido seguinte
+      // (ver Customer.lastDeliveryZoneId e publicOrder.service.ts#customerLogin, que
+      // devolve isso pro site público reaproveitar). Sempre sobrescreve com o endereço
+      // deste pedido (snapshot "vivo", não histórico) — só acontece em DELIVERY, retirada
+      // não tem endereço pra guardar.
+      if (input.orderType === 'DELIVERY') {
+        await tx.customer.update({
+          where: { id: customer.id },
+          data: {
+            lastDeliveryZoneId: input.deliveryZoneId ?? null,
+            lastDeliveryStreet: input.deliveryStreet ?? null,
+            lastDeliveryNumber: input.deliveryNumber ?? null,
+            lastDeliveryComplement: input.deliveryComplement ?? null,
+            lastDeliveryCep: input.deliveryCep ?? null,
+            lastDeliveryLat: input.deliveryLat ?? null,
+            lastDeliveryLng: input.deliveryLng ?? null,
+          },
+        });
+      }
       const { touchedStations, items: createdItems } = await createOrderItems(tx, tenantId, order.id, input.items);
       // Só gera trabalho de impressão aqui se o pedido já nasceu aceito — sem aceite
       // automático os itens ficam invisíveis na fila até accept() (que gera o próprio

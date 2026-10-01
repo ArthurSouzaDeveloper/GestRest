@@ -348,7 +348,7 @@ export function OrderComposer({
                 <div
                   key={p.id}
                   onClick={() => addSimple(p)}
-                  className="flex cursor-pointer items-center gap-3 border-b border-gray-100 py-3.5 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                  className="flex cursor-pointer items-center gap-3 border-b border-gray-200 py-3.5 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
                 >
                   <div className="min-w-0 flex-1">
                     {/* Fora da busca, o rótulo de categoria só é necessário na aba "Todos"
@@ -569,7 +569,7 @@ function ItemConfigModal({
               <span className="label !mb-0">Escolha a base</span>
               <span className="text-[11px] font-semibold uppercase tracking-wide text-red-500">Obrigatório</span>
             </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            <div className="divide-y divide-gray-200 dark:divide-gray-800">
               {bases.map((b) => {
                 const on = selectedBaseId === b.id;
                 return (
@@ -593,9 +593,9 @@ function ItemConfigModal({
           <div className="mb-4">
             <div className="label">Adicionais</div>
             {groupAddons(addons).map(({ group, items }, idx) => (
-              <div key={group} className={idx > 0 ? 'mt-3 border-t border-gray-100 pt-3 dark:border-gray-800' : ''}>
+              <div key={group} className={idx > 0 ? 'mt-3 border-t border-gray-200 pt-3 dark:border-gray-800' : ''}>
                 <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{group}</div>
-                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                <div className="divide-y divide-gray-200 dark:divide-gray-800">
                   {items.map((a) => {
                     const on = selected.includes(a.id);
                     return (

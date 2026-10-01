@@ -257,6 +257,23 @@ model Customer {
   restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt       DateTime   @default(now())
 
+  // Último endereço de entrega usado por esse cliente (telefone+nome) — pedido explícito
+  // do cliente/dono: não fazer quem já pediu redigitar o endereço no pedido seguinte.
+  // Snapshot "vivo" (ao contrário do endereço de cada Order, que é histórico fiscal e
+  // nunca muda depois de criado): sobrescrito a cada novo pedido de entrega em
+  // openPublic(), porque é só conveniência de preenchimento, não registro de pedido
+  // antigo. lastDeliveryLat/Lng só são usados no modo DISTANCE_BANDS (ver
+  // deliveryPricingMode); no modo ZONE ficam null e o endereço reaproveitado vem dos
+  // campos de texto + lastDeliveryZoneId.
+  lastDeliveryZoneId     String?
+  lastDeliveryZone       DeliveryZone? @relation(fields: [lastDeliveryZoneId], references: [id], onDelete: SetNull)
+  lastDeliveryStreet     String?
+  lastDeliveryNumber     String?
+  lastDeliveryComplement String?
+  lastDeliveryCep        String?
+  lastDeliveryLat        Float?
+  lastDeliveryLng        Float?
+
   orders Order[]
 
   @@index([restaurantId])
@@ -294,6 +311,9 @@ model DeliveryZone {
   updatedAt    DateTime   @updatedAt
 
   orders Order[]
+  // Clientes cujo último pedido de entrega usou esse bairro (ver Customer.lastDeliveryZoneId)
+  // — onDelete SetNull acima: desativar/remover um bairro nunca pode falhar por causa disso.
+  customersWithLastZone Customer[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, active])

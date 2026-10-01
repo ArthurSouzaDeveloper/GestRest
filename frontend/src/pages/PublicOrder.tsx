@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { deriveBrandVars } from '../lib/publicBrand';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -110,6 +110,19 @@ interface CustomerOrderSummary {
   createdAt: string;
 }
 
+/** Endereço do último pedido de ENTREGA desse cliente (nome+telefone) — devolvido por
+ * POST /public/:slug/customers/login (ver publicOrder.service.ts#customerLogin). null
+ * quando o cliente nunca pediu entrega (só retirada) ou é cliente novo. */
+interface LastDeliveryAddress {
+  zoneId: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  cep: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
 interface SavedCustomer {
   name: string;
   phone: string;
@@ -155,8 +168,13 @@ export default function PublicOrder() {
   const { slug = '' } = useParams();
   const [step, setStep] = useState<Step>('intro');
   const [orderKind, setOrderKind] = useState<OrderKind | null>(null);
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  // Pré-preenche com a identidade salva neste navegador de um pedido anterior (ver
+  // readSavedCustomer) — pedido explícito do cliente/dono: quem já pediu não deveria
+  // precisar redigitar nome/telefone a cada visita.
+  const [customerName, setCustomerName] = useState(() => readSavedCustomer(slug)?.name ?? '');
+  const [customerPhone, setCustomerPhone] = useState(() => readSavedCustomer(slug)?.phone ?? '');
+  const [addressAutoFilled, setAddressAutoFilled] = useState(false);
+  const appliedSavedAddressRef = useRef(false);
   const [deliveryZoneId, setDeliveryZoneId] = useState('');
   const [deliveryCity, setDeliveryCity] = useState<string | null>(null);
   const [deliveryLat, setDeliveryLat] = useState<number | null>(null);
@@ -217,6 +235,55 @@ export default function PublicOrder() {
   // Sem escolher a cidade ainda (tenant multi-cidade), não mostra bairro nenhum — evita o
   // cliente escolher um "Centro" errado antes de dizer qual cidade é a dele.
   const zonesForBairro = needsCityFirst ? zones.filter((z) => splitZoneName(z.name).city === deliveryCity) : zones;
+
+  // Automação pedida pelo cliente/dono: assim que nome+telefone identificam um cliente que
+  // já pediu ENTREGA antes, preenche o endereço sozinho (sem precisar redigitar) — mesma
+  // identificação (nome+telefone) já usada em "Já pediu antes? Entrar" (CustomerLoginPanel),
+  // aqui disparada silenciosamente em vez de exigir um clique. Só busca quando o endereço
+  // ainda está vazio (nunca sobrescreve o que o cliente já começou a digitar) e só aplica
+  // depois que os bairros carregarem (modo por bairro), senão o zoneId salvo não acha
+  // correspondência na lista ainda vazia.
+  const addressStillEmpty = !deliveryStreet.trim() && !deliveryNumber.trim();
+  const trimmedNameForLookup = customerName.trim();
+  const trimmedPhoneForLookup = customerPhone.trim();
+  const { data: savedAddressLookup } = useQuery({
+    queryKey: ['public-last-delivery-address', slug, trimmedNameForLookup, trimmedPhoneForLookup],
+    queryFn: async () =>
+      (
+        await api.post<{ lastDeliveryAddress: LastDeliveryAddress | null }>(`/public/${slug}/customers/login`, {
+          name: trimmedNameForLookup,
+          phone: trimmedPhoneForLookup,
+        })
+      ).data,
+    enabled:
+      !!slug &&
+      orderKind === 'DELIVERY' &&
+      addressStillEmpty &&
+      trimmedNameForLookup.length >= 2 &&
+      trimmedPhoneForLookup.length >= 8,
+    staleTime: Infinity,
+  });
+
+  useEffect(() => {
+    const addr = savedAddressLookup?.lastDeliveryAddress;
+    if (!addr || appliedSavedAddressRef.current) return;
+    if (!distanceMode && zones.length === 0) return; // espera os bairros carregarem pra achar o zoneId salvo
+    if (!addressStillEmpty) return; // cliente já começou a digitar — nunca sobrescreve
+    appliedSavedAddressRef.current = true;
+    if (distanceMode) {
+      if (addr.lat != null && addr.lng != null) {
+        setDeliveryLat(addr.lat);
+        setDeliveryLng(addr.lng);
+      }
+    } else if (addr.zoneId && zones.some((z) => z.id === addr.zoneId)) {
+      setDeliveryZoneId(addr.zoneId);
+    }
+    setDeliveryStreet(addr.street ?? '');
+    setDeliveryNumber(addr.number ?? '');
+    setDeliveryComplement(addr.complement ?? '');
+    setDeliveryCep(addr.cep ?? '');
+    setAddressAutoFilled(true);
+  }, [savedAddressLookup, distanceMode, zones, addressStillEmpty]);
 
   // Cotação do frete por distância — dispara quando o cliente escolhe um endereço no
   // autocomplete (não a cada tecla). Reconferida de novo pelo back no momento de confirmar
@@ -418,6 +485,7 @@ export default function PublicOrder() {
             setDeliveryCep={setDeliveryCep}
             deliveryComplement={deliveryComplement}
             setDeliveryComplement={setDeliveryComplement}
+            addressAutoFilled={addressAutoFilled}
             canContinue={!!canContinueDetails}
             onContinue={() => setStep(draft.length > 0 ? 'cart' : 'menu')}
             continueLabel={draft.length > 0 ? 'Continuar para o carrinho' : 'Continuar para o cardápio'}
@@ -482,19 +550,13 @@ export default function PublicOrder() {
             orderKind={orderKind}
             estimatedReadyAt={confirmedEta}
             onNewOrder={() => {
+              // Mantém nome/telefone/endereço de propósito (não limpa) — mesmo cliente
+              // pedindo de novo na mesma visita não deveria ter que redigitar tudo outra
+              // vez; só o que é específico DESTE pedido que acabou de ser confirmado volta
+              // ao zero (carrinho, pagamento, tipo escolhido).
               setStep('intro');
               setOrderKind(null);
               setDraft([]);
-              setCustomerName('');
-              setCustomerPhone('');
-              setDeliveryZoneId('');
-              setDeliveryCity(null);
-              setDeliveryLat(null);
-              setDeliveryLng(null);
-              setDeliveryStreet('');
-              setDeliveryNumber('');
-              setDeliveryCep('');
-              setDeliveryComplement('');
               setPaymentMethod('');
               setChangeFor('');
               setConfirmedOrderNumber(null);
@@ -718,7 +780,7 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
         className="mt-3 text-[11.5px] font-semibold text-brand underline decoration-brand/35 underline-offset-2"
         onClick={() => setOpen(true)}
       >
-        Já pediu antes? Entrar
+        Já pediu antes? Ver meus pedidos
       </button>
     );
   }
@@ -733,14 +795,14 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
             disabled={login.isPending}
             onClick={() => login.mutate()}
           >
-            {login.isPending ? 'Buscando...' : 'Ver meu pedido'}
+            {login.isPending ? 'Buscando...' : 'Ver meus pedidos'}
           </button>
         </div>
       )}
 
       {open && !result && (
         <div className="rounded-2xl border border-[#1E1024]/10 bg-white p-3.5">
-          <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Entrar</p>
+          <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Meus pedidos</p>
           <div className="flex flex-col gap-2">
             <input className={FIELD_INPUT} value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" />
             <input
@@ -914,6 +976,7 @@ function DetailsStep({
   setDeliveryCep,
   deliveryComplement,
   setDeliveryComplement,
+  addressAutoFilled,
   canContinue,
   onContinue,
   continueLabel,
@@ -946,6 +1009,7 @@ function DetailsStep({
   setDeliveryCep: (v: string) => void;
   deliveryComplement: string;
   setDeliveryComplement: (v: string) => void;
+  addressAutoFilled: boolean;
   canContinue: boolean;
   onContinue: () => void;
   continueLabel: string;
@@ -999,9 +1063,20 @@ function DetailsStep({
 
       {orderKind === 'DELIVERY' && distanceMode && (
         <>
+          {addressAutoFilled && (
+            <p className="-mt-2 text-[11.5px] font-semibold text-brand">
+              Preenchemos com o endereço do seu último pedido — pode alterar se mudou.
+            </p>
+          )}
           <div>
             <label className={FIELD_LABEL}>Endereço</label>
-            <AddressAutocomplete slug={slug} inputClassName={FIELD_INPUT} placeholder="Digite seu endereço" onSelect={onPickAddress} />
+            <AddressAutocomplete
+              slug={slug}
+              inputClassName={FIELD_INPUT}
+              placeholder="Digite seu endereço"
+              onSelect={onPickAddress}
+              defaultValue={deliveryStreet}
+            />
             {deliveryLat !== null && quotingDelivery && (
               <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#6B4A78]">
                 <Loader2 size={11} className="animate-spin" /> Calculando frete...
@@ -1044,6 +1119,11 @@ function DetailsStep({
 
       {orderKind === 'DELIVERY' && !distanceMode && (
         <>
+          {addressAutoFilled && (
+            <p className="text-[11.5px] font-semibold text-brand">
+              Preenchemos com o endereço do seu último pedido — pode alterar se mudou.
+            </p>
+          )}
           {zoneCities.length > 1 && (
             <div>
               <label className={FIELD_LABEL}>Cidade</label>

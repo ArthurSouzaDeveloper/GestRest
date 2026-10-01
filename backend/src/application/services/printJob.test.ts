@@ -481,9 +481,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
 
   it('retirada com pastel E suco: cada via avisa da outra (sem via de motoboy, que é só de entrega)', async () => {
     // Categorias com nome de verdade (não a "Cozinha" genérica do beforeAll) pra testar o
-    // resumo específico do aviso ("PASTEL", não o fallback genérico "COMIDA").
+    // resumo específico do aviso ("PASTEL", não o fallback genérico "COMIDA"). Nome
+    // diferente do usado no teste do "Monte o Seu Pastel" acima — mesmo restaurantId
+    // (compartilhado por todo o describe), e a categoria tem @@unique([restaurantId, name]).
     const pasteisSalgados = await prisma.category.create({
-      data: { name: 'Pastéis Salgados', station: Station.KITCHEN, restaurantId },
+      data: { name: 'Pastéis Salgados Retirada', station: Station.KITCHEN, restaurantId },
     });
     const pastel = await prisma.product.create({
       data: { name: 'Calabresa', price: 12, categoryId: pasteisSalgados.id, restaurantId },

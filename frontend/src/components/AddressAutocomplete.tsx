@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Loader2, MapPin } from 'lucide-react';
 import api from '../lib/api';
@@ -16,14 +16,25 @@ export default function AddressAutocomplete({
   placeholder,
   inputClassName,
   onSelect,
+  defaultValue,
 }: {
   slug: string;
   placeholder?: string;
   inputClassName?: string;
   onSelect: (place: PlaceDetails) => void;
+  /** Preenche o campo sem o cliente ter "escolhido" uma sugestão — usado pra reaproveitar
+   * o endereço do último pedido de entrega (ver PublicOrder.tsx). Só aplica quando chega
+   * preenchido (ex.: depois de uma busca assíncrona que resolve após o componente já ter
+   * montado); nunca sobrescreve o que o cliente já tiver digitado aqui. */
+  defaultValue?: string;
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (defaultValue && !query) setQuery(defaultValue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultValue]);
   // Um "sessionToken" agrupa as chamadas de autocomplete + o detalhe final que a fecha —
   // é o que dá o preço de sessão (mais barato) do Google em vez de cobrar por chamada
   // avulsa. Troca pra um novo a cada endereço resolvido, pra não misturar sessões.

@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
-import { DRINK_NOTE_PRESETS, toggleNotePreset } from '../lib/notePresets';
 import type { Additional, Product } from '../types';
 import { EXTRA_FRUIT_PRICE, type DraftItem } from './OrderComposer';
 
@@ -71,6 +70,11 @@ export function JuiceBuilder({
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
   const [selectedAdditionals, setSelectedAdditionals] = useState<string[]>([]);
+  // Adicionais começam fechados — pedido explícito do cliente: depois de escolher fruta+
+  // base, a lista de adicionais tomava a tela toda e empurrava "Adicionar ao pedido" pra
+  // fora da área visível sem rolar. Minimizado por padrão, com um botão pra abrir só quem
+  // quiser customizar o suco.
+  const [showAdditionals, setShowAdditionals] = useState(false);
 
   // Bases que TODAS as frutas selecionadas têm em comum — só essas fazem sentido pro combo
   // (ex.: se uma fruta não tem versão "Frapê", "Frapê" não pode ser escolhido como base).
@@ -121,6 +125,7 @@ export function JuiceBuilder({
     setQuantity(1);
     setNotes('');
     setSelectedAdditionals([]);
+    setShowAdditionals(false);
   };
 
   const removeFruit = (fruitName: string) => {
@@ -160,7 +165,7 @@ export function JuiceBuilder({
         {candidatesToAdd.length === 0 ? (
           <p className="text-sm text-gray-500">Nenhuma outra fruta disponível nessa base.</p>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {candidatesToAdd.map((f) => (
               <button
                 key={f.fruit}
@@ -190,7 +195,7 @@ export function JuiceBuilder({
         >
           <ChevronLeft size={16} /> {standaloneChosen ? 'Voltar' : 'Trocar base'}
         </button>
-        <div className="border-b border-gray-100 pb-3.5 dark:border-gray-800">
+        <div className="border-b border-gray-200 pb-3.5 dark:border-gray-800">
           <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Seu suco</div>
           {isCombo ? (
             <>
@@ -234,7 +239,7 @@ export function JuiceBuilder({
           </button>
         )}
 
-        <div className="flex items-center justify-between border-b border-gray-100 py-2.5 dark:border-gray-800">
+        <div className="flex items-center justify-between border-b border-gray-200 py-2.5 dark:border-gray-800">
           <span className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">Quantidade</span>
           <div className="flex items-center gap-2">
             <button
@@ -255,51 +260,49 @@ export function JuiceBuilder({
 
         {additionals.length > 0 && (
           <div>
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Adicionais</div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {additionals.map((a) => {
-                const on = selectedAdditionals.includes(a.id);
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() =>
-                      setSelectedAdditionals(on ? selectedAdditionals.filter((x) => x !== a.id) : [...selectedAdditionals, a.id])
-                    }
-                    className="flex w-full items-center justify-between py-3 text-left"
-                  >
-                    <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
-                    <span className="flex items-center gap-3">
-                      <span className="text-xs text-gray-400">+{brl(a.price)}</span>
-                      <span
-                        className={`flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
+            {!showAdditionals ? (
+              <button
+                type="button"
+                onClick={() => setShowAdditionals(true)}
+                className="flex w-full items-center justify-between rounded-2xl border border-gray-200 px-3.5 py-3 text-left text-[13.5px] font-semibold text-gray-600 transition hover:border-brand hover:text-brand dark:border-gray-700 dark:text-gray-300"
+              >
+                Adicionais (opcional)
+                <ChevronDown size={16} />
+              </button>
+            ) : (
+              <>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Adicionais</div>
+                <div className="divide-y divide-gray-200 dark:divide-gray-800">
+                  {additionals.map((a) => {
+                    const on = selectedAdditionals.includes(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() =>
+                          setSelectedAdditionals(on ? selectedAdditionals.filter((x) => x !== a.id) : [...selectedAdditionals, a.id])
+                        }
+                        className="flex w-full items-center justify-between py-3 text-left"
                       >
-                        {on && <Check size={12} strokeWidth={3.5} className="text-white" />}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                        <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
+                        <span className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400">+{brl(a.price)}</span>
+                          <span
+                            className={`flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
+                          >
+                            {on && <Check size={12} strokeWidth={3.5} className="text-white" />}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         )}
 
         <div>
-          <label className="label">Observações</label>
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {DRINK_NOTE_PRESETS.map((preset) => {
-              const on = notes.toLowerCase().split(',').map((p) => p.trim()).includes(preset.toLowerCase());
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => setNotes(toggleNotePreset(notes, preset))}
-                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${on ? 'border-brand text-brand' : 'border-gray-300 text-gray-500 dark:border-gray-700 dark:text-gray-400'}`}
-                >
-                  {preset}
-                </button>
-              );
-            })}
-          </div>
+          <label className="label">Observações (opcional)</label>
           <textarea
             className="input"
             rows={2}
@@ -309,9 +312,11 @@ export function JuiceBuilder({
           />
         </div>
 
-        <button className="btn-primary w-full !py-3" onClick={confirm}>
-          <Check size={16} /> Adicionar ao pedido
-        </button>
+        <div className="sticky bottom-0 -mx-1 bg-white px-1 pb-1 pt-2 dark:bg-gray-900">
+          <button className="btn-primary w-full !py-3" onClick={confirm}>
+            <Check size={16} /> Adicionar ao pedido
+          </button>
+        </div>
       </div>
     );
   }
@@ -331,7 +336,7 @@ export function JuiceBuilder({
             Essas frutas não têm nenhuma base em comum. Volte e escolha outra combinação.
           </p>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {commonBases.map((baseName) => {
               const preview = selectedFruits.map((f) => f.bases.find((b) => b.base === baseName)!.product);
               const previewPrice = Math.max(...preview.map((p) => p.price)) + (preview.length > 1 ? EXTRA_FRUIT_PRICE * (preview.length - 1) : 0);
@@ -361,7 +366,12 @@ export function JuiceBuilder({
     <div className="space-y-4">
       <div>
         <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Escolha a fruta</div>
-        <div className="max-h-[38vh] divide-y divide-gray-100 overflow-y-auto pr-1 dark:divide-gray-800">
+        {/* Sem scroll próprio aqui de propósito — pedido explícito do cliente: isso criava
+            uma "caixa" branca de altura fixa (38vh) dentro do scroll já existente do
+            catálogo (ver OrderComposer.tsx), cortando a visualização dos sabores mesmo
+            quando sobrava espaço. A lista agora flui livre dentro do scroll do catálogo,
+            igual já funciona na aba de comidas. */}
+        <div className="divide-y divide-gray-200 dark:divide-gray-800">
           {fruits.map((f) => (
             <button
               key={f.fruit}
@@ -378,7 +388,7 @@ export function JuiceBuilder({
       {standalone.length > 0 && (
         <div>
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Sabores especiais</div>
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {standalone.map((p) => (
               <button
                 key={p.id}
