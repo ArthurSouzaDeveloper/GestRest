@@ -400,9 +400,12 @@ export function OrderComposer({
                         </button>
                       )}
                       {qty === 0 ? (
-                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1E1024] text-2xl font-semibold leading-none text-white">
+                        <button
+                          onClick={() => addSimple(p)}
+                          className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1E1024] text-2xl font-semibold leading-none text-white"
+                        >
                           +
-                        </span>
+                        </button>
                       ) : (
                         <div className="flex items-center gap-1.5 rounded-full bg-brand-50 p-1">
                           <button
@@ -461,9 +464,12 @@ export function OrderComposer({
                       </button>
                     )}
                     {qty === 0 ? (
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-brand text-lg font-semibold leading-none text-brand">
+                      <button
+                        onClick={() => addSimple(p)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-brand text-lg font-semibold leading-none text-brand"
+                      >
                         +
-                      </span>
+                      </button>
                     ) : (
                       <div className="flex items-center gap-2">
                         <button
