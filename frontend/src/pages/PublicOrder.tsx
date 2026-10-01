@@ -86,6 +86,81 @@ function CartBar({
   );
 }
 
+/**
+ * Resumo do pedido fixo (sticky) ao lado do conteúdo em telas largas (lg:) — Cardápio,
+ * Dados e Pagamento. Reaproveita os mesmos totais já calculados em PublicOrder e expõe um
+ * único botão de continuar, cujo rótulo/ação variam por etapa (ver os 3 usos abaixo).
+ * No celular esse espaço não existe — a navegação continua pela CartBar fixa / botão da
+ * própria etapa, por isso este componente só aparece a partir de lg: (ver `hidden lg:block`
+ * nos pontos onde é usado).
+ */
+function DesktopSummaryCard({
+  draft,
+  subtotal,
+  deliveryFee,
+  orderKind,
+  deliveryZoneName,
+  total,
+  ctaLabel,
+  ctaDisabled,
+  onCta,
+}: {
+  draft: DraftItem[];
+  subtotal: number;
+  deliveryFee: number;
+  orderKind: OrderKind | null;
+  deliveryZoneName?: string;
+  total: number;
+  ctaLabel: string;
+  ctaDisabled?: boolean;
+  onCta: () => void;
+}) {
+  return (
+    <div className={`${CARD} p-6`}>
+      <h2 className="font-display text-[20px] font-extrabold text-[#1E1024]">Seu pedido</h2>
+      {draft.length === 0 ? (
+        <p className="mt-3 text-[13px] text-[#6B4A78]">Seu carrinho está vazio.</p>
+      ) : (
+        <div className="mt-4 flex max-h-[280px] flex-col gap-2.5 overflow-y-auto pr-1">
+          {draft.map((item, i) => (
+            <div key={i} className="flex items-center justify-between gap-2 text-[13.5px] text-[#1E1024]">
+              <span className="min-w-0 truncate">
+                <b>{item.quantity}×</b> {item.comboLabel ?? item.product.name}
+              </span>
+              <span className="shrink-0 font-bold">{brl(draftItemUnitPrice(item) * item.quantity)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="my-4 h-[2px] bg-brand-50" />
+      <div className="flex flex-col gap-2 text-[13.5px] text-[#6B4A78]">
+        <div className="flex justify-between">
+          <span>Subtotal</span>
+          <span>{brl(subtotal)}</span>
+        </div>
+        {orderKind === 'DELIVERY' && (
+          <div className="flex justify-between">
+            <span>Taxa de entrega{deliveryZoneName ? ` · ${deliveryZoneName}` : ''}</span>
+            <span>{brl(deliveryFee)}</span>
+          </div>
+        )}
+        {orderKind === 'PICKUP' && (
+          <div className="flex items-center gap-1.5 text-[12px] font-semibold text-green-600">
+            <CheckCircle2 size={13} /> Retirada no balcão — sem taxa de entrega
+          </div>
+        )}
+      </div>
+      <div className="mt-2 flex justify-between border-t-2 border-[#1E1024]/10 pt-3 text-[18px] font-extrabold text-[#1E1024]">
+        <span>Total</span>
+        <span>{brl(total)}</span>
+      </div>
+      <button className={`${PRIMARY_CTA} mt-5`} disabled={ctaDisabled} onClick={onCta}>
+        {ctaLabel}
+      </button>
+    </div>
+  );
+}
+
 type Step = 'intro' | 'details' | 'menu' | 'cart' | 'payment' | 'review' | 'confirmation';
 type OrderKind = 'DELIVERY' | 'PICKUP';
 /** Subset of PaymentMethod the public site offers — sem vale-refeição (só faz sentido presencial). */
@@ -335,6 +410,11 @@ export default function PublicOrder() {
         ? deliveryLat !== null && deliveryLng !== null && !!deliveryQuote && !quoteOutOfRange && deliveryNumber.trim()
         : deliveryZoneId && deliveryStreet.trim() && deliveryNumber.trim()));
 
+  // Mesma regra de PaymentStep, recalculada aqui só pra habilitar/desabilitar o botão
+  // "Continuar" do resumo lateral (lg:) — a tela em si continua validando por conta própria.
+  const paymentNeedsChange = paymentMethod === 'CASH';
+  const canContinuePayment = !!paymentMethod && (!paymentNeedsChange || !changeFor || Number(changeFor) >= total);
+
   // Quem clicou em "Só quero ver o cardápio" na Capa pula a escolha de Entrega/Retirada —
   // se tentar avançar pro Carrinho/Pagamento/Revisão sem isso definido, manda de volta pra
   // Dados pra escolher (sem isso, a Revisão ficava em branco e dava pra finalizar sem endereço).
@@ -464,7 +544,31 @@ export default function PublicOrder() {
       // A barra fixa do rodapé (CartBar) só existe no Cardápio quando já tem item no
       // carrinho, e no Carrinho/Revisão sempre — nos outros casos reservar esse espaço
       // deixava uma sobra vazia embaixo da tela sem nenhuma barra pra preencher ali.
-      <div className={`mx-auto px-4 pt-4 ${(step === 'menu' && itemCount === 0) || step === 'details' || step === 'payment' ? 'pb-6' : 'pb-28'} ${step === 'menu' ? 'max-w-3xl' : 'max-w-md'}`}>
+      // Em telas largas (lg:), Cardápio/Dados/Pagamento ganham um resumo fixo ao lado
+      // (ver DesktopSummaryCard) no lugar da CartBar, que fica só pro celular (lg:hidden).
+      // Confirmação também ganha mais espaço (lg:max-w-4xl) pra caber o resumo lateral que
+      // ConfirmationStep já monta sozinha — sem isso a lateral nunca teria onde esticar.
+      <div
+        className={`mx-auto px-4 pt-4 ${(step === 'menu' && itemCount === 0) || step === 'details' || step === 'payment' ? 'pb-6' : 'pb-28 lg:pb-10'} ${
+          step === 'menu' || step === 'details' || step === 'payment'
+            ? 'max-w-3xl lg:max-w-6xl'
+            : step === 'confirmation'
+              ? 'max-w-md lg:max-w-4xl'
+              : 'max-w-md'
+        }`}
+      >
+      <div
+        className={
+          step === 'menu' || step === 'details' || step === 'payment'
+            ? 'lg:grid lg:grid-cols-[1fr_380px] lg:items-start lg:gap-10'
+            : undefined
+        }
+      >
+      {/* min-w-0: por padrão um item de grid não encolhe além da largura intrínseca do
+          conteúdo mais largo lá dentro (ex.: a fileira de chips de categoria, com scroll
+          horizontal próprio) — sem isso a coluna "1fr" ignorava a largura da grade e
+          empurrava o resumo lateral (DesktopSummaryCard) pra fora da tela em telas largas. */}
+      <div className="lg:min-w-0">
         {step === 'details' && (
           <DetailsStep
             slug={slug}
@@ -515,7 +619,9 @@ export default function PublicOrder() {
           />
         )}
 
-        {step === 'menu' && <OrderComposer draft={draft} setDraft={setDraft} basePath={`/public/${slug}/catalog`} />}
+        {step === 'menu' && (
+          <OrderComposer draft={draft} setDraft={setDraft} basePath={`/public/${slug}/catalog`} variant="public" />
+        )}
 
         {step === 'cart' && (
           <CartStep
@@ -571,6 +677,11 @@ export default function PublicOrder() {
             orderId={confirmedOrderId}
             orderKind={orderKind}
             estimatedReadyAt={confirmedEta}
+            draft={draft}
+            subtotal={subtotal}
+            deliveryFee={deliveryFee}
+            total={total}
+            paymentMethod={paymentMethod}
             onNewOrder={() => {
               // Mantém nome/telefone/endereço de propósito (não limpa) — mesmo cliente
               // pedindo de novo na mesma visita não deveria ter que redigitar tudo outra
@@ -588,14 +699,66 @@ export default function PublicOrder() {
           />
         )}
       </div>
+
+      {/* Resumo fixo do pedido — só em telas largas (lg:), no lugar da CartBar fixa do
+          celular. Mesmas ações de continuar de cada etapa, recalculadas aqui. */}
+      {step === 'menu' && (
+        <div className="hidden lg:block lg:sticky lg:top-6">
+          <DesktopSummaryCard
+            draft={draft}
+            subtotal={subtotal}
+            deliveryFee={deliveryFee}
+            orderKind={orderKind}
+            deliveryZoneName={deliveryFeeLabel}
+            total={total}
+            ctaLabel={itemCount > 0 ? `Ver carrinho · ${brl(subtotal)}` : 'Carrinho vazio'}
+            ctaDisabled={itemCount === 0}
+            onCta={() => setStep('cart')}
+          />
+        </div>
+      )}
+      {step === 'details' && (
+        <div className="hidden lg:block lg:sticky lg:top-6">
+          <DesktopSummaryCard
+            draft={draft}
+            subtotal={subtotal}
+            deliveryFee={deliveryFee}
+            orderKind={orderKind}
+            deliveryZoneName={deliveryFeeLabel}
+            total={total}
+            ctaLabel={draft.length > 0 ? 'Continuar para o carrinho' : 'Continuar para o cardápio'}
+            ctaDisabled={!canContinueDetails}
+            onCta={() => setStep(draft.length > 0 ? 'cart' : 'menu')}
+          />
+        </div>
+      )}
+      {step === 'payment' && (
+        <div className="hidden lg:block lg:sticky lg:top-6">
+          <DesktopSummaryCard
+            draft={draft}
+            subtotal={subtotal}
+            deliveryFee={deliveryFee}
+            orderKind={orderKind}
+            deliveryZoneName={deliveryFeeLabel}
+            total={total}
+            ctaLabel="Continuar"
+            ctaDisabled={!canContinuePayment}
+            onCta={() => setStep(orderKind ? 'review' : 'details')}
+          />
+        </div>
+      )}
+      </div>
+      </div>
       )}
 
       {step === 'menu' && itemCount > 0 && (
+        <div className="lg:hidden">
         <CartBar
           left={`${itemCount} ${itemCount === 1 ? 'item' : 'itens'}`}
           right={`Ver carrinho · ${brl(subtotal)}`}
           onClick={() => setStep('cart')}
         />
+        </div>
       )}
 
       {step === 'cart' && (
@@ -619,6 +782,10 @@ export default function PublicOrder() {
   );
 }
 
+// Etapas que, em telas largas (lg:), ganham o resumo lateral fixo (DesktopSummaryCard) —
+// o cabeçalho precisa alargar junto, senão o título fica desalinhado com o conteúdo abaixo.
+const WIDE_HEADER_TITLES = ['Cardápio', 'Seus dados', 'Pagamento'];
+
 function PublicHeader({
   title,
   onBack,
@@ -626,9 +793,10 @@ function PublicHeader({
   title: string;
   onBack: () => void;
 }) {
+  const wide = WIDE_HEADER_TITLES.includes(title);
   return (
     <div className="sticky top-0 z-10 bg-brand-50/95 backdrop-blur">
-      <div className={`mx-auto flex items-center gap-3.5 px-4 py-4 ${title === 'Cardápio' ? 'max-w-3xl' : 'max-w-md'}`}>
+      <div className={`mx-auto flex items-center gap-3.5 px-4 py-4 ${wide ? 'max-w-3xl lg:max-w-6xl' : 'max-w-md'}`}>
         <button onClick={onBack} className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1E1024]" title="Voltar">
           <ChevronLeft size={22} strokeWidth={2.3} />
         </button>
@@ -664,20 +832,29 @@ function IntroStep({
   });
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-brand-50 dark:bg-brand-50">
-      <div className="w-full max-w-md">
+    <div className="flex min-h-screen flex-col items-center bg-brand-50 dark:bg-brand-50 lg:justify-center lg:py-10">
+      <div className="w-full max-w-md lg:flex lg:max-w-5xl lg:items-center lg:gap-16 lg:px-8">
         {/* Topo do card: a logo do restaurante (subida pela tela de Identidade Visual, ver
             branding.service.ts), centralizada num fundo levemente tingido da cor da marca.
             Sem logo configurada ainda, cai no mesmo placeholder de "foto do restaurante" de
-            antes — pensado pra virar uma foto de verdade do balcão quando existir esse campo. */}
+            antes — pensado pra virar uma foto de verdade do balcão quando existir esse campo.
+            Em telas largas (lg:) vira o painel decorativo da esquerda, ao lado do conteúdo. */}
         {logoUrl ? (
-          <div className="relative flex h-[300px] w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-b-[44px] bg-brand-100">
-            <div className="absolute -right-12 -top-10 h-44 w-44 rounded-full bg-[#F29A1F]" />
-            <img src={logoUrl} alt={restaurantName} className="relative h-40 w-40 rounded-full object-cover shadow-[0_10px_0_var(--brand-700,#5e0f78)]" />
+          <div className="relative flex h-[300px] w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-b-[44px] bg-brand-100 lg:h-[560px] lg:flex-1 lg:rounded-[44px]">
+            <div className="absolute -right-12 -top-10 h-44 w-44 rounded-full bg-[#F29A1F] lg:-right-20 lg:-top-20 lg:h-80 lg:w-80" />
+            <div className="absolute -bottom-14 -left-14 hidden h-60 w-60 rounded-full bg-brand opacity-[0.16] lg:block" />
+            <img
+              src={logoUrl}
+              alt={restaurantName}
+              className="relative h-40 w-40 rounded-full object-cover shadow-[0_10px_0_var(--brand-700,#5e0f78)] lg:h-64 lg:w-64 lg:shadow-[0_14px_0_var(--brand-700,#5e0f78)]"
+            />
+            <div className="absolute bottom-9 left-0 right-0 hidden text-center text-[13px] font-bold uppercase tracking-[0.08em] text-brand lg:block">
+              Pastelaria &amp; Sucaria
+            </div>
           </div>
         ) : (
           <div
-            className="flex h-40 w-full items-center justify-center text-center text-[10.5px] font-bold uppercase tracking-wide text-gray-400"
+            className="flex h-40 w-full items-center justify-center text-center text-[10.5px] font-bold uppercase tracking-wide text-gray-400 lg:h-[560px] lg:flex-1 lg:rounded-[44px]"
             style={{
               backgroundColor: '#E7E5E4',
               backgroundImage:
@@ -688,9 +865,9 @@ function IntroStep({
           </div>
         )}
 
-        <div className="px-6 pt-6">
-          <h6 className="text-center text-[12px] font-bold uppercase tracking-[0.08em] text-brand">Pastelaria &amp; Sucaria</h6>
-          <h1 className="mt-0.5 text-center font-display text-[38px] font-extrabold leading-none tracking-tight text-[#1E1024]">{restaurantName}</h1>
+        <div className="px-6 pt-6 lg:w-[460px] lg:shrink-0 lg:px-0 lg:pt-0">
+          <h6 className="text-center text-[12px] font-bold uppercase tracking-[0.08em] text-brand lg:text-left">Pastelaria &amp; Sucaria</h6>
+          <h1 className="mt-0.5 text-center font-display text-[38px] font-extrabold leading-none tracking-tight text-[#1E1024] lg:text-left lg:text-[58px]">{restaurantName}</h1>
 
           <div className="mt-6">
             <h6 className="mb-2 text-[15px] font-bold text-[#1E1024]">Como você quer receber?</h6>
@@ -730,7 +907,7 @@ function IntroStep({
         </div>
       </div>
 
-      <div className="mx-auto mt-auto flex w-full max-w-md flex-col items-center gap-2.5 pb-6 pt-8">
+      <div className="mx-auto mt-auto flex w-full max-w-md flex-col items-center gap-2.5 pb-6 pt-8 lg:max-w-5xl">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
           <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
           Aberto de quarta a domingo até 23h
@@ -1300,7 +1477,9 @@ function DetailsStep({
         </>
       )}
 
-      <button className={PRIMARY_CTA} disabled={!canContinue} onClick={onContinue}>
+      {/* Em telas largas (lg:) o botão equivalente mora no resumo lateral fixo
+          (DesktopSummaryCard), então este some pra não duplicar a ação. */}
+      <button className={`${PRIMARY_CTA} lg:hidden`} disabled={!canContinue} onClick={onContinue}>
         {continueLabel}
       </button>
     </div>
@@ -1483,7 +1662,14 @@ function PaymentStep({
         </div>
       )}
 
-      <button className={`${PRIMARY_CTA} mt-5`} disabled={!canContinue} onClick={onContinue}>
+      <div className="flex items-baseline justify-between pt-1">
+        <span className="text-[15px] text-[#1E1024]">Total do pedido</span>
+        <span className="font-display text-[26px] font-extrabold text-[#1E1024]">{brl(total)}</span>
+      </div>
+
+      {/* Em telas largas (lg:) o botão equivalente mora no resumo lateral fixo
+          (DesktopSummaryCard), então este some pra não duplicar a ação. */}
+      <button className={`${PRIMARY_CTA} mt-5 lg:hidden`} disabled={!canContinue} onClick={onContinue}>
         Continuar
       </button>
     </div>
@@ -1608,6 +1794,11 @@ function ConfirmationStep({
   orderId,
   orderKind,
   estimatedReadyAt,
+  draft,
+  subtotal,
+  deliveryFee,
+  total,
+  paymentMethod,
   onNewOrder,
 }: {
   slug: string;
@@ -1615,33 +1806,89 @@ function ConfirmationStep({
   orderId: string | null;
   orderKind: OrderKind | null;
   estimatedReadyAt: string | null;
+  draft: DraftItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  paymentMethod: PublicPaymentMethod | '';
   onNewOrder: () => void;
 }) {
+  const paymentLabel = PAYMENT_OPTIONS.find((p) => p.key === paymentMethod)?.label;
   return (
-    <div className="flex flex-col items-center gap-3 pt-[54px] text-center">
-      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand text-white">
-        <Check size={44} strokeWidth={3} />
+    <div className="lg:mx-auto lg:flex lg:max-w-4xl lg:items-center lg:justify-center lg:gap-16 lg:pt-10">
+      <div className="flex flex-col items-center gap-3 pt-[54px] text-center lg:w-[360px] lg:shrink-0 lg:pt-0">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand text-white">
+          <Check size={44} strokeWidth={3} />
+        </div>
+        <h1 className="mt-1 font-display text-[34px] font-extrabold tracking-tight text-[#1E1024]">Pedido recebido!</h1>
+        {orderNumber && (
+          <div className="text-[12.5px] text-[#6B4A78]">
+            Número do pedido <b className="text-[14.5px] text-[#1E1024]">#{orderNumber}</b>
+          </div>
+        )}
+        <p className="max-w-[26ch] text-[12.5px] leading-[1.5] text-[#6B4A78]">
+          {orderKind === 'DELIVERY'
+            ? 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo.'
+            : 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo — vá até o balcão no horário combinado.'}
+        </p>
+        {estimatedReadyAt && (
+          <div className="mx-auto flex w-fit items-center gap-2 rounded-2xl bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
+            <Clock size={16} />
+            {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
+          </div>
+        )}
+        {orderId && (
+          <Link to={`/pedido/${slug}/rastreio/${orderId}`} className={`${PRIMARY_CTA} mt-3`}>
+            Acompanhar pedido
+          </Link>
+        )}
+        <button className="mt-[18px] text-[12.5px] font-bold text-brand underline decoration-brand/35 underline-offset-2" onClick={onNewOrder}>
+          Fazer novo pedido
+        </button>
       </div>
-      <h1 className="mt-1 font-display text-[34px] font-extrabold tracking-tight text-[#1E1024]">Pedido recebido!</h1>
-      {orderNumber && (
-        <div className="text-[12.5px] text-[#6B4A78]">
-          Número do pedido <b className="text-[14.5px] text-[#1E1024]">#{orderNumber}</b>
+
+      {/* Resumo do pedido — só aparece em telas largas (lg:), ao lado da confirmação; no
+          celular a confirmação já tem tudo que precisa (número, previsão, acompanhar). */}
+      {draft.length > 0 && (
+        <div className="hidden lg:block lg:w-[380px] lg:shrink-0">
+          <div className={`${CARD} p-6`}>
+            <h2 className="font-display text-[20px] font-extrabold text-[#1E1024]">Resumo</h2>
+            <div className="mt-4 flex max-h-[280px] flex-col gap-2.5 overflow-y-auto pr-1">
+              {draft.map((item, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 text-[13.5px] text-[#1E1024]">
+                  <span className="min-w-0 truncate">
+                    <b>{item.quantity}×</b> {item.comboLabel ?? item.product.name}
+                  </span>
+                  <span className="shrink-0 font-bold">{brl(draftItemUnitPrice(item) * item.quantity)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="my-4 h-[2px] bg-brand-50" />
+            <div className="flex flex-col gap-2 text-[13.5px] text-[#6B4A78]">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{brl(subtotal)}</span>
+              </div>
+              {orderKind === 'DELIVERY' && (
+                <div className="flex justify-between">
+                  <span>Taxa de entrega</span>
+                  <span>{brl(deliveryFee)}</span>
+                </div>
+              )}
+              {paymentLabel && (
+                <div className="flex justify-between">
+                  <span>Pago com</span>
+                  <span>{paymentLabel}</span>
+                </div>
+              )}
+            </div>
+            <div className="mt-2 flex justify-between border-t-2 border-[#1E1024]/10 pt-3 text-[18px] font-extrabold text-[#1E1024]">
+              <span>Total</span>
+              <span>{brl(total)}</span>
+            </div>
+          </div>
         </div>
       )}
-      {estimatedReadyAt && (
-        <div className="mx-auto flex w-fit items-center gap-2 rounded-2xl bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
-          <Clock size={16} />
-          {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
-        </div>
-      )}
-      {orderId && (
-        <Link to={`/pedido/${slug}/rastreio/${orderId}`} className={`${PRIMARY_CTA} mt-3`}>
-          Acompanhar pedido
-        </Link>
-      )}
-      <button className="mt-[18px] text-[12.5px] font-bold text-brand underline decoration-brand/35 underline-offset-2" onClick={onNewOrder}>
-        Fazer novo pedido
-      </button>
     </div>
   );
 }

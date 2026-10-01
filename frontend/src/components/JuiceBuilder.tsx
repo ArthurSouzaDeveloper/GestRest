@@ -59,13 +59,19 @@ export function JuiceBuilder({
   categoryId,
   onAdd,
   basePath = '/catalog',
+  variant = 'staff',
 }: {
   products: Product[];
   categoryId: string;
   onAdd: (item: DraftItem) => void;
   /** Same purpose as OrderComposer's basePath — passed through from there. */
   basePath?: string;
+  /** 'public' aplica o visual "Fresco" do site do cliente só na Etapa 3 (monte seu suco) —
+   * mesma convenção de OrderComposer, propagada por ela. Default 'staff' preserva a tela
+   * interna de sempre. */
+  variant?: 'staff' | 'public';
 }) {
+  const isPublic = variant === 'public';
   const { fruits, standalone } = useMemo(() => groupByFruit(products), [products]);
   const [selectedFruits, setSelectedFruits] = useState<FruitEntry[]>([]);
   const [base, setBase] = useState<string | null>(null);
@@ -191,6 +197,152 @@ export function JuiceBuilder({
 
   // Etapa 3: fruta + base escolhidas — quantidade, adicionais, observações.
   if (effectiveProducts.length > 0 && primary) {
+    if (isPublic) {
+      // Visual "Fresco" do site do cliente — mesma hierarquia da tela interna (resumo,
+      // adicionar fruta, quantidade, adicionais, observações, confirmar), mas em cards
+      // brancos arredondados sobre o fundo lavanda da página em vez da lista "crua" da tela
+      // interna. Mantém os mesmos comportamentos já ajustados a pedido do cliente: adicionais
+      // minimizados com toggle (não a lista inteira aberta), sem sugestões de observação
+      // (só texto livre) e botão de confirmar fixo (sticky) no fim da tela.
+      return (
+        <div className="space-y-3.5">
+          <button
+            className="flex items-center gap-1 text-[13px] font-bold text-brand"
+            onClick={() => (standaloneChosen ? setStandaloneChosen(null) : setBase(null))}
+          >
+            <ChevronLeft size={15} /> {standaloneChosen ? 'Voltar' : 'Trocar base'}
+          </button>
+
+          <div className="rounded-3xl bg-white p-4">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-[#6B4A78]">Seu suco</div>
+            {isCombo ? (
+              <>
+                <div className="mt-0.5 flex items-baseline justify-between gap-2">
+                  <span className="font-display text-[18px] font-extrabold text-[#1E1024]">
+                    {selectedFruits.map((f) => f.fruit).join(' + ')}
+                  </span>
+                  <span className="shrink-0 font-display text-[18px] font-extrabold text-brand">{brl(totalUnitPrice)}</span>
+                </div>
+                <div className="mt-0.5 text-[12.5px] text-[#6B4A78]">Base: {base}</div>
+                <ul className="mt-2 space-y-1">
+                  {effectiveProducts.map((p) => {
+                    const fruitName = p.name.match(FRUIT_BASE_RE)?.[1] ?? p.name;
+                    return (
+                      <li key={p.id} className="flex items-center justify-between text-[12.5px] text-[#6B4A78]">
+                        <span>
+                          {fruitName} — {brl(p.price)}
+                          {p.id === primary.id && <span className="font-bold text-brand"> (preço base)</span>}
+                        </span>
+                        <button onClick={() => removeFruit(fruitName)} className="-m-1.5 p-1.5 text-[#C9A9D6] hover:text-red-500" title="Remover fruta">
+                          <X size={13} />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            ) : (
+              <div className="mt-0.5 flex items-baseline justify-between">
+                <span className="font-display text-[20px] font-extrabold text-[#1E1024]">{primary.name}</span>
+                <span className="font-display text-[20px] font-extrabold text-brand">{brl(primary.price)}</span>
+              </div>
+            )}
+          </div>
+
+          {!standaloneChosen && candidatesToAdd.length > 0 && selectedFruits.length < MAX_FRUITS && (
+            <button
+              className="flex w-full items-center justify-center gap-2 rounded-[20px] border-2 border-dashed border-brand-100 p-3.5 text-[14px] font-bold text-brand"
+              onClick={() => setAddingFruit(true)}
+            >
+              <Plus size={15} /> Adicionar outra fruta (+{brl(EXTRA_FRUIT_PRICE)})
+            </button>
+          )}
+
+          <div className="flex items-center justify-between rounded-[20px] bg-white px-[18px] py-3.5">
+            <span className="text-[15px] font-bold text-[#1E1024]">Quantidade</span>
+            <div className="flex items-center gap-3.5 rounded-full bg-brand-50 p-1">
+              <button
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[18px] font-bold text-[#1E1024]"
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              >
+                –
+              </button>
+              <span className="min-w-[14px] text-center text-[16px] font-extrabold text-[#1E1024]">{quantity}</span>
+              <button
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-[18px] font-bold text-white"
+                onClick={() => setQuantity((q) => q + 1)}
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {additionals.length > 0 && (
+            <div>
+              {/* Mesmo toggle minimizado/expansível pedido pelo cliente (ver tela interna
+                  abaixo) — só com o visual em cards brancos do site público. */}
+              <button
+                type="button"
+                onClick={() => setShowAdditionals((v) => !v)}
+                className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-[13.5px] font-bold transition ${
+                  showAdditionals ? 'bg-white text-brand' : 'bg-white text-[#6B4A78]'
+                }`}
+              >
+                {showAdditionals ? 'Adicionais' : 'Adicionais (opcional)'}
+                {showAdditionals ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+              {showAdditionals && (
+                <div className="mt-2 flex flex-col gap-2">
+                  {additionals.map((a) => {
+                    const on = selectedAdditionals.includes(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() =>
+                          setSelectedAdditionals(on ? selectedAdditionals.filter((x) => x !== a.id) : [...selectedAdditionals, a.id])
+                        }
+                        className={`flex w-full items-center justify-between rounded-2xl border-2 bg-white px-4 py-3 text-left transition ${on ? 'border-brand' : 'border-white'}`}
+                      >
+                        <span className="text-[14px] font-bold text-[#1E1024]">{a.name}</span>
+                        <span className="flex items-center gap-2.5">
+                          <span className="text-[12px] text-[#6B4A78]">+{brl(a.price)}</span>
+                          <span
+                            className={`flex h-[22px] w-[22px] items-center justify-center rounded-[7px] ${on ? 'bg-brand' : 'border-2 border-brand-100'}`}
+                          >
+                            {on && <Check size={13} strokeWidth={3.5} className="text-white" />}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div>
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#6B4A78]">Observações (opcional)</div>
+            <textarea
+              className="w-full rounded-2xl border-2 border-brand-100 bg-white px-4 py-3 text-[14px] text-[#1E1024] outline-none transition focus:border-brand"
+              rows={2}
+              placeholder="Sem açúcar, muito gelo, pouco gelo..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
+          <div className="sticky bottom-0 -mx-1 bg-brand-50 px-1 pb-1 pt-2">
+            <button
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-brand px-6 py-4 text-[16px] font-extrabold text-white shadow-[0_6px_0_var(--brand-700,#5e0f78)] transition active:translate-y-[3px] active:shadow-[0_3px_0_var(--brand-700,#5e0f78)]"
+              onClick={confirm}
+            >
+              <Check size={17} /> Adicionar ao pedido
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         <button

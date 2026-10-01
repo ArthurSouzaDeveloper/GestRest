@@ -121,13 +121,19 @@ export function OrderComposer({
   draft,
   setDraft,
   basePath = '/catalog',
+  variant = 'staff',
 }: {
   draft: DraftItem[];
   setDraft: (items: DraftItem[]) => void;
   /** Catalog endpoint prefix. Defaults to the authenticated staff catalog; the public
    * ordering site passes `/public/:slug/catalog` instead — same shape, no auth required. */
   basePath?: string;
+  /** 'public' aplica o visual "Fresco" do site do cliente (cards arredondados, botão "+"
+   * sólido, sem o painel de carrinho embutido — a página pública já tem o próprio
+   * carrinho/CartBar). Default 'staff' preserva o visual de sempre da tela interna. */
+  variant?: 'staff' | 'public';
 }) {
+  const isPublic = variant === 'public';
   const [topGroup, setTopGroup] = useState<TopGroup>('COMIDAS');
   // Sem valor inicial fixo: o efeito abaixo escolhe a primeira categoria assim que a
   // lista carrega (ver nota ali sobre por que não existe mais "Todos").
@@ -260,21 +266,28 @@ export function OrderComposer({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className={isPublic ? '' : 'grid grid-cols-1 gap-4 lg:grid-cols-2'}>
       {/* Catalog */}
       <div>
         {/* Busca instantânea por nome/descrição do produto */}
         <div className="relative mb-3">
-          <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search
+            size={17}
+            className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${isPublic ? 'text-[#6B4A78]' : 'text-gray-400'}`}
+          />
           <input
-            className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-9 text-[16px] text-gray-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className={
+              isPublic
+                ? 'w-full rounded-full border-0 bg-white py-3.5 pl-11 pr-9 text-[15px] text-[#1E1024] outline-none transition placeholder:text-[#6B4A78]'
+                : 'w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-9 text-[16px] text-gray-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100'
+            }
             placeholder="Pesquisar produto..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           {search && (
             <button
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-600"
+              className={`absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 ${isPublic ? 'text-[#6B4A78] hover:text-brand' : 'text-gray-400 hover:text-gray-600'}`}
               onClick={() => setSearch('')}
               title="Limpar"
             >
@@ -290,13 +303,21 @@ export function OrderComposer({
                 aba própria. */}
             <div className="mb-2 grid grid-cols-2 gap-2">
               <button
-                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={
+                  isPublic
+                    ? `flex h-12 items-center justify-center gap-1.5 rounded-full text-[13.5px] font-bold transition ${topGroup === 'COMIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-white text-[#6B4A78]'}`
+                    : `flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
+                }
                 onClick={() => setTopGroup('COMIDAS')}
               >
                 <Utensils size={15} className="shrink-0" /> Pastéis e Mini Pizzas
               </button>
               <button
-                className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
+                className={
+                  isPublic
+                    ? `flex h-12 items-center justify-center gap-1.5 rounded-full text-[13.5px] font-bold transition ${topGroup === 'BEBIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-white text-[#6B4A78]'}`
+                    : `flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
+                }
                 onClick={() => setTopGroup('BEBIDAS')}
               >
                 <CupSoda size={15} className="shrink-0" /> Sucos e Bebidas
@@ -314,7 +335,11 @@ export function OrderComposer({
                 {groupChips.map((chip) => (
                   <button
                     key={chip.key}
-                    className={`h-9 shrink-0 whitespace-nowrap rounded-full border px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'border-transparent bg-brand text-white' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
+                    className={
+                      isPublic
+                        ? `h-10 shrink-0 whitespace-nowrap rounded-full px-4 text-[13.5px] font-bold transition ${activeCat === chip.key ? 'bg-brand text-white' : 'bg-white text-[#6B4A78]'}`
+                        : `h-9 shrink-0 whitespace-nowrap rounded-full border px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'border-transparent bg-brand text-white' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
+                    }
                     onClick={() => setActiveCat(chip.key)}
                   >
                     {chip.label}
@@ -330,7 +355,7 @@ export function OrderComposer({
           </div>
         ) : useBuilder ? (
           <div className="max-h-[55vh] overflow-y-auto pr-1">
-            <JuiceBuilder products={filtered} categoryId={activeCat} onAdd={addFromBuilder} basePath={basePath} />
+            <JuiceBuilder products={filtered} categoryId={activeCat} onAdd={addFromBuilder} basePath={basePath} variant={variant} />
           </div>
         ) : filtered.length === 0 ? (
           <p className="py-8 text-center text-sm text-gray-400">
@@ -341,9 +366,65 @@ export function OrderComposer({
                 : 'Nenhum produto nesta categoria.'}
           </p>
         ) : (
-          <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+          <div className={isPublic ? 'flex max-h-[60vh] flex-col gap-2.5 overflow-y-auto pb-1 pr-1' : 'max-h-[55vh] space-y-2 overflow-y-auto pr-1'}>
             {filtered.map((p) => {
               const qty = simpleQty(p.id);
+              if (isPublic) {
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => addSimple(p)}
+                    className="flex cursor-pointer items-center gap-3.5 rounded-3xl bg-white p-4 transition active:scale-[0.99]"
+                  >
+                    <div className="min-w-0 flex-1">
+                      {(searching || activeCat === 'all') && (
+                        <span className="mb-1 block w-fit rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+                          {productBadgeLabel(p)}
+                        </span>
+                      )}
+                      <div className="text-[16px] font-bold leading-tight text-[#1E1024]">{p.name}</div>
+                      {p.description && (
+                        <div className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-[#6B4A78]">{p.description}</div>
+                      )}
+                      <div className="mt-1.5 text-[15px] font-extrabold text-[#1E1024]">
+                        {p.isCustom ? 'Preço pela montagem' : brl(p.price)}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      {qty > 0 && (
+                        <button
+                          onClick={() => setConfiguring({ product: p, index: draft.findIndex((d) => d.product.id === p.id) })}
+                          className="text-[#C9A9D6] hover:text-brand"
+                          title="Personalizar"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                      {qty === 0 ? (
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1E1024] text-2xl font-semibold leading-none text-white">
+                          +
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-1.5 rounded-full bg-brand-50 p-1">
+                          <button
+                            onClick={() => decSimple(p)}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#1E1024]"
+                          >
+                            <Minus size={13} />
+                          </button>
+                          <span className="min-w-[18px] text-center text-sm font-extrabold text-[#1E1024]">{qty}</span>
+                          <button
+                            onClick={() => addSimple(p)}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white"
+                          >
+                            <Plus size={13} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div
                   key={p.id}
@@ -410,8 +491,9 @@ export function OrderComposer({
       </div>
 
       {/* Draft cart — só ocupa espaço quando tem algo, pra não atrapalhar a visualização do
-          cardápio antes do cliente escolher o primeiro item. */}
-      {draft.length > 0 && (
+          cardápio antes do cliente escolher o primeiro item. No site público (variant="public")
+          este painel nunca aparece: a página já tem seu próprio carrinho (CartStep/CartBar). */}
+      {!isPublic && draft.length > 0 && (
       <div>
         <h4 className="mb-2 text-sm font-medium text-gray-600 dark:text-gray-300">Itens do pedido</h4>
         <div className="space-y-2">
