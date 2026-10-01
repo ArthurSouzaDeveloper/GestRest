@@ -44,12 +44,15 @@ function isHouseSuggestion(categoryName: string): boolean {
 }
 
 /**
- * Ordem fixa dos itens na via da cozinha (e na parte de cozinha da via combinada do
- * motoboy) — pedido explícito do cliente pra sempre sair na mesma sequência, não a ordem
- * em que o cliente escolheu os itens no site. "Sugestões da Casa" entra na frente (mesmo
- * critério já usado no cardápio, ver reorder-categories-add-frapes-rei-do-suco.ts); os
- * demais fora dessas 4 famílias (não deveria existir na estação COZINHA, mas por segurança)
- * ficam por último, mantendo a ordem relativa entre si (sort estável).
+ * Ordem fixa dos itens/papéis da cozinha (e da parte de cozinha da via combinada do
+ * motoboy, que continua numa via só) — pedido explícito do cliente pra sempre sair na
+ * mesma sequência, não a ordem em que o cliente escolheu os itens no site. Cada valor
+ * diferente também separa os itens em PAPÉIS distintos na via normal da cozinha (ver
+ * enqueueForItems): um papel só de "Sugestões da Casa", um só de Pastel (doce e salgado
+ * juntos — o "typeLabel" de cada item já distingue isso na linha), um só de Mini Pizza, um
+ * só de Porção. Os demais fora dessas 4 famílias (não deveria existir na estação COZINHA,
+ * mas por segurança) caem num papel por último, mantendo a ordem relativa entre si (sort
+ * estável).
  */
 function kitchenSortPriority(categoryName: string): number {
   const name = categoryName
@@ -230,31 +233,57 @@ export const printJobService = {
     );
     const juiceItems = byStation.get(Station.JUICE_BAR) ?? [];
 
-    // Uma via por estação tocada (COZINHA e/ou SUQUEIROS) — cada uma fica na própria
-    // bancada de produção, só com os itens que aquela estação prepara. Ordem fixa
-    // (cozinha sempre antes de suqueiros), não a ordem em que os itens foram
-    // adicionados ao pedido — pedido do cliente pra sempre sair "PEDIDOS COZINHA,
-    // PEDIDOS SUCOS" nessa sequência, sem depender de qual item o cliente escolheu primeiro.
-    // Cada via também avisa quando o pedido tem coisa na OUTRA estação, pra quem só vê
-    // essa via (ex.: quem vem buscar no caixa, sem ter feito o pedido) não esquecer.
-    for (const [station, stationItems, crossStationNotice] of [
-      [Station.KITCHEN, kitchenItems, hasBeverages ? 'PEDIDO COM BEBIDA' : null],
-      [Station.JUICE_BAR, juiceItems, fullKitchenItems.length > 0 ? `PEDIDO TAMBEM TEM: ${kitchenSummary}` : null],
-    ] as const) {
-      if (stationItems.length === 0) continue;
+    // Cozinha: 1 papel por TIPO de prato presente no pedido (Pastel, Mini Pizza, Porção,
+    // Sugestão da Casa), não mais 1 papel só com tudo junto — pedido explícito do cliente
+    // pra dar pra dividir o preparo entre quem faz cada tipo na mesma bancada. Mesmo
+    // agrupamento/ordem fixa de kitchenSortPriority (doce e salgado da mesma família
+    // ficam no mesmo papel, já que o "typeLabel" de cada item já distingue isso na
+    // linha — ver toTicketItem); um pedido com só 1 tipo continua saindo num papel só,
+    // como já era antes.
+    const kitchenGroups = new Map<number, CreatedOrderItem[]>();
+    for (const item of kitchenItems) {
+      const priority = kitchenSortPriority(item.product.category.name);
+      const group = kitchenGroups.get(priority) ?? [];
+      group.push(item);
+      kitchenGroups.set(priority, group);
+    }
+    for (const [, groupItems] of [...kitchenGroups.entries()].sort(([a], [b]) => a - b)) {
       await tx.printJob.create({
         data: {
           restaurantId: tenantId,
           orderId,
-          station,
+          station: Station.KITCHEN,
           payload: renderTicket({
             ...commonTicketFields,
-            station,
+            station: Station.KITCHEN,
+            // Identifica o tipo no próprio cabeçalho ("COZINHA - PASTEL") — com vários
+            // papéis de cozinha por pedido agora, precisa dar pra saber de qual é qual
+            // sem ter que ler item por item.
+            headerOverride: `COZINHA - ${kitchenTypeSummary(groupItems[0].product.category.name)}`,
             // Linha divisória depois de cada item, em qualquer via — pedido explícito do
             // cliente pra valer pra suco/bebida em geral também, não só comida.
             itemSeparator: true,
-            crossStationNotice,
-            items: stationItems.map(toTicketItem),
+            crossStationNotice: hasBeverages ? 'PEDIDO COM BEBIDA' : null,
+            items: groupItems.map(toTicketItem),
+          }),
+        },
+      });
+    }
+
+    // Suqueiros: via única com tudo que a estação prepara (sem a divisão por tipo da
+    // cozinha acima — o cliente só pediu a separação por papel pra cozinha).
+    if (juiceItems.length > 0) {
+      await tx.printJob.create({
+        data: {
+          restaurantId: tenantId,
+          orderId,
+          station: Station.JUICE_BAR,
+          payload: renderTicket({
+            ...commonTicketFields,
+            station: Station.JUICE_BAR,
+            itemSeparator: true,
+            crossStationNotice: fullKitchenItems.length > 0 ? `PEDIDO TAMBEM TEM: ${kitchenSummary}` : null,
+            items: juiceItems.map(toTicketItem),
           }),
         },
       });

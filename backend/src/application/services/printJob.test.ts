@@ -96,7 +96,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).not.toContain('[');
   });
 
-  it('prefixa o tipo do prato no ticket (Pastel/Mini Pizza/Porção, com salgado/doce) conforme a categoria, mas nunca em suco', async () => {
+  it('cozinha sai em um papel por TIPO de prato (Pastel, Mini Pizza, Porção), cada um prefixado (salgado/doce) conforme a categoria, mas nunca em suco', async () => {
     // Nomes de categoria propositalmente "não-canônicos" (singular, sem acento, ordem
     // diferente) — a regra bate por conteúdo (contém "pastel"/"mini pizza"/"porção" +
     // "doce"/"salgado"), não por string exata, então renomear a categoria no cardápio do
@@ -148,14 +148,33 @@ describe('fila de impressão térmica (PrintJob)', () => {
     );
 
     const jobs = await prisma.printJob.findMany({ where: { orderId: order!.id } });
-    const kitchenText = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
+    const kitchenJobs = jobs.filter((j) => j.station === Station.KITCHEN).map((j) => j.payload.toString('ascii'));
     const juiceText = jobs.find((j) => j.station === Station.JUICE_BAR)!.payload.toString('ascii');
 
-    expect(kitchenText).toContain('1- Pastel Salgado - Mussarela');
-    expect(kitchenText).toContain('1- Pastel Doce - Chocolate');
-    expect(kitchenText).toContain('1- Mini Pizza Salgada - Calabresa');
-    expect(kitchenText).toContain('1- Mini Pizza Doce - Banana com Canela');
-    expect(kitchenText).toContain('1- Porcao - Batata Frita');
+    // 1 papel por tipo (Pastel, Mini Pizza, Porção) — pedido explícito do cliente pra
+    // dividir o preparo em vez de um papel só com tudo junto.
+    expect(kitchenJobs).toHaveLength(3);
+    const pastelPaper = kitchenJobs.find((t) => t.includes('COZINHA - PASTEL'))!;
+    const miniPizzaPaper = kitchenJobs.find((t) => t.includes('COZINHA - MINI PIZZA'))!;
+    const porcaoPaper = kitchenJobs.find((t) => t.includes('COZINHA - PORCAO'))!;
+    expect(pastelPaper).toBeDefined();
+    expect(miniPizzaPaper).toBeDefined();
+    expect(porcaoPaper).toBeDefined();
+
+    expect(pastelPaper).toContain('1- Pastel Salgado - Mussarela');
+    expect(pastelPaper).toContain('1- Pastel Doce - Chocolate');
+    expect(pastelPaper).not.toContain('Mini Pizza');
+    expect(pastelPaper).not.toContain('Porcao');
+
+    expect(miniPizzaPaper).toContain('1- Mini Pizza Salgada - Calabresa');
+    expect(miniPizzaPaper).toContain('1- Mini Pizza Doce - Banana com Canela');
+    expect(miniPizzaPaper).not.toContain('Pastel ');
+    expect(miniPizzaPaper).not.toContain('Porcao');
+
+    expect(porcaoPaper).toContain('1- Porcao - Batata Frita');
+    expect(porcaoPaper).not.toContain('Pastel');
+    expect(porcaoPaper).not.toContain('Mini Pizza');
+
     // "Sucos" (categoria do juiceProductId, ver beforeAll) não bate em nenhuma das 3
     // famílias — continua sem prefixo nenhum, como já era antes desta mudança.
     expect(juiceText).toContain('1- Suco');
