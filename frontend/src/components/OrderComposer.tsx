@@ -598,10 +598,12 @@ function ItemConfigModal({
             </div>
           </div>
         )}
-        {addons.length > 0 && product.isCustom && (
+        {addons.length > 0 && (
           <div className="mb-4">
-            {/* Botão fica visível aberto ou fechado — mesmo padrão do JuiceBuilder: dá pra
-                minimizar de novo depois de abrir, não só abrir uma vez sem volta. */}
+            {/* Botão fica visível aberto ou fechado — mesmo padrão do montador de suco
+                (JuiceBuilder): dá pra minimizar de novo depois de abrir, não só abrir uma
+                vez sem volta. Pedido explícito do cliente pra valer em TODOS os produtos
+                (não só o "Monte o Seu"), mesma forma em toda aba do cardápio. */}
             <button
               type="button"
               onClick={() => setShowAddons((v) => !v)}
@@ -645,25 +647,6 @@ function ItemConfigModal({
                 ))}
               </div>
             )}
-          </div>
-        )}
-        {addons.length > 0 && !product.isCustom && (
-          <div className="mb-4">
-            <div className="label">Adicionais</div>
-            <div className="flex flex-wrap gap-2">
-              {addons.map((a) => {
-                const on = selected.includes(a.id);
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() => setSelected(on ? selected.filter((x) => x !== a.id) : [...selected, a.id])}
-                    className={`rounded-md border px-3 py-1.5 text-xs ${on ? 'border-brand bg-brand text-white' : 'border-gray-300 dark:border-gray-700'}`}
-                  >
-                    {a.name} <span className="opacity-70">+{brl(a.price)}</span>
-                  </button>
-                );
-              })}
-            </div>
           </div>
         )}
         <div className="mb-4">
