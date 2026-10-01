@@ -13,8 +13,17 @@ export const FRUIT_BASE_RE = /^(.+) \(([^)]+)\)$/;
 const MAX_FRUITS = 4;
 
 /** Linha de item com borda ao redor inteira (não só uma linha dividindo o próximo item) —
- * pedido explícito do cliente, aplicado em toda lista selecionável deste componente. */
+ * pedido explícito do cliente, aplicado em toda lista selecionável deste componente. Usado
+ * só na tela interna (staff) — o site público usa PUBLIC_ITEM_ROW abaixo. */
 const ITEM_ROW = 'rounded-xl border border-gray-200 px-3.5 dark:border-gray-700';
+
+/** Linha de item só pro site público (variant="public") — fundo branco sólido e texto
+ * preto em negrito, pedido explícito do cliente: a lista de frutas/bases estava com fundo
+ * lavanda "sem contraste" com a página, diferente dos cards de comida (brancos, texto
+ * preto). A Etapa 3 (monte seu suco) já tinha o próprio visual branco; isto estende o
+ * mesmo tratamento pras Etapas 1/2 e pra sub-tela de "adicionar fruta". */
+const PUBLIC_ITEM_ROW = 'rounded-2xl bg-white px-4 transition active:scale-[0.99]';
+const PUBLIC_ITEM_TEXT = 'text-[15px] font-bold text-[#1E1024]';
 
 interface FruitEntry {
   fruit: string;
@@ -183,10 +192,14 @@ export function JuiceBuilder({
                   setSelectedFruits([...selectedFruits, f]);
                   setAddingFruit(false);
                 }}
-                className={`flex w-full items-center justify-between py-3.5 text-left text-[15px] font-medium text-gray-900 transition hover:border-brand hover:text-brand dark:text-gray-100 ${ITEM_ROW}`}
+                className={
+                  isPublic
+                    ? `flex w-full items-center justify-between py-3.5 text-left ${PUBLIC_ITEM_TEXT} ${PUBLIC_ITEM_ROW}`
+                    : `flex w-full items-center justify-between py-3.5 text-left text-[15px] font-medium text-gray-900 transition hover:border-brand hover:text-brand dark:text-gray-100 ${ITEM_ROW}`
+                }
               >
                 {f.fruit}
-                <ChevronRight size={18} className="text-gray-300" />
+                <ChevronRight size={18} className={isPublic ? 'text-[#C9A9D6]' : 'text-gray-300'} />
               </button>
             ))}
           </div>
@@ -503,12 +516,16 @@ export function JuiceBuilder({
                 <button
                   key={baseName}
                   onClick={() => setBase(baseName)}
-                  className={`flex w-full items-center justify-between py-3.5 text-left transition hover:border-brand hover:text-brand ${ITEM_ROW}`}
+                  className={
+                    isPublic
+                      ? `flex w-full items-center justify-between py-3.5 text-left ${PUBLIC_ITEM_ROW}`
+                      : `flex w-full items-center justify-between py-3.5 text-left transition hover:border-brand hover:text-brand ${ITEM_ROW}`
+                  }
                 >
-                  <span className="text-[15px] font-medium text-gray-900 dark:text-gray-100">{baseName}</span>
+                  <span className={isPublic ? PUBLIC_ITEM_TEXT : 'text-[15px] font-medium text-gray-900 dark:text-gray-100'}>{baseName}</span>
                   <span className="flex items-center gap-2.5">
-                    <span className="text-sm text-gray-400">{brl(previewPrice)}</span>
-                    <ChevronRight size={18} className="text-gray-300" />
+                    <span className={isPublic ? PUBLIC_ITEM_TEXT : 'text-sm text-gray-400'}>{brl(previewPrice)}</span>
+                    <ChevronRight size={18} className={isPublic ? 'text-[#C9A9D6]' : 'text-gray-300'} />
                   </span>
                 </button>
               );
@@ -535,10 +552,14 @@ export function JuiceBuilder({
             <button
               key={f.fruit}
               onClick={() => setSelectedFruits([f])}
-              className={`flex w-full items-center justify-between py-3.5 text-left text-[15px] font-medium text-gray-900 transition hover:border-brand hover:text-brand dark:text-gray-100 ${ITEM_ROW}`}
+              className={
+                isPublic
+                  ? `flex w-full items-center justify-between py-3.5 text-left ${PUBLIC_ITEM_TEXT} ${PUBLIC_ITEM_ROW}`
+                  : `flex w-full items-center justify-between py-3.5 text-left text-[15px] font-medium text-gray-900 transition hover:border-brand hover:text-brand dark:text-gray-100 ${ITEM_ROW}`
+              }
             >
               {f.fruit}
-              <ChevronRight size={18} className="text-gray-300" />
+              <ChevronRight size={18} className={isPublic ? 'text-[#C9A9D6]' : 'text-gray-300'} />
             </button>
           ))}
         </div>
@@ -552,13 +573,17 @@ export function JuiceBuilder({
               <button
                 key={p.id}
                 onClick={() => setStandaloneChosen(p)}
-                className={`flex w-full items-center justify-between py-3 text-left transition hover:border-brand hover:text-brand ${ITEM_ROW}`}
+                className={
+                  isPublic
+                    ? `flex w-full items-center justify-between py-3 text-left ${PUBLIC_ITEM_ROW}`
+                    : `flex w-full items-center justify-between py-3 text-left transition hover:border-brand hover:text-brand ${ITEM_ROW}`
+                }
               >
                 <span>
-                  <span className="block text-[15px] font-medium text-gray-900 dark:text-gray-100">{p.name}</span>
-                  <span className="mt-0.5 block text-xs text-gray-400">{brl(p.price)}</span>
+                  <span className={isPublic ? `block ${PUBLIC_ITEM_TEXT}` : 'block text-[15px] font-medium text-gray-900 dark:text-gray-100'}>{p.name}</span>
+                  <span className={isPublic ? `mt-0.5 block ${PUBLIC_ITEM_TEXT}` : 'mt-0.5 block text-xs text-gray-400'}>{brl(p.price)}</span>
                 </span>
-                <ChevronRight size={18} className="text-gray-300" />
+                <ChevronRight size={18} className={isPublic ? 'text-[#C9A9D6]' : 'text-gray-300'} />
               </button>
             ))}
           </div>
