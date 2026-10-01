@@ -341,14 +341,14 @@ export function OrderComposer({
                 : 'Nenhum produto nesta categoria.'}
           </p>
         ) : (
-          <div className="max-h-[55vh] overflow-y-auto pr-1">
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
             {filtered.map((p) => {
               const qty = simpleQty(p.id);
               return (
                 <div
                   key={p.id}
                   onClick={() => addSimple(p)}
-                  className="flex cursor-pointer items-center gap-3 border-b border-gray-200 py-3.5 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-3.5 py-3.5 transition hover:border-brand hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
                 >
                   <div className="min-w-0 flex-1">
                     {/* Fora da busca, o rótulo de categoria só é necessário na aba "Todos"
@@ -569,11 +569,15 @@ function ItemConfigModal({
               <span className="label !mb-0">Escolha a base</span>
               <span className="text-[11px] font-semibold uppercase tracking-wide text-red-500">Obrigatório</span>
             </div>
-            <div className="divide-y divide-gray-200 dark:divide-gray-800">
+            <div className="space-y-2">
               {bases.map((b) => {
                 const on = selectedBaseId === b.id;
                 return (
-                  <button key={b.id} onClick={() => pickBase(b.id)} className="flex w-full items-center justify-between py-3 text-left">
+                  <button
+                    key={b.id}
+                    onClick={() => pickBase(b.id)}
+                    className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3.5 py-3 text-left dark:border-gray-700"
+                  >
                     <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{b.name}</span>
                     <span className="flex items-center gap-3">
                       <span className="text-xs text-gray-400">{brl(b.price)}</span>
@@ -595,14 +599,14 @@ function ItemConfigModal({
             {groupAddons(addons).map(({ group, items }, idx) => (
               <div key={group} className={idx > 0 ? 'mt-3 border-t border-gray-200 pt-3 dark:border-gray-800' : ''}>
                 <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{group}</div>
-                <div className="divide-y divide-gray-200 dark:divide-gray-800">
+                <div className="space-y-2">
                   {items.map((a) => {
                     const on = selected.includes(a.id);
                     return (
                       <button
                         key={a.id}
                         onClick={() => setSelected(on ? selected.filter((x) => x !== a.id) : [...selected, a.id])}
-                        className="flex w-full items-center justify-between py-3 text-left"
+                        className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3.5 py-3 text-left dark:border-gray-700"
                       >
                         <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
                         <span className="flex items-center gap-3">

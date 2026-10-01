@@ -110,13 +110,14 @@ interface CustomerOrderSummary {
   createdAt: string;
 }
 
-/** Endereço do último pedido de ENTREGA desse cliente (nome+telefone) — devolvido por
- * POST /public/:slug/customers/login (ver publicOrder.service.ts#customerLogin). null
- * quando o cliente nunca pediu entrega (só retirada) ou é cliente novo. */
-interface LastDeliveryAddress {
+/** Um endereço de entrega salvo pro telefone desse cliente — devolvido por
+ * POST /public/:slug/customers/login (ver publicOrder.service.ts#customerLogin). Lista
+ * vazia quando o cliente nunca pediu entrega (só retirada) ou é cliente novo. */
+interface SavedAddress {
+  id: string;
   zoneId: string | null;
-  street: string | null;
-  number: string | null;
+  street: string;
+  number: string;
   complement: string | null;
   cep: string | null;
   lat: number | null;
@@ -173,8 +174,12 @@ export default function PublicOrder() {
   // precisar redigitar nome/telefone a cada visita.
   const [customerName, setCustomerName] = useState(() => readSavedCustomer(slug)?.name ?? '');
   const [customerPhone, setCustomerPhone] = useState(() => readSavedCustomer(slug)?.phone ?? '');
-  const [addressAutoFilled, setAddressAutoFilled] = useState(false);
-  const appliedSavedAddressRef = useRef(false);
+  // 'picking': mostra a caixa de endereços salvos pro cliente escolher (ou cadastrar um
+  // novo); 'saved': um endereço salvo foi escolhido (campos preenchidos, ainda editáveis);
+  // 'new': cadastrando um endereço do zero (ou cliente sem nenhum salvo ainda).
+  const [addressChoice, setAddressChoice] = useState<'picking' | 'saved' | 'new'>('new');
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
+  const offeredAddressPickerRef = useRef(false);
   const [deliveryZoneId, setDeliveryZoneId] = useState('');
   const [deliveryCity, setDeliveryCity] = useState<string | null>(null);
   const [deliveryLat, setDeliveryLat] = useState<number | null>(null);
@@ -236,40 +241,38 @@ export default function PublicOrder() {
   // cliente escolher um "Centro" errado antes de dizer qual cidade é a dele.
   const zonesForBairro = needsCityFirst ? zones.filter((z) => splitZoneName(z.name).city === deliveryCity) : zones;
 
-  // Automação pedida pelo cliente/dono: assim que nome+telefone identificam um cliente que
-  // já pediu ENTREGA antes, preenche o endereço sozinho (sem precisar redigitar) — mesma
-  // identificação (nome+telefone) já usada em "Já pediu antes? Entrar" (CustomerLoginPanel),
-  // aqui disparada silenciosamente em vez de exigir um clique. Só busca quando o endereço
-  // ainda está vazio (nunca sobrescreve o que o cliente já começou a digitar) e só aplica
-  // depois que os bairros carregarem (modo por bairro), senão o zoneId salvo não acha
-  // correspondência na lista ainda vazia.
+  // Pedido explícito do cliente/dono: assim que nome+telefone identificam alguém que já
+  // pediu ENTREGA antes, mostra uma caixa com os endereços salvos pra escolher (ou
+  // cadastrar um novo) — mesma identificação (nome+telefone) já usada em "Já pediu antes?
+  // Ver meus pedidos" (CustomerLoginPanel), aqui disparada sozinha em vez de exigir clique.
   const addressStillEmpty = !deliveryStreet.trim() && !deliveryNumber.trim();
   const trimmedNameForLookup = customerName.trim();
   const trimmedPhoneForLookup = customerPhone.trim();
   const { data: savedAddressLookup } = useQuery({
-    queryKey: ['public-last-delivery-address', slug, trimmedNameForLookup, trimmedPhoneForLookup],
+    queryKey: ['public-saved-addresses', slug, trimmedNameForLookup, trimmedPhoneForLookup],
     queryFn: async () =>
       (
-        await api.post<{ lastDeliveryAddress: LastDeliveryAddress | null }>(`/public/${slug}/customers/login`, {
+        await api.post<{ addresses: SavedAddress[] }>(`/public/${slug}/customers/login`, {
           name: trimmedNameForLookup,
           phone: trimmedPhoneForLookup,
         })
       ).data,
     enabled:
-      !!slug &&
-      orderKind === 'DELIVERY' &&
-      addressStillEmpty &&
-      trimmedNameForLookup.length >= 2 &&
-      trimmedPhoneForLookup.length >= 8,
+      !!slug && orderKind === 'DELIVERY' && trimmedNameForLookup.length >= 2 && trimmedPhoneForLookup.length >= 8,
     staleTime: Infinity,
   });
+  const savedAddresses = savedAddressLookup?.addresses ?? [];
 
+  // Oferece a caixa de escolha só uma vez (não reabre sozinha depois que o cliente decidiu
+  // "cadastrar novo" ou já escolheu um) e só se os campos ainda estiverem vazios — nunca
+  // interrompe quem já começou a digitar.
   useEffect(() => {
-    const addr = savedAddressLookup?.lastDeliveryAddress;
-    if (!addr || appliedSavedAddressRef.current) return;
-    if (!distanceMode && zones.length === 0) return; // espera os bairros carregarem pra achar o zoneId salvo
-    if (!addressStillEmpty) return; // cliente já começou a digitar — nunca sobrescreve
-    appliedSavedAddressRef.current = true;
+    if (offeredAddressPickerRef.current || savedAddresses.length === 0 || !addressStillEmpty) return;
+    offeredAddressPickerRef.current = true;
+    setAddressChoice('picking');
+  }, [savedAddresses, addressStillEmpty]);
+
+  const applySavedAddress = (addr: SavedAddress) => {
     if (distanceMode) {
       if (addr.lat != null && addr.lng != null) {
         setDeliveryLat(addr.lat);
@@ -278,12 +281,25 @@ export default function PublicOrder() {
     } else if (addr.zoneId && zones.some((z) => z.id === addr.zoneId)) {
       setDeliveryZoneId(addr.zoneId);
     }
-    setDeliveryStreet(addr.street ?? '');
-    setDeliveryNumber(addr.number ?? '');
+    setDeliveryStreet(addr.street);
+    setDeliveryNumber(addr.number);
     setDeliveryComplement(addr.complement ?? '');
     setDeliveryCep(addr.cep ?? '');
-    setAddressAutoFilled(true);
-  }, [savedAddressLookup, distanceMode, zones, addressStillEmpty]);
+    setSelectedSavedAddressId(addr.id);
+    setAddressChoice('saved');
+  };
+
+  const startNewAddress = () => {
+    setSelectedSavedAddressId(null);
+    setDeliveryZoneId('');
+    setDeliveryLat(null);
+    setDeliveryLng(null);
+    setDeliveryStreet('');
+    setDeliveryNumber('');
+    setDeliveryComplement('');
+    setDeliveryCep('');
+    setAddressChoice('new');
+  };
 
   // Cotação do frete por distância — dispara quando o cliente escolhe um endereço no
   // autocomplete (não a cada tecla). Reconferida de novo pelo back no momento de confirmar
@@ -470,6 +486,7 @@ export default function PublicOrder() {
             setDeliveryZoneId={setDeliveryZoneId}
             deliveryLat={deliveryLat}
             onPickAddress={(place) => {
+              setSelectedSavedAddressId(null);
               setDeliveryLat(place.lat);
               setDeliveryLng(place.lng);
               setDeliveryStreet(place.formattedAddress);
@@ -485,7 +502,12 @@ export default function PublicOrder() {
             setDeliveryCep={setDeliveryCep}
             deliveryComplement={deliveryComplement}
             setDeliveryComplement={setDeliveryComplement}
-            addressAutoFilled={addressAutoFilled}
+            savedAddresses={savedAddresses}
+            selectedSavedAddressId={selectedSavedAddressId}
+            addressChoice={addressChoice}
+            onPickSavedAddress={applySavedAddress}
+            onStartNewAddress={startNewAddress}
+            onReopenAddressPicker={() => setAddressChoice('picking')}
             canContinue={!!canContinueDetails}
             onContinue={() => setStep(draft.length > 0 ? 'cart' : 'menu')}
             continueLabel={draft.length > 0 ? 'Continuar para o carrinho' : 'Continuar para o cardápio'}
@@ -948,6 +970,67 @@ function ZoneAutocomplete({
   );
 }
 
+/**
+ * Caixa de endereços salvos pro telefone do cliente (ver CustomerAddress no backend) —
+ * pedido explícito do cliente/dono: quem já pediu entrega escolhe entre os endereços de
+ * antes (ex.: casa, trabalho) em vez de redigitar, com a opção de cadastrar um novo.
+ * Aparece sozinha assim que nome+telefone reconhecem alguém com endereço salvo (ver
+ * PublicOrder()); escolher um ou cadastrar novo troca pra DetailsStep normal com os campos
+ * preenchidos (editáveis) ou vazios.
+ */
+function SavedAddressesBox({
+  addresses,
+  zones,
+  selectedId,
+  onPick,
+  onStartNew,
+}: {
+  addresses: SavedAddress[];
+  zones: DeliveryZone[];
+  selectedId: string | null;
+  onPick: (addr: SavedAddress) => void;
+  onStartNew: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#1E1024]/10 bg-white p-3.5">
+      <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Endereços salvos</p>
+      <div className="space-y-2">
+        {addresses.map((addr) => {
+          const zoneName = addr.zoneId ? zones.find((z) => z.id === addr.zoneId)?.name ?? null : null;
+          const subtitle = [zoneName ? splitZoneName(zoneName).bairro : null, addr.cep].filter(Boolean).join(' · ');
+          const isSelected = addr.id === selectedId;
+          return (
+            <button
+              key={addr.id}
+              type="button"
+              onClick={() => onPick(addr)}
+              className={`flex w-full items-start justify-between gap-2 rounded-2xl border px-3.5 py-3 text-left transition hover:border-brand ${
+                isSelected ? 'border-brand bg-brand-50' : 'border-[#1E1024]/10'
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-bold text-[#1E1024]">
+                  {addr.street}, {addr.number}
+                  {addr.complement ? ` — ${addr.complement}` : ''}
+                </span>
+                {subtitle && <span className="mt-0.5 block text-[11px] text-[#6B4A78]">{subtitle}</span>}
+              </span>
+              <MapPin size={16} className="mt-0.5 shrink-0 text-brand" />
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={onStartNew}
+        className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-[#1E1024]/15 px-3.5 py-3 text-[13px] font-bold text-brand"
+      >
+        <Plus size={14} /> Cadastrar novo endereço
+      </button>
+    </div>
+  );
+}
+
 function DetailsStep({
   slug,
   orderKind,
@@ -976,7 +1059,12 @@ function DetailsStep({
   setDeliveryCep,
   deliveryComplement,
   setDeliveryComplement,
-  addressAutoFilled,
+  savedAddresses,
+  selectedSavedAddressId,
+  addressChoice,
+  onPickSavedAddress,
+  onStartNewAddress,
+  onReopenAddressPicker,
   canContinue,
   onContinue,
   continueLabel,
@@ -1009,7 +1097,12 @@ function DetailsStep({
   setDeliveryCep: (v: string) => void;
   deliveryComplement: string;
   setDeliveryComplement: (v: string) => void;
-  addressAutoFilled: boolean;
+  savedAddresses: SavedAddress[];
+  selectedSavedAddressId: string | null;
+  addressChoice: 'picking' | 'saved' | 'new';
+  onPickSavedAddress: (addr: SavedAddress) => void;
+  onStartNewAddress: () => void;
+  onReopenAddressPicker: () => void;
   canContinue: boolean;
   onContinue: () => void;
   continueLabel: string;
@@ -1061,12 +1154,26 @@ function DetailsStep({
         />
       </div>
 
-      {orderKind === 'DELIVERY' && distanceMode && (
+      {orderKind === 'DELIVERY' && addressChoice === 'picking' && (
+        <SavedAddressesBox
+          addresses={savedAddresses}
+          zones={zones}
+          selectedId={selectedSavedAddressId}
+          onPick={onPickSavedAddress}
+          onStartNew={onStartNewAddress}
+        />
+      )}
+
+      {orderKind === 'DELIVERY' && addressChoice !== 'picking' && distanceMode && (
         <>
-          {addressAutoFilled && (
-            <p className="-mt-2 text-[11.5px] font-semibold text-brand">
-              Preenchemos com o endereço do seu último pedido — pode alterar se mudou.
-            </p>
+          {savedAddresses.length > 0 && (
+            <button
+              type="button"
+              onClick={onReopenAddressPicker}
+              className="-mt-2 flex items-center gap-1 text-[11.5px] font-semibold text-brand underline decoration-brand/35 underline-offset-2"
+            >
+              {addressChoice === 'saved' ? 'Escolher outro endereço salvo' : 'Usar um endereço salvo'}
+            </button>
           )}
           <div>
             <label className={FIELD_LABEL}>Endereço</label>
@@ -1117,12 +1224,16 @@ function DetailsStep({
         </>
       )}
 
-      {orderKind === 'DELIVERY' && !distanceMode && (
+      {orderKind === 'DELIVERY' && addressChoice !== 'picking' && !distanceMode && (
         <>
-          {addressAutoFilled && (
-            <p className="text-[11.5px] font-semibold text-brand">
-              Preenchemos com o endereço do seu último pedido — pode alterar se mudou.
-            </p>
+          {savedAddresses.length > 0 && (
+            <button
+              type="button"
+              onClick={onReopenAddressPicker}
+              className="flex items-center gap-1 text-[11.5px] font-semibold text-brand underline decoration-brand/35 underline-offset-2"
+            >
+              {addressChoice === 'saved' ? 'Escolher outro endereço salvo' : 'Usar um endereço salvo'}
+            </button>
           )}
           {zoneCities.length > 1 && (
             <div>

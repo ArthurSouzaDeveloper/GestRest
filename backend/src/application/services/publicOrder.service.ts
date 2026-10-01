@@ -89,28 +89,27 @@ export const publicOrderService = {
     const phoneNormalized = normalizePhone(phone);
     const candidates = await prisma.customer.findMany({
       where: { restaurantId: tenantId, phoneNormalized },
-      select: {
-        id: true,
-        name: true,
-        lastDeliveryZoneId: true,
-        lastDeliveryStreet: true,
-        lastDeliveryNumber: true,
-        lastDeliveryComplement: true,
-        lastDeliveryCep: true,
-        lastDeliveryLat: true,
-        lastDeliveryLng: true,
-      },
+      select: { id: true, name: true },
     });
     const nameNormalized = name.trim().toLowerCase();
     const matched = candidates.find((c) => c.name.trim().toLowerCase() === nameNormalized);
-    if (!matched) return { name: null, orders: [], lastDeliveryAddress: null };
+    if (!matched) return { name: null, orders: [], addresses: [] };
 
-    const orders = await prisma.order.findMany({
-      where: { restaurantId: tenantId, customerId: { in: candidates.map((c) => c.id) } },
-      include: orderInclude,
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    });
+    const [orders, addresses] = await Promise.all([
+      prisma.order.findMany({
+        where: { restaurantId: tenantId, customerId: { in: candidates.map((c) => c.id) } },
+        include: orderInclude,
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      // Endereços salvos desse telefone (ver order.service.ts#openPublic) — mais usado/
+      // recente primeiro, pra aparecer no topo da caixa de endereços salvos do site
+      // público. Lista vazia quando o cliente nunca pediu entrega (só retirada).
+      prisma.customerAddress.findMany({
+        where: { restaurantId: tenantId, phoneNormalized },
+        orderBy: { lastUsedAt: 'desc' },
+      }),
+    ]);
     return {
       name: matched.name,
       orders: orders.map((o) => ({
@@ -122,20 +121,16 @@ export const publicOrderService = {
         estimatedReadyAt: o.estimatedReadyAt,
         createdAt: o.createdAt,
       })),
-      // Endereço do último pedido de entrega desse cliente (ver order.service.ts#openPublic)
-      // — null quando ele nunca pediu entrega (só retirada) ou quando é cliente novo. O site
-      // público usa isso pra pré-preencher o endereço automaticamente no próximo pedido.
-      lastDeliveryAddress: matched.lastDeliveryStreet
-        ? {
-            zoneId: matched.lastDeliveryZoneId,
-            street: matched.lastDeliveryStreet,
-            number: matched.lastDeliveryNumber,
-            complement: matched.lastDeliveryComplement,
-            cep: matched.lastDeliveryCep,
-            lat: matched.lastDeliveryLat,
-            lng: matched.lastDeliveryLng,
-          }
-        : null,
+      addresses: addresses.map((a) => ({
+        id: a.id,
+        zoneId: a.zoneId,
+        street: a.street,
+        number: a.number,
+        complement: a.complement,
+        cep: a.cep,
+        lat: a.lat,
+        lng: a.lng,
+      })),
     };
   },
 };

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import type { Additional, Product } from '../types';
@@ -11,6 +11,10 @@ export const FRUIT_BASE_RE = /^(.+) \(([^)]+)\)$/;
 
 /** Máximo de frutas combináveis num só suco/frapê — espelha o limite do backend (zod). */
 const MAX_FRUITS = 4;
+
+/** Linha de item com borda ao redor inteira (não só uma linha dividindo o próximo item) —
+ * pedido explícito do cliente, aplicado em toda lista selecionável deste componente. */
+const ITEM_ROW = 'rounded-xl border border-gray-200 px-3.5 dark:border-gray-700';
 
 interface FruitEntry {
   fruit: string;
@@ -165,7 +169,7 @@ export function JuiceBuilder({
         {candidatesToAdd.length === 0 ? (
           <p className="text-sm text-gray-500">Nenhuma outra fruta disponível nessa base.</p>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-800">
+          <div className="space-y-2">
             {candidatesToAdd.map((f) => (
               <button
                 key={f.fruit}
@@ -173,7 +177,7 @@ export function JuiceBuilder({
                   setSelectedFruits([...selectedFruits, f]);
                   setAddingFruit(false);
                 }}
-                className="flex w-full items-center justify-between py-3.5 text-left text-[15px] font-medium text-gray-900 transition hover:text-brand dark:text-gray-100"
+                className={`flex w-full items-center justify-between py-3.5 text-left text-[15px] font-medium text-gray-900 transition hover:border-brand hover:text-brand dark:text-gray-100 ${ITEM_ROW}`}
               >
                 {f.fruit}
                 <ChevronRight size={18} className="text-gray-300" />
@@ -260,43 +264,46 @@ export function JuiceBuilder({
 
         {additionals.length > 0 && (
           <div>
-            {!showAdditionals ? (
-              <button
-                type="button"
-                onClick={() => setShowAdditionals(true)}
-                className="flex w-full items-center justify-between rounded-2xl border border-gray-200 px-3.5 py-3 text-left text-[13.5px] font-semibold text-gray-600 transition hover:border-brand hover:text-brand dark:border-gray-700 dark:text-gray-300"
-              >
-                Adicionais (opcional)
-                <ChevronDown size={16} />
-              </button>
-            ) : (
-              <>
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Adicionais</div>
-                <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                  {additionals.map((a) => {
-                    const on = selectedAdditionals.includes(a.id);
-                    return (
-                      <button
-                        key={a.id}
-                        onClick={() =>
-                          setSelectedAdditionals(on ? selectedAdditionals.filter((x) => x !== a.id) : [...selectedAdditionals, a.id])
-                        }
-                        className="flex w-full items-center justify-between py-3 text-left"
-                      >
-                        <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
-                        <span className="flex items-center gap-3">
-                          <span className="text-xs text-gray-400">+{brl(a.price)}</span>
-                          <span
-                            className={`flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
-                          >
-                            {on && <Check size={12} strokeWidth={3.5} className="text-white" />}
-                          </span>
+            {/* Botão fica visível aberto ou fechado — pedido explícito do cliente: depois de
+                clicar pra ver os adicionais, precisa dar pra minimizar de novo clicando nele
+                outra vez, não só abrir uma vez sem volta. */}
+            <button
+              type="button"
+              onClick={() => setShowAdditionals((v) => !v)}
+              className={`flex w-full items-center justify-between rounded-2xl border px-3.5 py-3 text-left text-[13.5px] font-semibold transition ${
+                showAdditionals
+                  ? 'border-brand text-brand'
+                  : 'border-gray-200 text-gray-600 hover:border-brand hover:text-brand dark:border-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {showAdditionals ? 'Adicionais' : 'Adicionais (opcional)'}
+              {showAdditionals ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {showAdditionals && (
+              <div className="mt-2 space-y-2">
+                {additionals.map((a) => {
+                  const on = selectedAdditionals.includes(a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() =>
+                        setSelectedAdditionals(on ? selectedAdditionals.filter((x) => x !== a.id) : [...selectedAdditionals, a.id])
+                      }
+                      className={`flex w-full items-center justify-between py-3 text-left ${ITEM_ROW}`}
+                    >
+                      <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
+                      <span className="flex items-center gap-3">
+                        <span className="text-xs text-gray-400">+{brl(a.price)}</span>
+                        <span
+                          className={`flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
+                        >
+                          {on && <Check size={12} strokeWidth={3.5} className="text-white" />}
                         </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
@@ -336,7 +343,7 @@ export function JuiceBuilder({
             Essas frutas não têm nenhuma base em comum. Volte e escolha outra combinação.
           </p>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-800">
+          <div className="space-y-2">
             {commonBases.map((baseName) => {
               const preview = selectedFruits.map((f) => f.bases.find((b) => b.base === baseName)!.product);
               const previewPrice = Math.max(...preview.map((p) => p.price)) + (preview.length > 1 ? EXTRA_FRUIT_PRICE * (preview.length - 1) : 0);
@@ -344,7 +351,7 @@ export function JuiceBuilder({
                 <button
                   key={baseName}
                   onClick={() => setBase(baseName)}
-                  className="flex w-full items-center justify-between py-3.5 text-left transition hover:text-brand"
+                  className={`flex w-full items-center justify-between py-3.5 text-left transition hover:border-brand hover:text-brand ${ITEM_ROW}`}
                 >
                   <span className="text-[15px] font-medium text-gray-900 dark:text-gray-100">{baseName}</span>
                   <span className="flex items-center gap-2.5">
@@ -371,12 +378,12 @@ export function JuiceBuilder({
             catálogo (ver OrderComposer.tsx), cortando a visualização dos sabores mesmo
             quando sobrava espaço. A lista agora flui livre dentro do scroll do catálogo,
             igual já funciona na aba de comidas. */}
-        <div className="divide-y divide-gray-200 dark:divide-gray-800">
+        <div className="space-y-2">
           {fruits.map((f) => (
             <button
               key={f.fruit}
               onClick={() => setSelectedFruits([f])}
-              className="flex w-full items-center justify-between py-3.5 text-left text-[15px] font-medium text-gray-900 transition hover:text-brand dark:text-gray-100"
+              className={`flex w-full items-center justify-between py-3.5 text-left text-[15px] font-medium text-gray-900 transition hover:border-brand hover:text-brand dark:text-gray-100 ${ITEM_ROW}`}
             >
               {f.fruit}
               <ChevronRight size={18} className="text-gray-300" />
@@ -388,12 +395,12 @@ export function JuiceBuilder({
       {standalone.length > 0 && (
         <div>
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Sabores especiais</div>
-          <div className="divide-y divide-gray-200 dark:divide-gray-800">
+          <div className="space-y-2">
             {standalone.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setStandaloneChosen(p)}
-                className="flex w-full items-center justify-between py-3 text-left transition hover:text-brand"
+                className={`flex w-full items-center justify-between py-3 text-left transition hover:border-brand hover:text-brand ${ITEM_ROW}`}
               >
                 <span>
                   <span className="block text-[15px] font-medium text-gray-900 dark:text-gray-100">{p.name}</span>

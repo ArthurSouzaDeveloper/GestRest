@@ -148,6 +148,7 @@ model Restaurant {
   additionals   Additional[]
   tables        RestaurantTable[]
   customers     Customer[]
+  customerAddresses CustomerAddress[]
   orders        Order[]
   payments      Payment[]
   auditLogs     AuditLog[]
@@ -257,23 +258,6 @@ model Customer {
   restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt       DateTime   @default(now())
 
-  // Último endereço de entrega usado por esse cliente (telefone+nome) — pedido explícito
-  // do cliente/dono: não fazer quem já pediu redigitar o endereço no pedido seguinte.
-  // Snapshot "vivo" (ao contrário do endereço de cada Order, que é histórico fiscal e
-  // nunca muda depois de criado): sobrescrito a cada novo pedido de entrega em
-  // openPublic(), porque é só conveniência de preenchimento, não registro de pedido
-  // antigo. lastDeliveryLat/Lng só são usados no modo DISTANCE_BANDS (ver
-  // deliveryPricingMode); no modo ZONE ficam null e o endereço reaproveitado vem dos
-  // campos de texto + lastDeliveryZoneId.
-  lastDeliveryZoneId     String?
-  lastDeliveryZone       DeliveryZone? @relation(fields: [lastDeliveryZoneId], references: [id], onDelete: SetNull)
-  lastDeliveryStreet     String?
-  lastDeliveryNumber     String?
-  lastDeliveryComplement String?
-  lastDeliveryCep        String?
-  lastDeliveryLat        Float?
-  lastDeliveryLng        Float?
-
   orders Order[]
 
   @@index([restaurantId])
@@ -311,13 +295,43 @@ model DeliveryZone {
   updatedAt    DateTime   @updatedAt
 
   orders Order[]
-  // Clientes cujo último pedido de entrega usou esse bairro (ver Customer.lastDeliveryZoneId)
-  // — onDelete SetNull acima: desativar/remover um bairro nunca pode falhar por causa disso.
-  customersWithLastZone Customer[]
+  // Endereços salvos de clientes que usam esse bairro (ver CustomerAddress.zoneId) —
+  // onDelete SetNull lá: desativar/remover um bairro nunca pode falhar por causa disso.
+  customerAddresses CustomerAddress[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId, active])
   @@map("delivery_zones")
+}
+
+// Endereço de entrega salvo por telefone (não por Customer.id) — pedido explícito do
+// cliente/dono: um mesmo número pode ter mais de um endereço (casa, trabalho...) e o site
+// público mostra todos pro cliente escolher no próximo pedido, com a opção de cadastrar um
+// novo. Vive à parte do histórico de pedidos (Order.deliveryStreet etc., que é snapshot
+// fiscal e nunca muda): aqui é só conveniência de preenchimento, atualizada a cada entrega.
+// Chave de "mesmo endereço" pra não duplicar: restaurantId + phoneNormalized + rua + número
+// (ver order.service.ts#openPublic) — complemento/CEP/zona só atualizam no lugar.
+model CustomerAddress {
+  id              String        @id @default(uuid())
+  restaurantId    String
+  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  phoneNormalized String
+  zoneId          String?
+  zone            DeliveryZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  street          String
+  number          String
+  complement      String?
+  cep             String?
+  // Só usados no modo DISTANCE_BANDS (ver Restaurant.deliveryPricingMode); no modo ZONE
+  // ficam null e o endereço reaproveitado vem dos campos de texto + zoneId.
+  lat             Float?
+  lng             Float?
+  // Pra ordenar "mais usado/recente primeiro" na caixa de endereços salvos do site público.
+  lastUsedAt      DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+
+  @@index([restaurantId, phoneNormalized])
+  @@map("customer_addresses")
 }
 
 // Faixa de distância + taxa de entrega, usada quando Restaurant.deliveryPricingMode =
