@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda, Check } from 'lucide-react';
+import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { JuiceBuilder } from './JuiceBuilder';
@@ -533,6 +533,11 @@ function ItemConfigModal({
 }) {
   const [notes, setNotes] = useState(current?.notes ?? '');
   const [selected, setSelected] = useState<string[]>(current?.additionalIds ?? []);
+  // Adicionais do "Monte o Seu" (salgado e doce) começam minimizados, com um toggle pra
+  // abrir/fechar de novo — pedido explícito do cliente, mesmo padrão já usado no montador
+  // de suco (JuiceBuilder), pra deixar a tela organizada em vez de uma lista enorme logo
+  // de cara.
+  const [showAddons, setShowAddons] = useState(false);
 
   const { data: additionals = [] } = useQuery({
     queryKey: ['additionals', product.categoryId, basePath],
@@ -595,34 +600,51 @@ function ItemConfigModal({
         )}
         {addons.length > 0 && product.isCustom && (
           <div className="mb-4">
-            <div className="label">Adicionais</div>
-            {groupAddons(addons).map(({ group, items }, idx) => (
-              <div key={group} className={idx > 0 ? 'mt-3 border-t border-gray-200 pt-3 dark:border-gray-800' : ''}>
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{group}</div>
-                <div className="space-y-2">
-                  {items.map((a) => {
-                    const on = selected.includes(a.id);
-                    return (
-                      <button
-                        key={a.id}
-                        onClick={() => setSelected(on ? selected.filter((x) => x !== a.id) : [...selected, a.id])}
-                        className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3.5 py-3 text-left dark:border-gray-700"
-                      >
-                        <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
-                        <span className="flex items-center gap-3">
-                          <span className="text-xs text-gray-400">+{brl(a.price)}</span>
-                          <span
-                            className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
+            {/* Botão fica visível aberto ou fechado — mesmo padrão do JuiceBuilder: dá pra
+                minimizar de novo depois de abrir, não só abrir uma vez sem volta. */}
+            <button
+              type="button"
+              onClick={() => setShowAddons((v) => !v)}
+              className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left text-[13.5px] font-semibold transition ${
+                showAddons
+                  ? 'border-brand text-brand'
+                  : 'border-gray-200 text-gray-600 hover:border-brand hover:text-brand dark:border-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {showAddons ? 'Adicionais' : 'Adicionais (opcional)'}
+              {showAddons ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {showAddons && (
+              <div className="mt-2">
+                {groupAddons(addons).map(({ group, items }, idx) => (
+                  <div key={group} className={idx > 0 ? 'mt-3 border-t border-gray-200 pt-3 dark:border-gray-800' : ''}>
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{group}</div>
+                    <div className="space-y-2">
+                      {items.map((a) => {
+                        const on = selected.includes(a.id);
+                        return (
+                          <button
+                            key={a.id}
+                            onClick={() => setSelected(on ? selected.filter((x) => x !== a.id) : [...selected, a.id])}
+                            className="flex w-full items-center justify-between rounded-xl border border-gray-200 px-3.5 py-3 text-left dark:border-gray-700"
                           >
-                            {on && <Check size={12} strokeWidth={3.5} className="text-white" />}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                            <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
+                            <span className="flex items-center gap-3">
+                              <span className="text-xs text-gray-400">+{brl(a.price)}</span>
+                              <span
+                                className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
+                              >
+                                {on && <Check size={12} strokeWidth={3.5} className="text-white" />}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
         {addons.length > 0 && !product.isCustom && (
