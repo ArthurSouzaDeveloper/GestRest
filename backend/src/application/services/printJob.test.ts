@@ -221,6 +221,133 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(kitchenJobs[0]).toContain('1- 2 Queijos');
   });
 
+  it('com pastel no pedido: só a via de Pastel leva nome/telefone/endereço — Mini Pizza e Porção levam só o número do pedido', async () => {
+    const pasteisSalgados = await prisma.category.create({
+      data: { name: 'Pastel Dados Minimos', station: Station.KITCHEN, restaurantId },
+    });
+    const miniPizza = await prisma.category.create({
+      data: { name: 'Mini Pizza Dados Minimos', station: Station.KITCHEN, restaurantId },
+    });
+    const porcoes = await prisma.category.create({
+      data: { name: 'Porcao Dados Minimos', station: Station.KITCHEN, restaurantId },
+    });
+    const pastel = await prisma.product.create({
+      data: { name: 'Mussarela', price: 14.5, categoryId: pasteisSalgados.id, restaurantId },
+    });
+    const miniPizzaProduto = await prisma.product.create({
+      data: { name: 'Calabresa', price: 16, categoryId: miniPizza.id, restaurantId },
+    });
+    const porcao = await prisma.product.create({
+      data: { name: 'Batata Frita', price: 22, categoryId: porcoes.id, restaurantId },
+    });
+
+    const zone = await prisma.deliveryZone.create({
+      data: { name: 'Zona Dados Minimos', fee: 5, restaurantId },
+    });
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Dados Minimos',
+      customerPhone: '11999990010',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua dos Dados',
+      deliveryNumber: '77',
+      items: [
+        { productId: pastel.id, quantity: 1 },
+        { productId: miniPizzaProduto.id, quantity: 1 },
+        { productId: porcao.id, quantity: 1 },
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    // Só os papéis da cozinha por TIPO (COZINHA - X) — exclui a via combinada extra do
+    // motoboy (entrega sempre gera uma, ver enqueueForItems), que também é station
+    // KITCHEN mas não entra nessa contagem por tipo.
+    const kitchenJobs = jobs
+      .filter((j) => j.station === Station.KITCHEN)
+      .map((j) => j.payload.toString('ascii'))
+      .filter((t) => t.includes('COZINHA - '));
+    expect(kitchenJobs).toHaveLength(3);
+    const pastelPaper = kitchenJobs.find((t) => t.includes('COZINHA - PASTEL'))!;
+    const miniPizzaPaper = kitchenJobs.find((t) => t.includes('COZINHA - MINI PIZZA'))!;
+    const porcaoPaper = kitchenJobs.find((t) => t.includes('COZINHA - PORCAO'))!;
+
+    // Via principal (Pastel, menor prioridade presente): dados completos, como sempre.
+    expect(pastelPaper).toContain('Cliente Dados Minimos');
+    expect(pastelPaper).toContain('Tel: 11999990010');
+    expect(pastelPaper).toContain('Rua dos Dados, 77');
+
+    // Vias secundárias: só o número do pedido — sem nome/telefone/endereço (economia de
+    // papel, pedido explícito do cliente — esses dados já saem na via de Pastel).
+    for (const paper of [miniPizzaPaper, porcaoPaper]) {
+      expect(paper).toContain(`PEDIDO #${order.number}`);
+      expect(paper).not.toContain('Cliente Dados Minimos');
+      expect(paper).not.toContain('Tel:');
+      expect(paper).not.toContain('Rua dos Dados');
+    }
+  });
+
+  it('sem pastel no pedido: a via de Mini Pizza reconhece que virou a principal e leva os dados completos — só Porção leva o número do pedido', async () => {
+    // Nomes sem a substring "pastel" de propósito — kitchenSortPriority/categoryTypeLabel
+    // batem por conteúdo, e um nome como "Mini Pizza Sem Pastel" conteria "pastel" e
+    // seria classificado (errado) como papel de Pastel.
+    const miniPizza = await prisma.category.create({
+      data: { name: 'Mini Pizza Pedido Isolado', station: Station.KITCHEN, restaurantId },
+    });
+    const porcoes = await prisma.category.create({
+      data: { name: 'Porcao Pedido Isolado', station: Station.KITCHEN, restaurantId },
+    });
+    const miniPizzaProduto = await prisma.product.create({
+      data: { name: 'Calabresa', price: 16, categoryId: miniPizza.id, restaurantId },
+    });
+    const porcao = await prisma.product.create({
+      data: { name: 'Batata Frita', price: 22, categoryId: porcoes.id, restaurantId },
+    });
+
+    const zone = await prisma.deliveryZone.create({
+      data: { name: 'Zona Pedido Isolado', fee: 5, restaurantId },
+    });
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Sem Pastel',
+      customerPhone: '11999990011',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua Sem Pastel',
+      deliveryNumber: '88',
+      items: [
+        { productId: miniPizzaProduto.id, quantity: 1 },
+        { productId: porcao.id, quantity: 1 },
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    // Só os papéis da cozinha por TIPO — exclui a via combinada extra do motoboy (ver
+    // comentário equivalente no teste "com pastel" acima).
+    const kitchenJobs = jobs
+      .filter((j) => j.station === Station.KITCHEN)
+      .map((j) => j.payload.toString('ascii'))
+      .filter((t) => t.includes('COZINHA - '));
+    expect(kitchenJobs).toHaveLength(2);
+    const miniPizzaPaper = kitchenJobs.find((t) => t.includes('COZINHA - MINI PIZZA'))!;
+    const porcaoPaper = kitchenJobs.find((t) => t.includes('COZINHA - PORCAO'))!;
+
+    // Sem pastel no pedido: Mini Pizza vira a via principal — dados completos.
+    expect(miniPizzaPaper).toContain('Cliente Sem Pastel');
+    expect(miniPizzaPaper).toContain('Tel: 11999990011');
+    expect(miniPizzaPaper).toContain('Rua Sem Pastel, 88');
+
+    // Porção continua secundária — só o número do pedido.
+    expect(porcaoPaper).toContain(`PEDIDO #${order.number}`);
+    expect(porcaoPaper).not.toContain('Cliente Sem Pastel');
+    expect(porcaoPaper).not.toContain('Tel:');
+    expect(porcaoPaper).not.toContain('Rua Sem Pastel');
+  });
+
   it('categoria "Sugestões da Casa" imprime só o nome do prato, sem a descrição', async () => {
     const category = await prisma.category.create({
       data: { name: 'Sugestões da Casa', station: Station.KITCHEN, restaurantId },

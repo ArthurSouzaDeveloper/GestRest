@@ -249,7 +249,13 @@ export const printJobService = {
       group.push(item);
       kitchenGroups.set(priority, group);
     }
-    for (const [, groupItems] of [...kitchenGroups.entries()].sort(([a], [b]) => a - b)) {
+    // A via de menor prioridade presente (Pastel se houver; senão Mini Pizza; senão
+    // Porção) é a "principal" do pedido e carrega nome/telefone/endereço/forma de
+    // pagamento/horário completos — as demais mostram só o número do pedido, pedido
+    // explícito do cliente pra economizar papel (esses dados já saem na via principal).
+    // Se não tiver pastel, a via de mini pizza reconhece isso e vira a principal.
+    const mainKitchenPriority = kitchenGroups.size > 0 ? Math.min(...kitchenGroups.keys()) : null;
+    for (const [priority, groupItems] of [...kitchenGroups.entries()].sort(([a], [b]) => a - b)) {
       await tx.printJob.create({
         data: {
           restaurantId: tenantId,
@@ -266,6 +272,7 @@ export const printJobService = {
             // cliente pra valer pra suco/bebida em geral também, não só comida.
             itemSeparator: true,
             crossStationNotice: hasBeverages ? 'PEDIDO COM BEBIDA' : null,
+            minimalData: priority !== mainKitchenPriority,
             items: groupItems.map(toTicketItem),
           }),
         },

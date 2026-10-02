@@ -100,6 +100,12 @@ export interface TicketInput {
    * adicionais+obs) — pedido explícito do cliente pra valer em toda via (cozinha, suco/
    * bebida em geral e a via combinada do motoboy), não só comida. */
   itemSeparator?: boolean;
+  /** true omite nome/telefone/endereço/total/forma de pagamento/horário, deixando só a
+   * linha de origem+número do pedido — pedido explícito do cliente pra economizar papel
+   * nas vias secundárias (mini pizza/porção) de um pedido que já tem todos esses dados
+   * impressos na via principal (pastel). Ver printJob.service.ts: só é true pra um grupo
+   * de cozinha que NÃO é o de menor prioridade presente no pedido. */
+  minimalData?: boolean;
 }
 
 /**
@@ -167,27 +173,32 @@ export function renderTicket(input: TicketInput): Buffer {
 
   const origin = input.tableNumber != null ? `MESA ${input.tableNumber}` : ORDER_TYPE_LABEL[input.orderType];
   parts.push(line(`${origin} - PEDIDO #${input.orderNumber}`));
-  if (input.customerName) parts.push(line(input.customerName));
-  if (input.customerPhone) parts.push(line(`Tel: ${input.customerPhone}`));
-  if (input.deliveryAddress) {
-    const addr = input.deliveryAddress;
-    parts.push(line(`${addr.street}, ${addr.number}${addr.complement ? ` - ${addr.complement}` : ''}`));
-    if (addr.zoneName) parts.push(line(addr.zoneName));
-    if (addr.cep) parts.push(line(`CEP: ${addr.cep}`));
+  // minimalData: via secundária (mini pizza/porção) de um pedido que também tem pastel —
+  // os dados completos já saem na via principal, então aqui só o número do pedido mesmo
+  // (pedido explícito do cliente pra economizar papel).
+  if (!input.minimalData) {
+    if (input.customerName) parts.push(line(input.customerName));
+    if (input.customerPhone) parts.push(line(`Tel: ${input.customerPhone}`));
+    if (input.deliveryAddress) {
+      const addr = input.deliveryAddress;
+      parts.push(line(`${addr.street}, ${addr.number}${addr.complement ? ` - ${addr.complement}` : ''}`));
+      if (addr.zoneName) parts.push(line(addr.zoneName));
+      if (addr.cep) parts.push(line(`CEP: ${addr.cep}`));
+    }
+    if (input.orderTotal != null) {
+      parts.push(line(`TOTAL DO PEDIDO: ${formatCurrency(input.orderTotal)}`));
+    }
+    if (input.paymentMethod) {
+      const changeNote =
+        input.paymentMethod === PaymentMethod.CASH && input.changeFor
+          ? ` (troco p/ ${formatCurrency(input.changeFor)})`
+          : '';
+      parts.push(line(`PAGAMENTO: ${PAYMENT_METHOD_LABEL[input.paymentMethod]}${changeNote}`));
+    }
+    // Horário fixado à zona de São Paulo de propósito — o container do backend roda em
+    // UTC, então usar o fuso padrão do processo mostraria uma hora adiantada no ticket.
+    parts.push(line(input.placedAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })));
   }
-  if (input.orderTotal != null) {
-    parts.push(line(`TOTAL DO PEDIDO: ${formatCurrency(input.orderTotal)}`));
-  }
-  if (input.paymentMethod) {
-    const changeNote =
-      input.paymentMethod === PaymentMethod.CASH && input.changeFor
-        ? ` (troco p/ ${formatCurrency(input.changeFor)})`
-        : '';
-    parts.push(line(`PAGAMENTO: ${PAYMENT_METHOD_LABEL[input.paymentMethod]}${changeNote}`));
-  }
-  // Horário fixado à zona de São Paulo de propósito — o container do backend roda em
-  // UTC, então usar o fuso padrão do processo mostraria uma hora adiantada no ticket.
-  parts.push(line(input.placedAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })));
   parts.push(line('--------------------------------'));
 
   for (const item of input.items) {
