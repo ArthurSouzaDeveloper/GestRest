@@ -181,6 +181,46 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(juiceText).not.toContain('Sucos - Suco');
   });
 
+  it('"Sugestões da Casa" sai na MESMA via de "Pastel" (são pastéis também) — não vira um papel separado', async () => {
+    // Nomes de categoria únicos neste describe (restaurantId é compartilhado por todos os
+    // testes do arquivo, e Category tem @@unique([restaurantId, name])) — evita colidir
+    // com "Pastéis Salgados"/"Sugestões da Casa" criados por outros testes abaixo.
+    const pasteisSalgados = await prisma.category.create({
+      data: { name: 'Pastéis Salgados Unificacao', station: Station.KITCHEN, restaurantId },
+    });
+    const sugestoesDaCasa = await prisma.category.create({
+      data: { name: 'Sugestões da Casa Unificacao', station: Station.KITCHEN, restaurantId },
+    });
+    const pastel = await prisma.product.create({
+      data: { name: 'Mussarela', price: 14.5, categoryId: pasteisSalgados.id, restaurantId },
+    });
+    const sugestao = await prisma.product.create({
+      data: { name: '2 Queijos', description: 'mussarela e catupiry', price: 18, categoryId: sugestoesDaCasa.id, restaurantId },
+    });
+
+    const table = await prisma.restaurantTable.create({ data: { number: 531, restaurantId } });
+    const order = await orderService.open({ tableId: table.id }, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
+    await orderService.addItems(
+      order!.id,
+      [
+        { productId: pastel.id, quantity: 1 },
+        { productId: sugestao.id, quantity: 1 },
+      ],
+      { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
+    );
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order!.id } });
+    const kitchenJobs = jobs.filter((j) => j.station === Station.KITCHEN).map((j) => j.payload.toString('ascii'));
+    // 1 papel só pros dois — antes saíam em papéis separados ("COZINHA - PASTEL" e
+    // "COZINHA - SUGESTAO DA CASA"), o que o cliente apontou como errado: Sugestões da
+    // Casa são pastéis também e precisam sair junto com o resto dos pastéis.
+    expect(kitchenJobs).toHaveLength(1);
+    expect(kitchenJobs[0]).toContain('COZINHA - PASTEL');
+    expect(kitchenJobs[0]).not.toContain('SUGESTAO DA CASA');
+    expect(kitchenJobs[0]).toContain('1- Pastel Salgado - Mussarela');
+    expect(kitchenJobs[0]).toContain('1- 2 Queijos');
+  });
+
   it('categoria "Sugestões da Casa" imprime só o nome do prato, sem a descrição', async () => {
     const category = await prisma.category.create({
       data: { name: 'Sugestões da Casa', station: Station.KITCHEN, restaurantId },

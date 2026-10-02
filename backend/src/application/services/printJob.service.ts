@@ -48,9 +48,11 @@ function isHouseSuggestion(categoryName: string): boolean {
  * motoboy, que continua numa via só) — pedido explícito do cliente pra sempre sair na
  * mesma sequência, não a ordem em que o cliente escolheu os itens no site. Cada valor
  * diferente também separa os itens em PAPÉIS distintos na via normal da cozinha (ver
- * enqueueForItems): um papel só de "Sugestões da Casa", um só de Pastel (doce e salgado
- * juntos — o "typeLabel" de cada item já distingue isso na linha), um só de Mini Pizza, um
- * só de Porção. Os demais fora dessas 4 famílias (não deveria existir na estação COZINHA,
+ * enqueueForItems): um papel só de Pastel, um só de Mini Pizza, um só de Porção. "Sugestões
+ * da Casa" entra no MESMO papel de Pastel (pedido explícito do cliente: são pastéis também
+ * — sabores curados/premium —, e saíam incorretamente numa via separada antes); doce e
+ * salgado da mesma família também ficam juntos (o "typeLabel" de cada item já distingue
+ * isso na linha). Os demais fora dessas famílias (não deveria existir na estação COZINHA,
  * mas por segurança) caem num papel por último, mantendo a ordem relativa entre si (sort
  * estável).
  */
@@ -59,27 +61,27 @@ function kitchenSortPriority(categoryName: string): number {
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();
-  if (name.includes('sugest')) return 0;
-  if (name.includes('pastel') || name.includes('pasteis')) return 1;
-  if (name.includes('mini pizza')) return 2;
-  if (name.includes('porcao') || name.includes('porcoes')) return 3;
-  return 4;
+  if (name.includes('sugest') || name.includes('pastel') || name.includes('pasteis')) return 0;
+  if (name.includes('mini pizza')) return 1;
+  if (name.includes('porcao') || name.includes('porcoes')) return 2;
+  return 3;
 }
 
 /**
  * Versão curta do tipo do prato (sem doce/salgado) pro aviso "PEDIDO TAMBEM TEM: ..." na
- * via dos suqueiros — pedido explícito do cliente: às vezes quem faz o pedido não é quem
- * vem buscar, e sem esse aviso a pessoa que só vê a via do suco não sabe que também tem
- * comida esperando na cozinha (ou vice-versa).
+ * via dos suqueiros e pro cabeçalho de cada papel da cozinha ("COZINHA - PASTEL" etc.) —
+ * pedido explícito do cliente: às vezes quem faz o pedido não é quem vem buscar, e sem
+ * esse aviso a pessoa que só vê a via do suco não sabe que também tem comida esperando na
+ * cozinha (ou vice-versa). "Sugestões da Casa" vira "PASTEL" aqui também, mesmo critério
+ * de kitchenSortPriority acima — são a mesma família pro resto do sistema.
  */
 function kitchenTypeSummary(categoryName: string): string {
   const name = categoryName
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();
-  if (name.includes('sugest')) return 'SUGESTAO DA CASA';
   if (name.includes('mini pizza')) return 'MINI PIZZA';
-  if (name.includes('pastel') || name.includes('pasteis')) return 'PASTEL';
+  if (name.includes('sugest') || name.includes('pastel') || name.includes('pasteis')) return 'PASTEL';
   if (name.includes('porcao') || name.includes('porcoes')) return 'PORCAO';
   return 'COMIDA';
 }
@@ -225,9 +227,9 @@ export const printJobService = {
       changeFor: order.changeFor !== null ? Number(order.changeFor) : null,
     };
 
-    // Cozinha imprime na ordem fixa (Sugestões da Casa, Pastel, Mini Pizza, Porção) — ver
-    // kitchenSortPriority; suco não muda (pedido explícito do cliente: "não alterar a
-    // ordem dos sucos").
+    // Cozinha imprime na ordem fixa (Pastel — incluindo Sugestões da Casa —, Mini Pizza,
+    // Porção) — ver kitchenSortPriority; suco não muda (pedido explícito do cliente: "não
+    // alterar a ordem dos sucos").
     const kitchenItems = [...(byStation.get(Station.KITCHEN) ?? [])].sort(
       (a, b) => kitchenSortPriority(a.product.category.name) - kitchenSortPriority(b.product.category.name),
     );
