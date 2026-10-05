@@ -185,9 +185,6 @@ export function renderTicket(input: TicketInput): Buffer {
       if (addr.zoneName) parts.push(line(addr.zoneName));
       if (addr.cep) parts.push(line(`CEP: ${addr.cep}`));
     }
-    if (input.orderTotal != null) {
-      parts.push(line(`TOTAL DO PEDIDO: ${formatCurrency(input.orderTotal)}`));
-    }
     if (input.paymentMethod) {
       const changeNote =
         input.paymentMethod === PaymentMethod.CASH && input.changeFor
@@ -216,6 +213,13 @@ export function renderTicket(input: TicketInput): Buffer {
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
     if (input.itemSeparator) parts.push(line('----------------------------'));
+  }
+
+  // Abaixo do ÚLTIMO item, não mais junto dos dados do cliente no topo — pedido explícito
+  // do cliente pra conferir o valor junto da lista de itens, não lá em cima antes de ver o
+  // que está sendo cobrado.
+  if (input.orderTotal != null) {
+    parts.push(line('--------------------------------'), line(`TOTAL DO PEDIDO: ${formatCurrency(input.orderTotal)}`));
   }
 
   parts.push(line('--------------------------------'), feedLines(4), PARTIAL_CUT);

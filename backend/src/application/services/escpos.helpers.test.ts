@@ -414,7 +414,7 @@ describe('renderTicket', () => {
     expect(outroTexto).toContain('PEDIDO TAMBEM TEM: PASTEL, PORCAO');
   });
 
-  it('orderTotal imprime "TOTAL DO PEDIDO" logo antes da forma de pagamento; ausente, não imprime nada', () => {
+  it('orderTotal imprime "TOTAL DO PEDIDO" abaixo do último item (não junto dos dados do cliente no topo); ausente, não imprime nada', () => {
     const semTotal = renderTicket({
       station: Station.KITCHEN,
       tableNumber: null,
@@ -443,7 +443,10 @@ describe('renderTicket', () => {
       items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
     expect(comTotal).toContain('TOTAL DO PEDIDO: R$ 67,50');
-    expect(comTotal.indexOf('TOTAL DO PEDIDO')).toBeLessThan(comTotal.indexOf('PAGAMENTO'));
+    // Abaixo do último item (depois do nome "X" do item e do seu preço), não lá em cima
+    // junto da forma de pagamento — pedido explícito do cliente.
+    expect(comTotal.indexOf('TOTAL DO PEDIDO')).toBeGreaterThan(comTotal.indexOf('PAGAMENTO'));
+    expect(comTotal.indexOf('TOTAL DO PEDIDO')).toBeGreaterThan(comTotal.indexOf('R$ 10,00 / un.'));
   });
 
   it('itemSeparator imprime uma linha divisória depois de cada item (nome+preço+adicionais+obs); sem a opção, não imprime nada extra', () => {
