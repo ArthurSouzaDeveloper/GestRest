@@ -96,12 +96,18 @@ function toTicketItem(item: CreatedOrderItem): TicketItem {
   // do cliente: no lugar do nome genérico, o título vira a lista de ingredientes
   // escolhidos em CAIXA ALTA, sem tipo/descrição (ambos genéricos aqui).
   if (item.product.isCustom) {
+    // "Monte o Seu" não tem preço próprio (Product.price = 0, "Preço pela montagem") — o
+    // valor inteiro vem da base + adicionais escolhidos, gravados em item.additionals (ver
+    // createOrderItems em order.service.ts). item.unitPrice sozinho ficaria zerado no
+    // ticket se não somasse os adicionais aqui, mesmo cálculo que computeTotals já faz pro
+    // total do pedido.
+    const additionalsTotal = item.additionals.reduce((sum, a) => sum + Number(a.price), 0);
     return {
       name: item.additionals.map((a) => a.name.toUpperCase()).join(', '),
       typeLabel: null,
       description: null,
       quantity: item.quantity,
-      unitPrice: Number(item.unitPrice),
+      unitPrice: Number(item.unitPrice) + additionalsTotal,
       notes: item.notes,
       additionals: [],
     };

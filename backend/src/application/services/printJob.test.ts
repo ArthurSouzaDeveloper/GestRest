@@ -415,6 +415,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).not.toContain('Monte o Seu Pastel');
     expect(text).not.toContain('escolha os ingredientes');
     expect(text).not.toContain('+ Catupiry');
+    // "Monte o Seu" não tem preço próprio (Product.price = 0) — o valor inteiro vem da
+    // base (Frango R$12) + adicional (Catupiry R$2) = R$14, não R$0 (achado de produção:
+    // o ticket saía com "R$ 0,00 / un." pra esses itens).
+    expect(text).toContain('R$ 14,00 / un.');
+    expect(text).not.toContain('R$ 0,00 / un.');
   });
 
   it('aceite manual de pedido online gera o PrintJob no momento do aceite, não antes', async () => {
