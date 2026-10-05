@@ -23,7 +23,7 @@ import {
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Spinner } from '../components/ui';
-import { OrderComposer, draftItemUnitPrice, type DraftItem } from '../components/OrderComposer';
+import { OrderComposer, draftItemUnitPrice, draftItemLabel, type DraftItem } from '../components/OrderComposer';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import type { DeliveryZone, EtaEstimate, OrderStatus, OrderType, PaymentMethod, PlaceDetails } from '../types';
 
@@ -125,7 +125,7 @@ function DesktopSummaryCard({
           {draft.map((item, i) => (
             <div key={i} className="flex items-center justify-between gap-2 text-[13.5px] text-[#1E1024]">
               <span className="min-w-0 truncate">
-                <b>{item.quantity}×</b> {item.comboLabel ?? item.product.name}
+                <b>{item.quantity}×</b> {draftItemLabel(item)}
               </span>
               <span className="shrink-0 font-bold">{brl(draftItemUnitPrice(item) * item.quantity)}</span>
             </div>
@@ -1526,10 +1526,12 @@ function CartStep({
             <div key={i} className={`${CARD} p-3.5 shadow-sm`}>
               <div className="flex items-start justify-between gap-2.5">
                 <div className="min-w-0">
-                  <div className="text-[13.5px] font-bold text-[#1E1024]">{item.comboLabel ?? item.product.name}</div>
+                  <div className="text-[13.5px] font-bold text-[#1E1024]">{draftItemLabel(item)}</div>
                   <div className="mt-0.5 text-[11px] text-[#6B4A78]">{brl(draftItemUnitPrice(item))} cada</div>
                   {item.notes && <div className="mt-0.5 text-[10.5px] text-[#6B4A78]">{item.notes}</div>}
-                  {item.additionalIds.length > 0 && (
+                  {/* "Monte o Seu" já mostra os ingredientes no nome acima (draftItemLabel)
+                      — repetir "+N adicional(is)" aqui seria redundante. */}
+                  {!item.product.isCustom && item.additionalIds.length > 0 && (
                     <div className="mt-0.5 text-[10.5px] text-[#6B4A78]">+ {item.additionalIds.length} adicional(is)</div>
                   )}
                 </div>
@@ -1740,7 +1742,7 @@ function ReviewStep({
         <h3 className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-brand">Itens</h3>
         {draft.map((item, i) => (
           <div key={i} className="text-[12.5px] leading-[1.55] text-[#1E1024]">
-            {item.quantity}× {item.comboLabel ?? item.product.name} — {brl(draftItemUnitPrice(item) * item.quantity)}
+            {item.quantity}× {draftItemLabel(item)} — {brl(draftItemUnitPrice(item) * item.quantity)}
           </div>
         ))}
       </div>
@@ -1857,7 +1859,7 @@ function ConfirmationStep({
               {draft.map((item, i) => (
                 <div key={i} className="flex items-center justify-between gap-2 text-[13.5px] text-[#1E1024]">
                   <span className="min-w-0 truncate">
-                    <b>{item.quantity}×</b> {item.comboLabel ?? item.product.name}
+                    <b>{item.quantity}×</b> {draftItemLabel(item)}
                   </span>
                   <span className="shrink-0 font-bold">{brl(draftItemUnitPrice(item) * item.quantity)}</span>
                 </div>

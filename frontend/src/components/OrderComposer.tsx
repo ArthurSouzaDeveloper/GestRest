@@ -14,6 +14,12 @@ export interface DraftItem {
   additionalIds: string[];
   /** Sum of the selected additionals' unit price, captured at selection time so the cart can show a running total without re-fetching every product's additionals. */
   additionalsTotal: number;
+  /** Nomes dos adicionais selecionados (base primeiro, se houver), na mesma ordem de
+   * additionalIds — capturado no momento da escolha (igual additionalsTotal) pra exibir
+   * o "Monte o Seu Pastel/Mini Pizza" pelos ingredientes escolhidos em vez do nome
+   * genérico do produto, sem precisar rebuscar os adicionais em todo lugar que exibe o
+   * carrinho. Pedido explícito do cliente/dono. */
+  additionalNames?: string[];
   /** "Monte o Seu" de sucos com mais de 1 fruta: ids de todas as combinações fruta+base
    * escolhidas (`product` acima é a de maior preço entre elas). Ausente = item comum. */
   comboProductIds?: string[];
@@ -34,6 +40,38 @@ export function draftItemUnitPrice(item: DraftItem): number {
     ? EXTRA_FRUIT_PRICE * (item.comboProductIds.length - 1)
     : 0;
   return item.product.price + item.additionalsTotal + comboExtra;
+}
+
+/**
+ * "Pastel" ou "Mini Pizza" a partir do NOME da categoria do produto (contém "pastel"/
+ * "mini pizza"/"sugest"?), pra mostrar no resumo do pedido independente de ser um sabor
+ * cadastrado (ex.: categoria "Sugestões da Casa") ou um "Monte o Seu" — mesmo critério
+ * por conteúdo já usado no ticket da cozinha (ver categoryTypeLabel em
+ * backend/src/application/services/printJob.service.ts). Outras categorias (Porção,
+ * Sucos etc.) não ganham rótulo. Pedido explícito do cliente/dono.
+ */
+function cartTypeLabel(categoryName?: string | null): string | null {
+  if (!categoryName) return null;
+  const name = categoryName.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (name.includes('mini pizza')) return 'Mini Pizza';
+  if (name.includes('sugest') || name.includes('pastel') || name.includes('pasteis')) return 'Pastel';
+  return null;
+}
+
+/**
+ * Texto de exibição de uma linha do carrinho/resumo do pedido: combo de suco mantém seu
+ * comboLabel como já era; "Monte o Seu Pastel/Pastel Doce" mostra os ingredientes
+ * escolhidos (additionalNames) em vez do nome genérico do produto — pedido explícito do
+ * cliente, igual ao ticket da cozinha já mostra. Produto comum/sabor cadastrado (inclusive
+ * "Sugestões da Casa") mostra o próprio nome. Em qualquer um desses casos (exceto combo de
+ * suco), prefixa "Pastel - "/"Mini Pizza - " quando a categoria bate (ver cartTypeLabel).
+ */
+export function draftItemLabel(item: DraftItem): string {
+  if (item.comboLabel) return item.comboLabel;
+  const name =
+    item.product.isCustom && item.additionalNames?.length ? item.additionalNames.join(', ') : item.product.name;
+  const label = cartTypeLabel(item.product.category?.name);
+  return label ? `${label} - ${name}` : name;
 }
 
 // Só 2 abas no topo — Água e Refrigerantes viraram sub-filtro (chip) dentro de "Sucos e
@@ -506,13 +544,15 @@ export function OrderComposer({
             <div key={i} className="card p-3">
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium">{item.comboLabel ?? item.product.name}</div>
+                  <div className="text-sm font-medium">{draftItemLabel(item)}</div>
                   {item.comboProductIds && item.comboProductIds.length > 1 && (
                     <div className="text-xs text-gray-500">
                       + {brl(EXTRA_FRUIT_PRICE * (item.comboProductIds.length - 1))} fruta extra
                     </div>
                   )}
-                  {item.additionalIds.length > 0 && (
+                  {/* "Monte o Seu" já mostra os ingredientes no nome acima (draftItemLabel)
+                      — repetir "+N adicional(is)" aqui seria redundante. */}
+                  {!item.product.isCustom && item.additionalIds.length > 0 && (
                     <div className="text-xs text-gray-500">+ {item.additionalIds.length} adicional(is)</div>
                   )}
                   <div className="text-xs font-semibold text-brand">{brl(draftItemUnitPrice(item) * item.quantity)}</div>
@@ -555,12 +595,18 @@ export function OrderComposer({
           current={configuring.index !== null ? draft[configuring.index] : undefined}
           basePath={basePath}
           onClose={() => setConfiguring(null)}
-          onSave={(notes, additionalIds, additionalsTotal) => {
+          onSave={(notes, additionalIds, additionalsTotal, additionalNames) => {
             const next = [...draft];
             if (configuring.index !== null) {
-              next[configuring.index] = { ...next[configuring.index], notes, additionalIds, additionalsTotal };
+              next[configuring.index] = {
+                ...next[configuring.index],
+                notes,
+                additionalIds,
+                additionalsTotal,
+                additionalNames,
+              };
             } else {
-              next.push({ product: configuring.product, quantity: 1, notes, additionalIds, additionalsTotal });
+              next.push({ product: configuring.product, quantity: 1, notes, additionalIds, additionalsTotal, additionalNames });
             }
             setDraft(next);
             setConfiguring(null);
@@ -616,7 +662,7 @@ function ItemConfigModal({
   current?: DraftItem;
   basePath: string;
   onClose: () => void;
-  onSave: (notes: string, additionalIds: string[], additionalsTotal: number) => void;
+  onSave: (notes: string, additionalIds: string[], additionalsTotal: number, additionalNames: string[]) => void;
 }) {
   const [notes, setNotes] = useState(current?.notes ?? '');
   const [selected, setSelected] = useState<string[]>(current?.additionalIds ?? []);
@@ -755,7 +801,14 @@ function ItemConfigModal({
             className="btn-primary"
             disabled={needsBase}
             title={needsBase ? 'Escolha a base primeiro' : undefined}
-            onClick={() => onSave(notes, selected, selectedTotal)}
+            onClick={() => {
+              // Ordem de `selected` (base primeiro quando houver, ver pickBase acima) —
+              // vira a ordem dos ingredientes exibidos no "Monte o Seu" (ver draftItemLabel).
+              const names = selected
+                .map((id) => additionals.find((a) => a.id === id)?.name)
+                .filter((n): n is string => Boolean(n));
+              onSave(notes, selected, selectedTotal, names);
+            }}
           >
             Salvar
           </button>
