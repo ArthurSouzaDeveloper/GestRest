@@ -15,6 +15,15 @@
  */
 function createPollLoop({ apiUrl, printerKey, printJob, ackJob, fetchImpl = fetch, log = console.log, logError = console.error }) {
   let running = false;
+  // Ids já mandados pra impressora física nesta execução, mas cujo ack ainda não foi
+  // confirmado pelo backend (ex.: a rede até o servidor falhou bem na hora do POST de
+  // confirmação, depois do `copy /b`/socket já ter entregue os bytes pra impressora —
+  // esse envio não tem como ser desfeito). Sem isso, o job continua PENDING no backend e
+  // o próximo ciclo (sem sobrepor o anterior, já coberto pelo guard `running` acima)
+  // buscaria o MESMO job de novo e reimprimiria a via — era exatamente o duplicado
+  // relatado pelo cliente numa entrega (via do motoboy saindo 2x). Agora, pra um id já
+  // nesta lista, só se tenta confirmar de novo — nunca reimprimir.
+  const printedPendingAck = new Set();
 
   async function fetchPendingJobs() {
     const res = await fetchImpl(`${apiUrl}/print-agent/jobs`, {
@@ -40,14 +49,29 @@ function createPollLoop({ apiUrl, printerKey, printJob, ackJob, fetchImpl = fetc
       }
 
       for (const job of jobs) {
+        const alreadyPrinted = printedPendingAck.has(job.id);
         try {
-          await printJob(job);
+          if (!alreadyPrinted) {
+            await printJob(job);
+            printedPendingAck.add(job.id);
+          }
           await ackJob(job.id);
-          log(`[ok] Ticket impresso — ${job.station} (${job.id}).`);
+          printedPendingAck.delete(job.id);
+          log(
+            alreadyPrinted
+              ? `[ok] Ticket ${job.id} já tinha sido impresso — confirmação pendente resolvida agora.`
+              : `[ok] Ticket impresso — ${job.station} (${job.id}).`,
+          );
         } catch (err) {
-          // Não confirma (ack) quando falha — o ticket continua pendente e será
-          // tentado de novo no próximo ciclo, nada se perde.
-          logError(`[erro] Falha ao imprimir o ticket ${job.id}, vou tentar de novo:`, err.message);
+          if (alreadyPrinted) {
+            // Já saiu na impressora antes — NÃO tenta imprimir de novo, só avisa que a
+            // confirmação continua falhando (vai tentar de novo no próximo ciclo).
+            logError(`[erro] Ticket ${job.id} já impresso, mas a confirmação falhou de novo:`, err.message);
+          } else {
+            // Não confirma (ack) quando falha ao IMPRIMIR — o ticket continua pendente e
+            // será tentado de novo no próximo ciclo, nada se perde.
+            logError(`[erro] Falha ao imprimir o ticket ${job.id}, vou tentar de novo:`, err.message);
+          }
         }
       }
     } finally {

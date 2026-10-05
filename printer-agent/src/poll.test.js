@@ -117,3 +117,37 @@ test('regressão: um ciclo sobreposto NÃO reimprime o ticket que o ciclo anteri
   assert.equal(fetchCalls, 1, 'o segundo tick não deveria nem chegar a buscar a fila de novo');
   assert.deepEqual(printed, ['only-job'], 'o ticket só pode ter sido impresso uma vez');
 });
+
+test('regressão: ack falha DEPOIS da impressão ter sido feita com sucesso — próximo ciclo só tenta confirmar de novo, não reimprime', async () => {
+  // Reproduz o duplicado relatado pelo cliente numa entrega (via do motoboy saindo 2x):
+  // a impressão USB/rede local já tinha sido entregue com sucesso, mas o POST de ack pro
+  // backend falhou (rede até o servidor, nada a ver com a impressora) — sem rastrear que
+  // esse job já foi impresso, o próximo ciclo buscava o mesmo job (continua PENDING no
+  // backend) e reimprimia a via inteira.
+  const printed = [];
+  const ackAttempts = [];
+  let ackShouldFail = true;
+  const jobs = [{ id: 'motoboy-1', station: 'KITCHEN', payload: 'x' }];
+
+  const loop = createPollLoop({
+    apiUrl: 'http://api',
+    printerKey: 'k',
+    fetchImpl: async () => ({ ok: true, json: async () => jobs }),
+    printJob: async (job) => {
+      printed.push(job.id);
+    },
+    ackJob: async (id) => {
+      ackAttempts.push(id);
+      if (ackShouldFail) throw new Error('rede caiu bem na hora do ack');
+    },
+    log: noop,
+    logError: noop,
+  });
+
+  await loop.tick(); // imprime, ack falha
+  ackShouldFail = false;
+  await loop.tick(); // job ainda PENDING (ack nunca confirmou) — só deve tentar o ack de novo
+
+  assert.deepEqual(printed, ['motoboy-1'], 'a via só pode ter sido impressa uma vez, mesmo com o ack falhando antes');
+  assert.deepEqual(ackAttempts, ['motoboy-1', 'motoboy-1']);
+});
