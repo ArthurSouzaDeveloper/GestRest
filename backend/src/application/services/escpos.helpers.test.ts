@@ -65,6 +65,37 @@ describe('renderTicket', () => {
     expect(text).toContain('obs: sem gelo');
   });
 
+  it('remove bytes de controle injetados em campos do cliente — não deixa um pedido malicioso mandar comando real pra impressora (achado de auditoria de segurança)', () => {
+    // ESC p (0x1B 0x70) é o comando real de abrir a gaveta de dinheiro em impressoras
+    // ESC/POS — se um ESC cru sobrevivesse num campo de texto livre (nome, observação,
+    // endereço) de um pedido público, um cliente malicioso podia embutir esse comando e
+    // fazer a impressora executar ele de verdade. "Maria" sem o bloco injetado continua
+    // aparecendo normalmente — só o byte de controle em si é removido.
+    const maliciousName = 'Maria\x1bp\x00\x19\xfa-Sobrenome';
+    const maliciousNotes = 'sem cebola\x1dV\x00 cortar tudo';
+    const bytes = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 1,
+      customerName: maliciousName,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [
+        { name: 'Pastel', description: null, unitPrice: 10, quantity: 1, additionals: [], notes: maliciousNotes },
+      ],
+    });
+    // Nem o ESC p (abrir gaveta) nem o GS V (corte de papel) injetados sobrevivem.
+    expect(bytes.includes(Buffer.from([0x1b, 0x70]))).toBe(false);
+    expect(bytes.includes(Buffer.from([0x1d, 0x56, 0x00]))).toBe(false);
+    // O texto legítimo ao redor do byte malicioso continua no ticket, só sem o controle.
+    const text = bytes.toString('ascii');
+    expect(text).toContain('Mariap');
+    expect(text).toContain('-Sobrenome');
+    expect(text).toContain('sem cebolaV cortar tudo');
+  });
+
   it('remove acentuação em vez de arriscar uma codepage não validada', () => {
     const bytes = renderTicket({
       station: Station.KITCHEN,

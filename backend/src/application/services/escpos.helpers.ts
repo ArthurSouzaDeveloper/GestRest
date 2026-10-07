@@ -118,7 +118,15 @@ export interface TicketInput {
  * codificação com acento se o modelo confirmar suporte.
  */
 function toAscii(text: string): string {
-  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // Tira os bytes de controle (0x00-0x1F, 0x7F) al\u00e9m do acento \u2014 sem isso, um pedido
+  // p\u00fablico com um ESC (0x1B) ou GS (0x1D) cru no nome/observa\u00e7\u00e3o/endere\u00e7o chegaria
+  // intacto no ticket e injetaria comando ESC/POS de verdade na impressora f\u00edsica (abrir
+  // gaveta, cortar papel em loop, resetar no meio da impress\u00e3o) \u2014 achado de auditoria de
+  // seguran\u00e7a. `\n` nunca aparece aqui (\u00e9 s\u00f3 adicionado depois, em line()).
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\x00-\x1f\x7f]/g, '');
 }
 
 function line(text: string): Buffer {
