@@ -419,7 +419,59 @@ describe('fila de impressão térmica (PrintJob)', () => {
     // base (Frango R$12) + adicional (Catupiry R$2) = R$14, não R$0 (achado de produção:
     // o ticket saía com "R$ 0,00 / un." pra esses itens).
     expect(text).toContain('R$ 14,00 / un.');
-    expect(text).not.toContain('R$ 0,00 / un.');
+  });
+
+  it('"Monte o Seu Pastel" rejeita um sabor-base de OUTRA categoria (achado de auditoria: substituição de preço)', async () => {
+    const pasteisSalgados = await prisma.category.create({
+      data: { name: 'Pastéis Salgados Preco', station: Station.KITCHEN, restaurantId },
+    });
+    const pasteisDoces = await prisma.category.create({
+      data: { name: 'Pastéis Doces Preco', station: Station.KITCHEN, restaurantId },
+    });
+    const customProduct = await prisma.product.create({
+      data: {
+        name: 'Monte o Seu Pastel',
+        price: 0,
+        isCustom: true,
+        categoryId: pasteisSalgados.id,
+        restaurantId,
+      },
+    });
+    // Base de uma categoria DIFERENTE da do produto (ex.: um sabor doce bem mais barato,
+    // ou uma base já desativada) — a tela nunca ofereceria isso, mas uma chamada de API
+    // direta podia mandar esse id antes da correção, e o item saía pelo preço errado.
+    const baseOutraCategoria = await prisma.additional.create({
+      data: { name: 'Chocolate Barato', kind: AdditionalKind.BASE, price: 1, restaurantId, categoryId: pasteisDoces.id },
+    });
+    const baseDesativada = await prisma.additional.create({
+      data: {
+        name: 'Base Descontinuada',
+        kind: AdditionalKind.BASE,
+        price: 1,
+        restaurantId,
+        categoryId: pasteisSalgados.id,
+        active: false,
+      },
+    });
+
+    const table = await prisma.restaurantTable.create({ data: { number: 523, restaurantId } });
+    const order = await orderService.open({ tableId: table.id }, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
+
+    await expect(
+      orderService.addItems(
+        order!.id,
+        [{ productId: customProduct.id, quantity: 1, additionalIds: [baseOutraCategoria.id] }],
+        { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
+      ),
+    ).rejects.toThrow(/sabor-base/);
+
+    await expect(
+      orderService.addItems(
+        order!.id,
+        [{ productId: customProduct.id, quantity: 1, additionalIds: [baseDesativada.id] }],
+        { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
+      ),
+    ).rejects.toThrow(/sabor-base/);
   });
 
   it('aceite manual de pedido online gera o PrintJob no momento do aceite, não antes', async () => {

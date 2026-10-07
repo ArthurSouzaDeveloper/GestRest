@@ -185,9 +185,20 @@ async function createOrderItems(
     const station = product.category.station;
     touchedStations.add(station);
 
+    // categoryId + active: sem isso, uma chamada direta de API (sem passar pela tela, que
+    // só oferece os adicionais certos) podia mandar o id de uma BASE de OUTRA categoria —
+    // inclusive mais barata — ou de uma BASE já desativada/descontinuada, e pagar o preço
+    // errado por um "Monte o Seu" (achado de auditoria de segurança). categoryId null
+    // continua aceito (adicional "global", sem categoria própria — não é exclusivo de
+    // nenhum prato), só categoria DIFERENTE da do produto é que fica de fora.
     const additionals = item.additionalIds?.length
       ? await tx.additional.findMany({
-          where: { id: { in: item.additionalIds }, restaurantId: tenantId },
+          where: {
+            id: { in: item.additionalIds },
+            restaurantId: tenantId,
+            active: true,
+            OR: [{ categoryId: product.categoryId }, { categoryId: null }],
+          },
         })
       : [];
 
