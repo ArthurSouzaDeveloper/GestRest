@@ -248,20 +248,25 @@ model Customer {
   id              String     @id @default(uuid())
   name            String
   phone           String?
-  // Só dígitos de `phone` (ver order.helpers.normalizePhone) — permite achar o mesmo
-  // cliente em visitas diferentes mesmo com formatação diferente ("(19) 99999-8888" vs
-  // "19999998888"), sem precisar mudar o que fica salvo/exibido em `phone`. Usado pro
-  // site público reconhecer quem já pediu antes (login por nome+telefone) e pra
-  // openPublic() reaproveitar o mesmo Customer em vez de criar um novo a cada pedido.
+  // Só dígitos de `phone` (ver order.helpers.normalizePhone) — só contato/exibição agora,
+  // não é mais a chave de identidade do cliente (ver cpfNormalized): telefone pode mudar.
   phoneNormalized String?
+  cpf             String?
+  // Só dígitos de `cpf` (ver order.helpers.normalizeCpf) — é a chave de identidade do
+  // cliente no site público: permite achar o mesmo cliente em visitas diferentes mesmo que
+  // ele troque de telefone. Usado pro login por nome+CPF e pra openPublic() reaproveitar o
+  // mesmo Customer em vez de criar um novo a cada pedido.
+  cpfNormalized   String?
   restaurantId    String
   restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt       DateTime   @default(now())
 
-  orders Order[]
+  orders    Order[]
+  addresses CustomerAddress[]
 
   @@index([restaurantId])
   @@index([restaurantId, phoneNormalized])
+  @@index([restaurantId, cpfNormalized])
   @@map("customers")
 }
 
@@ -304,33 +309,38 @@ model DeliveryZone {
   @@map("delivery_zones")
 }
 
-// Endereço de entrega salvo por telefone (não por Customer.id) — pedido explícito do
-// cliente/dono: um mesmo número pode ter mais de um endereço (casa, trabalho...) e o site
+// Endereço de entrega salvo por Customer (não mais por telefone) — pedido explícito do
+// cliente/dono: um mesmo cliente pode ter mais de um endereço (casa, trabalho...) e o site
 // público mostra todos pro cliente escolher no próximo pedido, com a opção de cadastrar um
 // novo. Vive à parte do histórico de pedidos (Order.deliveryStreet etc., que é snapshot
 // fiscal e nunca muda): aqui é só conveniência de preenchimento, atualizada a cada entrega.
-// Chave de "mesmo endereço" pra não duplicar: restaurantId + phoneNormalized + rua + número
-// (ver order.service.ts#openPublic) — complemento/CEP/zona só atualizam no lugar.
+// Chave de "mesmo endereço" pra não duplicar: customerId + rua normalizada (sem acento,
+// minúsculo — ver order.helpers.normalizeForMatch) + número (ver order.service.ts#openPublic)
+// — complemento/CEP/zona só atualizam no lugar. customerId é opcional só pra não exigir
+// backfill de linhas antigas (criadas quando a chave ainda era telefone) numa migração
+// direto em produção; linhas órfãs ficam inacessíveis pro reaproveitamento mas continuam
+// existindo (histórico curto do restaurante, perda aceitável).
 model CustomerAddress {
-  id              String        @id @default(uuid())
-  restaurantId    String
-  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  phoneNormalized String
-  zoneId          String?
-  zone            DeliveryZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
-  street          String
-  number          String
-  complement      String?
-  cep             String?
+  id           String        @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerId   String?
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  zoneId       String?
+  zone         DeliveryZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  street       String
+  number       String
+  complement   String?
+  cep          String?
   // Só usados no modo DISTANCE_BANDS (ver Restaurant.deliveryPricingMode); no modo ZONE
   // ficam null e o endereço reaproveitado vem dos campos de texto + zoneId.
-  lat             Float?
-  lng             Float?
+  lat          Float?
+  lng          Float?
   // Pra ordenar "mais usado/recente primeiro" na caixa de endereços salvos do site público.
-  lastUsedAt      DateTime      @default(now())
-  createdAt       DateTime      @default(now())
+  lastUsedAt   DateTime      @default(now())
+  createdAt    DateTime      @default(now())
 
-  @@index([restaurantId, phoneNormalized])
+  @@index([restaurantId, customerId])
   @@map("customer_addresses")
 }
 

@@ -16,7 +16,15 @@ import { auditService } from './audit.service';
 import { deliveryPricingService } from './deliveryPricing.service';
 import { etaService } from './eta.service';
 import { printJobService } from './printJob.service';
-import { assertCustomProductBase, normalizePhone, orderInclude, serializeOrder, syncTableStatus } from './order.helpers';
+import {
+  assertCustomProductBase,
+  normalizeCpf,
+  normalizeForMatch,
+  normalizePhone,
+  orderInclude,
+  serializeOrder,
+  syncTableStatus,
+} from './order.helpers';
 
 interface Ctx {
   userId: string;
@@ -62,6 +70,7 @@ export interface PublicOrderInput {
   orderType: 'DELIVERY' | 'PICKUP';
   customerName: string;
   customerPhone: string;
+  customerCpf: string;
   deliveryZoneId?: string;
   deliveryLat?: number;
   deliveryLng?: number;
@@ -382,28 +391,37 @@ export const orderService = {
     const estimatedReadyAt = new Date(Date.now() + etaMinutes * 60_000);
 
     const { orderId, touchedStations } = await prisma.$transaction(async (tx) => {
-      // Reaproveita o mesmo Customer entre pedidos (pelo telefone + nome) em vez de criar um
-      // novo a cada vez — é o que permite o cliente "logar" de novo (nome+telefone) e
-      // encontrar os pedidos anteriores depois de fechar o site. Só reaproveita quando o
-      // nome digitado bate com o já cadastrado — NUNCA sobrescreve o nome de um Customer
-      // existente com o que veio nesse request: telefone sozinho não é prova de posse, e
-      // sobrescrever silenciosamente permitiria alguém que só sabe o telefone de outra
-      // pessoa renomear o cadastro dela e depois "logar" (nome+telefone) pra ver o
-      // histórico de pedidos alheio. Nome diferente para o mesmo telefone vira um Customer
-      // novo (não há unicidade de telefone no schema, de propósito).
+      // Reaproveita o mesmo Customer entre pedidos (pelo CPF + nome) em vez de criar um novo
+      // a cada vez — é o que permite o cliente "logar" de novo (nome+CPF) e encontrar os
+      // pedidos anteriores depois de fechar o site. CPF, e não telefone, é a chave: o
+      // telefone do cliente pode mudar de um pedido pro outro, o CPF não (pedido do
+      // cliente/dono). Só reaproveita quando o nome digitado bate com o já cadastrado —
+      // NUNCA sobrescreve o nome de um Customer existente com o que veio nesse request: CPF
+      // sozinho não é prova de posse, e sobrescrever silenciosamente permitiria alguém que
+      // só sabe o CPF de outra pessoa renomear o cadastro dela e depois "logar" (nome+CPF)
+      // pra ver o histórico de pedidos alheio. Nome diferente para o mesmo CPF vira um
+      // Customer novo (não há unicidade de CPF no schema, de propósito). phone/phoneNormalized
+      // continuam salvos e atualizados a cada pedido — são só contato/exibição agora, não
+      // identidade.
+      const cpfNormalized = normalizeCpf(input.customerCpf);
       const phoneNormalized = normalizePhone(input.customerPhone);
       const nameNormalized = input.customerName.trim().toLowerCase();
       const candidates = await tx.customer.findMany({
-        where: { restaurantId: tenantId, phoneNormalized },
+        where: { restaurantId: tenantId, cpfNormalized },
       });
       const existing = candidates.find((c) => c.name.trim().toLowerCase() === nameNormalized);
       const customer = existing
-        ? existing
+        ? await tx.customer.update({
+            where: { id: existing.id },
+            data: { phone: input.customerPhone.trim(), phoneNormalized },
+          })
         : await tx.customer.create({
             data: {
               name: input.customerName.trim(),
               phone: input.customerPhone.trim(),
               phoneNormalized,
+              cpf: input.customerCpf.trim(),
+              cpfNormalized,
               restaurantId: tenantId,
             },
           });
@@ -432,18 +450,23 @@ export const orderService = {
           estimatedReadyAt,
         },
       });
-      // Guarda/atualiza esse endereço na lista de endereços salvos desse telefone — pedido
+      // Guarda/atualiza esse endereço na lista de endereços salvos desse cliente — pedido
       // explícito do cliente/dono: quem já pediu entrega vê os endereços de antes (ex.:
       // casa, trabalho) pra escolher no pedido seguinte em vez de redigitar (ver
       // CustomerAddress e publicOrder.service.ts#customerLogin, que devolve a lista pro
-      // site público mostrar). Chave de "mesmo endereço" é rua+número (já garantidos não-
-      // vazios pelo schema de validação quando orderType é DELIVERY) — bate com um já
-      // salvo apenas atualiza complemento/CEP/zona/lastUsedAt, sem duplicar; endereço novo
-      // vira uma entrada nova (nunca substitui as outras). Só acontece em DELIVERY,
-      // retirada não tem endereço pra guardar.
+      // site público mostrar). Chave de "mesmo endereço" é customerId + número + rua
+      // normalizada (sem acento, minúsculo, espaços colapsados — ver normalizeForMatch):
+      // sem essa normalização, "Rua Ana Esperança, 138" digitada diferente em duas visitas
+      // (acento, maiúscula, autocomplete vs. digitação manual) virava dois endereços
+      // "diferentes" salvos em vez de reconhecidos como o mesmo (achado do cliente/dono:
+      // "melhore o reconhecimento de endereço"). Bate com um já salvo apenas atualiza
+      // complemento/CEP/zona/lastUsedAt, sem duplicar; endereço novo vira uma entrada nova
+      // (nunca substitui as outras). Só acontece em DELIVERY, retirada não tem endereço pra
+      // guardar.
       if (input.orderType === 'DELIVERY') {
         const street = input.deliveryStreet!.trim();
         const number = input.deliveryNumber!.trim();
+        const streetNormalized = normalizeForMatch(street);
         const addressData = {
           zoneId: input.deliveryZoneId ?? null,
           complement: input.deliveryComplement ?? null,
@@ -451,9 +474,10 @@ export const orderService = {
           lat: input.deliveryLat ?? null,
           lng: input.deliveryLng ?? null,
         };
-        const existingAddress = await tx.customerAddress.findFirst({
-          where: { restaurantId: tenantId, phoneNormalized, street, number },
+        const sameNumberAddresses = await tx.customerAddress.findMany({
+          where: { restaurantId: tenantId, customerId: customer.id, number },
         });
+        const existingAddress = sameNumberAddresses.find((a) => normalizeForMatch(a.street) === streetNormalized);
         if (existingAddress) {
           await tx.customerAddress.update({
             where: { id: existingAddress.id },
@@ -461,7 +485,7 @@ export const orderService = {
           });
         } else {
           await tx.customerAddress.create({
-            data: { restaurantId: tenantId, phoneNormalized, street, number, ...addressData },
+            data: { restaurantId: tenantId, customerId: customer.id, street, number, ...addressData },
           });
         }
       }

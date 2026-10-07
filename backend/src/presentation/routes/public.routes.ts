@@ -104,7 +104,7 @@ router.post(
   customerLookupLimiter,
   validateBody(customerLoginSchema),
   asyncHandler(async (req, res) =>
-    res.json(await publicOrderService.customerLogin(req.params.slug, req.body.name, req.body.phone)),
+    res.json(await publicOrderService.customerLogin(req.params.slug, req.body.name, req.body.cpf)),
   ),
 );
 

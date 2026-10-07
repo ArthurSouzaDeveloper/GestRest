@@ -4,7 +4,7 @@ import { additionalService, categoryService, deliveryZoneService, productService
 import { deliveryPricingService } from './deliveryPricing.service';
 import { etaService } from './eta.service';
 import { googleMapsClient } from './googleMaps.client';
-import { computeTotals, normalizePhone, orderInclude, serializePublicStatus } from './order.helpers';
+import { computeTotals, normalizeCpf, orderInclude, serializePublicStatus } from './order.helpers';
 import { orderService, type PublicOrderInput } from './order.service';
 
 /** Resolves a public :slug to a tenant id, rejecting unknown or inactive restaurants. */
@@ -78,17 +78,18 @@ export const publicOrderService = {
     return serializePublicStatus(order);
   },
   /**
-   * "Login" do site público por nome+telefone — sem senha, só serve pra um cliente que já
-   * pediu antes reencontrar os próprios pedidos depois de fechar o navegador (não tem link
-   * de rastreio salvo). Exige nome E telefone batendo (não só telefone) como uma barreira
-   * mínima contra alguém só adivinhando um número. Casa por telefone normalizado (só
-   * dígitos) pra não depender de como cada visita formatou o campo.
+   * "Login" do site público por nome+CPF — sem senha, só serve pra um cliente que já pediu
+   * antes reencontrar os próprios pedidos depois de fechar o navegador (não tem link de
+   * rastreio salvo). Exige nome E CPF batendo (não só CPF) como uma barreira mínima contra
+   * alguém só adivinhando um CPF. Casa por CPF normalizado (só dígitos) pra não depender de
+   * como cada visita formatou o campo. CPF, e não telefone, porque o telefone do cliente
+   * pode mudar entre visitas e o CPF não (pedido do cliente/dono).
    */
-  async customerLogin(slug: string, name: string, phone: string) {
+  async customerLogin(slug: string, name: string, cpf: string) {
     const tenantId = await resolveActiveTenant(slug);
-    const phoneNormalized = normalizePhone(phone);
+    const cpfNormalized = normalizeCpf(cpf);
     const candidates = await prisma.customer.findMany({
-      where: { restaurantId: tenantId, phoneNormalized },
+      where: { restaurantId: tenantId, cpfNormalized },
       select: { id: true, name: true },
     });
     const nameNormalized = name.trim().toLowerCase();
@@ -102,11 +103,11 @@ export const publicOrderService = {
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
-      // Endereços salvos desse telefone (ver order.service.ts#openPublic) — mais usado/
+      // Endereços salvos desse cliente (ver order.service.ts#openPublic) — mais usado/
       // recente primeiro, pra aparecer no topo da caixa de endereços salvos do site
       // público. Lista vazia quando o cliente nunca pediu entrega (só retirada).
       prisma.customerAddress.findMany({
-        where: { restaurantId: tenantId, phoneNormalized },
+        where: { restaurantId: tenantId, customerId: { in: candidates.map((c) => c.id) } },
         orderBy: { lastUsedAt: 'desc' },
       }),
     ]);

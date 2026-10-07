@@ -28,7 +28,7 @@ export const customerService = {
 
     const anonymized = await prisma.customer.update({
       where: { id },
-      data: { name: 'Cliente removido (LGPD)', phone: null, phoneNormalized: null },
+      data: { name: 'Cliente removido (LGPD)', phone: null, phoneNormalized: null, cpf: null, cpfNormalized: null },
       select: publicSelect,
     });
 

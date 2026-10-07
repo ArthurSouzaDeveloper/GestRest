@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { AdditionalKind } from '@prisma/client';
-import { assertCustomProductBase, computeTotals, itemDisplayName, type OrderWithRelations } from './order.helpers';
+import {
+  assertCustomProductBase,
+  computeTotals,
+  isValidCpf,
+  itemDisplayName,
+  normalizeCpf,
+  normalizeForMatch,
+  type OrderWithRelations,
+} from './order.helpers';
 
 function makeOrder(overrides: Partial<OrderWithRelations> = {}): OrderWithRelations {
   const base = {
@@ -92,6 +100,37 @@ describe('assertCustomProductBase', () => {
     expect(() => assertCustomProductBase(regular, [ADDON, ADDON])).not.toThrow();
     expect(() => assertCustomProductBase(regular, [])).not.toThrow();
     expect(() => assertCustomProductBase(regular, [BASE])).toThrow(/não aceita/);
+  });
+});
+
+describe('isValidCpf / normalizeCpf — identidade do cliente no site público (achado do cliente/dono)', () => {
+  it('aceita um CPF válido (dígitos verificadores corretos), formatado ou não', () => {
+    expect(isValidCpf(normalizeCpf('100.000.148-26'))).toBe(true);
+    expect(isValidCpf('10000014826')).toBe(true);
+  });
+
+  it('rejeita um CPF com dígito verificador errado (erro de digitação)', () => {
+    expect(isValidCpf('10000014827')).toBe(false);
+  });
+
+  it('rejeita CPF com quantidade errada de dígitos', () => {
+    expect(isValidCpf('123')).toBe(false);
+    expect(isValidCpf('123456789012')).toBe(false);
+  });
+
+  it('rejeita os "CPFs" de 11 dígitos repetidos, que passariam no cálculo do dígito verificador', () => {
+    expect(isValidCpf('11111111111')).toBe(false);
+    expect(isValidCpf('00000000000')).toBe(false);
+  });
+});
+
+describe('normalizeForMatch — reconhecimento de endereço tolerante a acento/caixa/espaçamento (achado do cliente/dono)', () => {
+  it('reconhece o mesmo endereço digitado com acento/maiúscula/espaço duplo diferentes', () => {
+    expect(normalizeForMatch('Rua Ana Esperança')).toBe(normalizeForMatch('rua  ana esperanca'));
+  });
+
+  it('ainda distingue ruas realmente diferentes', () => {
+    expect(normalizeForMatch('Rua das Flores')).not.toBe(normalizeForMatch('Rua das Palmeiras'));
   });
 });
 

@@ -1,9 +1,49 @@
 import { AdditionalKind, OrderStatus, Prisma, TableStatus } from '@prisma/client';
 import { AppError } from '../../utils/errors';
 
-/** Só os dígitos de um telefone — pra achar o mesmo cliente independente de como ele formatou. */
+/** Só os dígitos de um telefone — usado só pra exibição/contato, não mais pra identidade do cliente (ver normalizeCpf). */
 export function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '');
+}
+
+/** Só os dígitos de um CPF — é a chave de identidade do cliente no site público agora
+ * (telefone pode mudar, CPF não). */
+export function normalizeCpf(cpf: string): string {
+  return cpf.replace(/\D/g, '');
+}
+
+/**
+ * Valida um CPF pelo algoritmo oficial (dígitos verificadores) — recebe já só os dígitos
+ * (ver normalizeCpf). Rejeita também os "CPFs" de 11 dígitos repetidos (111.111.111-11 etc.),
+ * que passariam no cálculo do dígito verificador mas nunca são CPFs reais emitidos.
+ */
+export function isValidCpf(digits: string): boolean {
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+
+  const checkDigit = (base: string, factorStart: number): number => {
+    let sum = 0;
+    for (let i = 0; i < base.length; i++) sum += Number(base[i]) * (factorStart - i);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  return checkDigit(digits.slice(0, 9), 10) === Number(digits[9]) && checkDigit(digits.slice(0, 10), 11) === Number(digits[10]);
+}
+
+/**
+ * Normaliza texto pra COMPARAÇÃO de endereço (nunca pra exibição) — sem acento, minúsculo,
+ * espaços duplicados colapsados. Sem isso, "Rua Ana Esperança, 138" e "rua ana esperanca 138"
+ * (mesmo endereço, digitado diferente em duas visitas, ou vindo do autocomplete numa vez e
+ * digitado à mão na outra) viravam dois endereços salvos "diferentes" em vez de reconhecidos
+ * como o mesmo — achado do cliente/dono: "melhore o reconhecimento de endereço".
+ */
+export function normalizeForMatch(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**

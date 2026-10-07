@@ -1,6 +1,17 @@
 import { z } from 'zod';
 import { PaymentMethod, Role, Station } from '@prisma/client';
 import { stripHtmlTags } from '../../utils/sanitize';
+import { isValidCpf, normalizeCpf } from '../../application/services/order.helpers';
+
+// Identidade do cliente no site público (ver order.service.ts#openPublic) — valida o
+// dígito verificador de verdade, não só o formato: um CPF com um dígito trocado na hora
+// de digitar não pode virar silenciosamente a identidade de outra pessoa (ou uma conta
+// nova de ninguém) sem ninguém notar o erro de digitação.
+const cpfField = z
+  .string()
+  .min(11)
+  .max(14)
+  .refine((v) => isValidCpf(normalizeCpf(v)), 'CPF inválido');
 
 // Applies to every password being SET (create/update/reset) — not to the login payload,
 // which just needs to accept whatever was set under this rule at the time. 72 is bcrypt's
@@ -238,6 +249,7 @@ export const publicOrderSchema = z
     orderType: z.enum(['DELIVERY', 'PICKUP']),
     customerName: text(z.string().min(2).max(80)),
     customerPhone: z.string().min(8).max(20),
+    customerCpf: cpfField,
     deliveryZoneId: z.string().uuid().optional(),
     // Modo por distância: coordenadas do endereço escolhido no autocomplete (ver
     // AddressAutocomplete) — o back nunca confia num valor de frete vindo do cliente,
@@ -280,11 +292,11 @@ export const publicOrderSchema = z
     },
   );
 
-// Login do site público (nome+telefone) pra reencontrar pedidos depois de fechar o
-// site — mesmas regras de tamanho do publicOrderSchema, já que é o mesmo par de campos.
+// Login do site público (nome+CPF) pra reencontrar pedidos depois de fechar o site —
+// mesmas regras do publicOrderSchema, já que é o mesmo par de campos de identidade.
 export const customerLoginSchema = z
   .object({
     name: text(z.string().min(2).max(80)),
-    phone: z.string().min(8).max(20),
+    cpf: cpfField,
   })
   .strict();

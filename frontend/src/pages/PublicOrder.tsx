@@ -202,10 +202,13 @@ interface SavedAddress {
 interface SavedCustomer {
   name: string;
   phone: string;
+  cpf: string;
 }
 
-/** Identidade salva no navegador (nome+telefone) — só pra reconhecer quem já pediu
- * antes e oferecer "ver meu pedido" sem precisar redigitar. Escopada por restaurante. */
+/** Identidade salva no navegador (nome+CPF, telefone só como contato) — só pra reconhecer
+ * quem já pediu antes e oferecer "ver meu pedido" sem precisar redigitar. CPF, e não
+ * telefone, é a chave de identidade (pedido do cliente/dono: telefone pode mudar, CPF não —
+ * ver order.helpers.ts#normalizeCpf no backend). Escopada por restaurante. */
 function customerStorageKey(slug: string): string {
   return `gr:${slug}:customer`;
 }
@@ -223,6 +226,36 @@ function saveCustomer(slug: string, customer: SavedCustomer): void {
   } catch {
     // localStorage indisponível (modo privado etc.) — não é crítico, só perde a conveniência.
   }
+}
+
+/** Só os dígitos de um CPF (ver order.helpers.ts#normalizeCpf no backend — mesma regra). */
+function normalizeCpf(cpf: string): string {
+  return cpf.replace(/\D/g, '');
+}
+
+/**
+ * Valida o dígito verificador de um CPF (mesmo algoritmo de order.helpers.ts#isValidCpf no
+ * backend) — checado aqui só pra dar feedback imediato antes de mandar o pedido; o back
+ * sempre revalida, essa cópia nunca é a fonte de verdade.
+ */
+function isValidCpf(digits: string): boolean {
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+  const checkDigit = (base: string, factorStart: number): number => {
+    let sum = 0;
+    for (let i = 0; i < base.length; i++) sum += Number(base[i]) * (factorStart - i);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+  return checkDigit(digits.slice(0, 9), 10) === Number(digits[9]) && checkDigit(digits.slice(0, 10), 11) === Number(digits[10]);
+}
+
+/** Aplica a máscara 000.000.000-00 enquanto o cliente digita (só dígitos são guardados por baixo). */
+function formatCpf(value: string): string {
+  const digits = normalizeCpf(value).slice(0, 11);
+  const parts = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9)].filter(Boolean);
+  let out = parts.join('.');
+  if (digits.length > 9) out += `-${digits.slice(9, 11)}`;
+  return out;
 }
 
 const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
@@ -249,6 +282,7 @@ export default function PublicOrder() {
   // precisar redigitar nome/telefone a cada visita.
   const [customerName, setCustomerName] = useState(() => readSavedCustomer(slug)?.name ?? '');
   const [customerPhone, setCustomerPhone] = useState(() => readSavedCustomer(slug)?.phone ?? '');
+  const [customerCpf, setCustomerCpf] = useState(() => readSavedCustomer(slug)?.cpf ?? '');
   // 'picking': mostra a caixa de endereços salvos pro cliente escolher (ou cadastrar um
   // novo); 'saved': um endereço salvo foi escolhido (campos preenchidos, ainda editáveis);
   // 'new': cadastrando um endereço do zero (ou cliente sem nenhum salvo ainda).
@@ -316,24 +350,24 @@ export default function PublicOrder() {
   // cliente escolher um "Centro" errado antes de dizer qual cidade é a dele.
   const zonesForBairro = needsCityFirst ? zones.filter((z) => splitZoneName(z.name).city === deliveryCity) : zones;
 
-  // Pedido explícito do cliente/dono: assim que nome+telefone identificam alguém que já
-  // pediu ENTREGA antes, mostra uma caixa com os endereços salvos pra escolher (ou
-  // cadastrar um novo) — mesma identificação (nome+telefone) já usada em "Já pediu antes?
-  // Ver meus pedidos" (CustomerLoginPanel), aqui disparada sozinha em vez de exigir clique.
+  // Pedido explícito do cliente/dono: assim que nome+CPF identificam alguém que já pediu
+  // ENTREGA antes, mostra uma caixa com os endereços salvos pra escolher (ou cadastrar um
+  // novo) — mesma identificação (nome+CPF) já usada em "Já pediu antes? Ver meus pedidos"
+  // (CustomerLoginPanel), aqui disparada sozinha em vez de exigir clique.
   const addressStillEmpty = !deliveryStreet.trim() && !deliveryNumber.trim();
   const trimmedNameForLookup = customerName.trim();
-  const trimmedPhoneForLookup = customerPhone.trim();
+  const normalizedCpfForLookup = normalizeCpf(customerCpf);
   const { data: savedAddressLookup } = useQuery({
-    queryKey: ['public-saved-addresses', slug, trimmedNameForLookup, trimmedPhoneForLookup],
+    queryKey: ['public-saved-addresses', slug, trimmedNameForLookup, normalizedCpfForLookup],
     queryFn: async () =>
       (
         await api.post<{ addresses: SavedAddress[] }>(`/public/${slug}/customers/login`, {
           name: trimmedNameForLookup,
-          phone: trimmedPhoneForLookup,
+          cpf: normalizedCpfForLookup,
         })
       ).data,
     enabled:
-      !!slug && orderKind === 'DELIVERY' && trimmedNameForLookup.length >= 2 && trimmedPhoneForLookup.length >= 8,
+      !!slug && orderKind === 'DELIVERY' && trimmedNameForLookup.length >= 2 && isValidCpf(normalizedCpfForLookup),
     staleTime: Infinity,
   });
   const savedAddresses = savedAddressLookup?.addresses ?? [];
@@ -405,6 +439,7 @@ export default function PublicOrder() {
     !!orderKind &&
     customerName.trim().length >= 2 &&
     customerPhone.trim().length >= 8 &&
+    isValidCpf(normalizeCpf(customerCpf)) &&
     (orderKind === 'PICKUP' ||
       (distanceMode
         ? deliveryLat !== null && deliveryLng !== null && !!deliveryQuote && !quoteOutOfRange && deliveryNumber.trim()
@@ -430,6 +465,7 @@ export default function PublicOrder() {
         orderType: orderKind,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
+        customerCpf: normalizeCpf(customerCpf),
         ...(orderKind === 'DELIVERY'
           ? {
               ...(distanceMode
@@ -460,9 +496,9 @@ export default function PublicOrder() {
       setConfirmedOrderId(order.id);
       setConfirmedEta(order.estimatedReadyAt);
       setStep('confirmation');
-      // Lembra nome+telefone nesse navegador — é o que deixa o cliente "entrar" de novo na
-      // Capa depois de fechar o site pra ver como o pedido está indo.
-      saveCustomer(slug, { name: customerName.trim(), phone: customerPhone.trim() });
+      // Lembra nome+telefone+CPF nesse navegador — é o que deixa o cliente "entrar" de novo
+      // na Capa depois de fechar o site pra ver como o pedido está indo.
+      saveCustomer(slug, { name: customerName.trim(), phone: customerPhone.trim(), cpf: normalizeCpf(customerCpf) });
     },
     onError: (e) => setSubmitError(apiError(e)),
   });
@@ -578,6 +614,8 @@ export default function PublicOrder() {
             setCustomerName={setCustomerName}
             customerPhone={customerPhone}
             setCustomerPhone={setCustomerPhone}
+            customerCpf={customerCpf}
+            setCustomerCpf={setCustomerCpf}
             distanceMode={distanceMode}
             zones={zonesForBairro}
             zoneCities={zoneCities}
@@ -652,6 +690,7 @@ export default function PublicOrder() {
             orderKind={orderKind}
             customerName={customerName}
             customerPhone={customerPhone}
+            customerCpf={customerCpf}
             deliveryZoneName={deliveryFeeLabel}
             deliveryStreet={deliveryStreet}
             deliveryNumber={deliveryNumber}
@@ -950,24 +989,30 @@ function IntroStep({
 }
 
 /**
- * "Entrar" no site público por nome+telefone — não é autenticação de verdade (sem senha),
- * é só o jeito do cliente reencontrar os próprios pedidos depois de fechar o navegador
- * (sem o link de acompanhamento salvo). Se o navegador já tem uma identidade salva de um
- * pedido anterior, mostra direto "bem-vindo de volta"; senão, oferece o link discreto que
- * abre o formulário.
+ * "Entrar" no site público por nome+CPF — não é autenticação de verdade (sem senha), é só
+ * o jeito do cliente reencontrar os próprios pedidos depois de fechar o navegador (sem o
+ * link de acompanhamento salvo). CPF, e não telefone, porque o telefone pode mudar entre
+ * visitas e o CPF não (pedido do cliente/dono). Se o navegador já tem uma identidade salva
+ * de um pedido anterior, mostra direto "bem-vindo de volta"; senão, oferece o link discreto
+ * que abre o formulário.
  */
 function CustomerLoginPanel({ slug }: { slug: string }) {
   const [saved] = useState(() => readSavedCustomer(slug));
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(saved?.name ?? '');
-  const [phone, setPhone] = useState(saved?.phone ?? '');
+  const [cpf, setCpf] = useState(saved?.cpf ?? '');
   const [result, setResult] = useState<{ name: string | null; orders: CustomerOrderSummary[] } | null>(null);
 
   const login = useMutation({
     mutationFn: async () => {
-      const payload = { name: name.trim(), phone: phone.trim() };
-      const data = (await api.post<{ name: string | null; orders: CustomerOrderSummary[] }>(`/public/${slug}/customers/login`, payload)).data;
-      if (data.name) saveCustomer(slug, payload);
+      const normalizedCpf = normalizeCpf(cpf);
+      const data = (
+        await api.post<{ name: string | null; orders: CustomerOrderSummary[] }>(`/public/${slug}/customers/login`, {
+          name: name.trim(),
+          cpf: normalizedCpf,
+        })
+      ).data;
+      if (data.name) saveCustomer(slug, { name: name.trim(), cpf: normalizedCpf, phone: saved?.phone ?? '' });
       return data;
     },
     onSuccess: setResult,
@@ -1006,14 +1051,15 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
             <input className={FIELD_INPUT} value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" />
             <input
               className={FIELD_INPUT}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(21) 9 9999-9999"
-              inputMode="tel"
+              value={formatCpf(cpf)}
+              onChange={(e) => setCpf(normalizeCpf(e.target.value))}
+              placeholder="CPF: 000.000.000-00"
+              inputMode="numeric"
+              maxLength={14}
             />
             <button
               className="rounded-2xl bg-brand py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
-              disabled={login.isPending || name.trim().length < 2 || phone.trim().length < 8}
+              disabled={login.isPending || name.trim().length < 2 || !isValidCpf(normalizeCpf(cpf))}
               onClick={() => login.mutate()}
             >
               {login.isPending ? 'Buscando...' : 'Entrar'}
@@ -1025,7 +1071,7 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
       {result && (
         <div className="rounded-2xl border border-[#1E1024]/10 bg-white p-3.5">
           {result.name === null ? (
-            <p className="text-[12px] text-red-600">Nenhum pedido encontrado com esse nome e telefone.</p>
+            <p className="text-[12px] text-red-600">Nenhum pedido encontrado com esse nome e CPF.</p>
           ) : result.orders.length === 0 ? (
             <p className="text-[12px] text-[#6B4A78]">Você ainda não tem pedidos por aqui.</p>
           ) : (
@@ -1216,6 +1262,8 @@ function DetailsStep({
   setCustomerName,
   customerPhone,
   setCustomerPhone,
+  customerCpf,
+  setCustomerCpf,
   distanceMode,
   zones,
   zoneCities,
@@ -1254,6 +1302,8 @@ function DetailsStep({
   setCustomerName: (v: string) => void;
   customerPhone: string;
   setCustomerPhone: (v: string) => void;
+  customerCpf: string;
+  setCustomerCpf: (v: string) => void;
   distanceMode: boolean;
   zones: DeliveryZone[];
   zoneCities: string[];
@@ -1329,6 +1379,22 @@ function DetailsStep({
           placeholder="(21) 9 9999-9999"
           inputMode="tel"
         />
+      </div>
+      <div>
+        <label className={FIELD_LABEL}>CPF</label>
+        <input
+          className={FIELD_INPUT}
+          value={formatCpf(customerCpf)}
+          onChange={(e) => setCustomerCpf(normalizeCpf(e.target.value))}
+          placeholder="000.000.000-00"
+          inputMode="numeric"
+          maxLength={14}
+        />
+        {/* Identidade do cliente aqui pra frente (nome+CPF) — telefone fica só como
+            contato, porque pode mudar entre pedidos e o CPF não. */}
+        {normalizeCpf(customerCpf).length === 11 && !isValidCpf(normalizeCpf(customerCpf)) && (
+          <p className="mt-1 text-[11px] text-red-600">CPF inválido — confira os números.</p>
+        )}
       </div>
 
       {orderKind === 'DELIVERY' && addressChoice === 'picking' && (
@@ -1682,6 +1748,7 @@ function ReviewStep({
   orderKind,
   customerName,
   customerPhone,
+  customerCpf,
   deliveryZoneName,
   deliveryStreet,
   deliveryNumber,
@@ -1701,6 +1768,7 @@ function ReviewStep({
   orderKind: OrderKind;
   customerName: string;
   customerPhone: string;
+  customerCpf: string;
   deliveryZoneName?: string;
   deliveryStreet: string;
   deliveryNumber: string;
@@ -1727,6 +1795,7 @@ function ReviewStep({
           {orderKind === 'DELIVERY' ? 'Entrega' : 'Retirada'}
         </h3>
         <div className="text-[12.5px] leading-[1.55] text-[#1E1024]">{customerName} · {customerPhone}</div>
+        <div className="text-[11.5px] text-[#6B4A78]">CPF: {formatCpf(customerCpf)}</div>
         {orderKind === 'DELIVERY' && (
           <>
             <div className="text-[12.5px] leading-[1.55] text-[#1E1024]">

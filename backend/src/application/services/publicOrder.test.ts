@@ -6,11 +6,15 @@ import { orderService } from './order.service';
 import { publicOrderService } from './publicOrder.service';
 
 /**
- * Testes de integração (banco real) pros endereços de entrega salvos por telefone — pedido
+ * Testes de integração (banco real) pros endereços de entrega salvos por cliente — pedido
  * explícito do cliente/dono: quem já pediu entrega vê os endereços de antes (casa,
  * trabalho...) pra escolher no pedido seguinte em vez de redigitar. Ver CustomerAddress no
  * schema, order.service.ts#openPublic (grava/atualiza) e
  * publicOrder.service.ts#customerLogin (devolve a lista).
+ *
+ * Identidade agora é CPF+nome, não mais telefone+nome (achado do cliente/dono: telefone
+ * pode mudar, CPF não) — ver order.helpers.normalizeCpf/isValidCpf e a troca em
+ * order.service.ts#openPublic / publicOrder.service.ts#customerLogin.
  */
 describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', () => {
   let restaurantId: string;
@@ -43,6 +47,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
       orderType: 'DELIVERY',
       customerName: 'Fulano da Silva',
       customerPhone: '19991112222',
+      customerCpf: '10000014826',
       deliveryZoneId: zoneId,
       deliveryStreet: 'Rua das Flores',
       deliveryNumber: '100',
@@ -52,7 +57,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
       items: [{ productId, quantity: 1 }],
     });
 
-    const result = await publicOrderService.customerLogin(slug, 'Fulano da Silva', '19991112222');
+    const result = await publicOrderService.customerLogin(slug, 'Fulano da Silva', '10000014826');
     expect(result.name).toBe('Fulano da Silva');
     expect(result.addresses).toHaveLength(1);
     expect(result.addresses[0]).toMatchObject({
@@ -71,6 +76,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
       orderType: 'DELIVERY',
       customerName: 'Beltrano Souza',
       customerPhone: '19993334444',
+      customerCpf: '10000018570',
       deliveryZoneId: zoneId,
       deliveryStreet: 'Rua de Casa',
       deliveryNumber: '1',
@@ -81,6 +87,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
       orderType: 'DELIVERY',
       customerName: 'Beltrano Souza',
       customerPhone: '19993334444',
+      customerCpf: '10000018570',
       deliveryZoneId: zoneId,
       deliveryStreet: 'Rua do Trabalho',
       deliveryNumber: '2',
@@ -88,7 +95,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
       items: [{ productId, quantity: 1 }],
     });
 
-    const result = await publicOrderService.customerLogin(slug, 'Beltrano Souza', '19993334444');
+    const result = await publicOrderService.customerLogin(slug, 'Beltrano Souza', '10000018570');
     expect(result.addresses).toHaveLength(2);
     // Mais recente primeiro.
     expect(result.addresses[0].street).toBe('Rua do Trabalho');
@@ -100,6 +107,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
       orderType: 'DELIVERY',
       customerName: 'Ciclano Pereira',
       customerPhone: '19997778888',
+      customerCpf: '10000022250',
       deliveryZoneId: zoneId,
       deliveryStreet: 'Rua Repetida',
       deliveryNumber: '5',
@@ -110,6 +118,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
       orderType: 'DELIVERY',
       customerName: 'Ciclano Pereira',
       customerPhone: '19997778888',
+      customerCpf: '10000022250',
       deliveryZoneId: zoneId,
       deliveryStreet: 'Rua Repetida',
       deliveryNumber: '5',
@@ -118,9 +127,77 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
       items: [{ productId, quantity: 1 }],
     });
 
-    const result = await publicOrderService.customerLogin(slug, 'Ciclano Pereira', '19997778888');
+    const result = await publicOrderService.customerLogin(slug, 'Ciclano Pereira', '10000022250');
     expect(result.addresses).toHaveLength(1);
     expect(result.addresses[0].complement).toBe('Casa 2');
+  });
+
+  it('endereço reconhecido como o mesmo mesmo com acento/maiúscula/espaçamento diferente da vez anterior', async () => {
+    await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Ana Esperança',
+      customerPhone: '19990001111',
+      customerCpf: '10000025941',
+      deliveryZoneId: zoneId,
+      deliveryStreet: 'Rua Ana Esperança',
+      deliveryNumber: '138',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId, quantity: 1 }],
+    });
+    // Mesmo endereço, digitado diferente (sem acento, caixa diferente, espaço duplo) —
+    // achado do cliente/dono: "melhore o reconhecimento de endereço". Antes da correção
+    // isso virava uma segunda linha em vez de atualizar a existente.
+    await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Ana Esperança',
+      customerPhone: '19990001111',
+      customerCpf: '10000025941',
+      deliveryZoneId: zoneId,
+      deliveryStreet: 'rua  ana esperanca',
+      deliveryNumber: '138',
+      deliveryComplement: 'Apto 12',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId, quantity: 1 }],
+    });
+
+    const result = await publicOrderService.customerLogin(slug, 'Ana Esperança', '10000025941');
+    expect(result.addresses).toHaveLength(1);
+    expect(result.addresses[0].complement).toBe('Apto 12');
+  });
+
+  it('mesmo cliente é reconhecido pelo CPF mesmo tendo trocado de telefone entre os pedidos', async () => {
+    await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Marcia Trocou Celular',
+      customerPhone: '19980001234',
+      customerCpf: '10000029696',
+      deliveryZoneId: zoneId,
+      deliveryStreet: 'Rua do Celular Antigo',
+      deliveryNumber: '7',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId, quantity: 1 }],
+    });
+    // Telefone diferente do pedido anterior, mesmo CPF+nome — tem que ser reconhecido como
+    // o MESMO cliente (não criar um Customer novo), e o telefone de contato salvo atualiza
+    // pro novo número.
+    await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Marcia Trocou Celular',
+      customerPhone: '19999998765',
+      customerCpf: '10000029696',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId, quantity: 1 }],
+    });
+
+    const result = await publicOrderService.customerLogin(slug, 'Marcia Trocou Celular', '10000029696');
+    // Os dois pedidos aparecem pro mesmo cliente, e o endereço do primeiro pedido continua
+    // reconhecido mesmo com o telefone já tendo trocado.
+    expect(result.orders).toHaveLength(2);
+    expect(result.addresses).toHaveLength(1);
+    expect(result.addresses[0].street).toBe('Rua do Celular Antigo');
+
+    const customer = await prisma.customer.findFirstOrThrow({ where: { restaurantId, cpfNormalized: '10000029696' } });
+    expect(customer.phoneNormalized).toBe('19999998765');
   });
 
   it('cliente que só pediu retirada (nunca entrega) não tem endereço salvo', async () => {
@@ -128,16 +205,17 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
       orderType: 'PICKUP',
       customerName: 'Cliente Retirada',
       customerPhone: '19995556666',
+      customerCpf: '10000033375',
       declaredPaymentMethod: PaymentMethod.CASH,
       items: [{ productId, quantity: 1 }],
     });
 
-    const result = await publicOrderService.customerLogin(slug, 'Cliente Retirada', '19995556666');
+    const result = await publicOrderService.customerLogin(slug, 'Cliente Retirada', '10000033375');
     expect(result.addresses).toEqual([]);
   });
 
-  it('nome que não bate com o telefone não reconhece (e não vaza o endereço de outra pessoa)', async () => {
-    const result = await publicOrderService.customerLogin(slug, 'Nome Errado', '19991112222');
+  it('nome que não bate com o CPF não reconhece (e não vaza o endereço de outra pessoa)', async () => {
+    const result = await publicOrderService.customerLogin(slug, 'Nome Errado', '10000014826');
     expect(result).toEqual({ name: null, orders: [], addresses: [] });
   });
 });

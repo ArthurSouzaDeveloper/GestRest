@@ -41,6 +41,7 @@ describe('aceite automático de pedidos online', () => {
     orderType: 'PICKUP' as const,
     customerName: 'Cliente Teste',
     customerPhone: '11999998888',
+    customerCpf: '10000011134',
     declaredPaymentMethod: PaymentMethod.CASH,
     items: [{ productId: '', quantity: 1 }],
   };
