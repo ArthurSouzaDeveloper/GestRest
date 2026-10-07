@@ -77,3 +77,67 @@ describe('userService.update — barreiras de hierarquia (achado de auditoria)',
     ).rejects.toThrow(/último administrador/);
   });
 });
+
+/**
+ * Mesma classe de achado acima (MANAGER mexendo em ADMIN sem permissão), mas em
+ * create()/remove() — a barreira de hierarquia foi adicionada em update() na correção de
+ * agosto/2026, mas nunca foi copiada pra create()/remove(), deixando as duas rotas abertas
+ * pra um MANAGER criar um ADMIN pra si mesmo e remover o ADMIN de verdade (tomada hostil do
+ * tenant). Achado da auditoria de segurança de outubro/2026.
+ */
+describe('userService.create/remove — barreiras de hierarquia (achado de auditoria de outubro)', () => {
+  let restaurantId: string;
+  let adminId: string;
+  let managerId: string;
+
+  async function freshUsers() {
+    const restaurant = await prisma.restaurant.create({
+      data: { name: 'Teste Hierarquia Create Remove', slug: `teste-hierarquia-cr-${randomUUID()}` },
+    });
+    restaurantId = restaurant.id;
+    const admin = await prisma.user.create({
+      data: { name: 'Admin', email: `admin-cr-${randomUUID()}@teste.local`, passwordHash: 'x', role: Role.ADMIN, restaurantId },
+    });
+    const manager = await prisma.user.create({
+      data: { name: 'Manager', email: `manager-cr-${randomUUID()}@teste.local`, passwordHash: 'x', role: Role.MANAGER, restaurantId },
+    });
+    adminId = admin.id;
+    managerId = manager.id;
+  }
+
+  beforeEach(freshUsers);
+  afterAll(async () => {
+    if (restaurantId) await prisma.restaurant.delete({ where: { id: restaurantId } });
+  });
+
+  it('um MANAGER não consegue criar um ADMIN novo', async () => {
+    await expect(
+      userService.create(
+        restaurantId,
+        { name: 'Invasor', email: `invasor-${randomUUID()}@teste.local`, password: 'Senha1234', role: Role.ADMIN },
+        { userId: managerId, role: Role.MANAGER },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    const created = await prisma.user.findFirst({ where: { restaurantId, role: Role.ADMIN, id: { not: adminId } } });
+    expect(created).toBeNull();
+  });
+
+  it('um ADMIN consegue criar um ADMIN novo normalmente (não é bloqueio geral)', async () => {
+    const created = await userService.create(
+      restaurantId,
+      { name: 'Novo Admin', email: `novo-admin-${randomUUID()}@teste.local`, password: 'Senha1234', role: Role.ADMIN },
+      { userId: adminId, role: Role.ADMIN },
+    );
+    expect(created.role).toBe(Role.ADMIN);
+  });
+
+  it('um MANAGER não consegue remover/desativar um ADMIN existente', async () => {
+    await expect(
+      userService.remove(restaurantId, adminId, { userId: managerId, role: Role.MANAGER }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    const stillThere = await prisma.user.findUniqueOrThrow({ where: { id: adminId } });
+    expect(stillThere.active).toBe(true);
+  });
+});

@@ -35,9 +35,12 @@ userRouter.get('/', asyncHandler(async (req, res) => res.json(await userService.
 userRouter.post(
   '/',
   validateBody(createUserSchema),
-  asyncHandler(async (req, res) =>
-    res.status(201).json(await userService.create(ctx(req).tenantId, req.body, ctx(req))),
-  ),
+  asyncHandler(async (req, res) => {
+    const c = ctx(req);
+    res
+      .status(201)
+      .json(await userService.create(c.tenantId, req.body, { userId: c.userId, role: c.role, ip: c.ip }));
+  }),
 );
 userRouter.patch(
   '/:id',
@@ -51,7 +54,7 @@ userRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
     const c = ctx(req);
-    res.json(await userService.remove(c.tenantId, req.params.id, { userId: c.userId, ip: c.ip }));
+    res.json(await userService.remove(c.tenantId, req.params.id, { userId: c.userId, role: c.role, ip: c.ip }));
   }),
 );
 

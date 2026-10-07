@@ -36,9 +36,17 @@ export const userService = {
   async create(
     tenantId: string,
     data: { name: string; email: string; password: string; role: Role },
-    ctx?: { userId: string; ip?: string },
+    requester: { userId: string; role: Role; ip?: string },
   ) {
     if (!ASSIGNABLE_ROLES.includes(data.role)) throw new ForbiddenError('Perfil inválido');
+
+    // Mesma regra de update(): só um ADMIN cria outro ADMIN — sem isso, um MANAGER
+    // (que também tem acesso a este endpoint) podia criar uma conta ADMIN pra si mesmo
+    // e assumir o tenant inteiro (achado de auditoria de segurança).
+    if (data.role === Role.ADMIN && requester.role !== Role.ADMIN) {
+      throw new ForbiddenError('Só um administrador pode criar outro administrador');
+    }
+
     const exists = await prisma.user.findUnique({ where: { email: data.email } });
     if (exists) throw new ConflictError('E-mail já cadastrado');
 
@@ -55,11 +63,11 @@ export const userService = {
 
     await auditService.record({
       action: AuditAction.USER_CREATED,
-      userId: ctx?.userId,
+      userId: requester.userId,
       restaurantId: tenantId,
       entity: 'User',
       entityId: user.id,
-      ip: ctx?.ip,
+      ip: requester.ip,
     });
     return user;
   },
@@ -142,11 +150,18 @@ export const userService = {
   async remove(
     tenantId: string,
     id: string,
-    requester: { userId: string; ip?: string },
+    requester: { userId: string; role: Role; ip?: string },
   ): Promise<{ deactivated: boolean }> {
     const user = await prisma.user.findFirst({ where: { id, restaurantId: tenantId } });
     if (!user) throw new NotFoundError('Usuário');
     if (id === requester.userId) throw new ForbiddenError('Você não pode remover seu próprio usuário');
+
+    // Mesma regra de update()/create(): só um ADMIN remove outro ADMIN — sem isso, um
+    // MANAGER podia derrubar o admin de verdade depois de criar um pra si (achado de
+    // auditoria de segurança).
+    if (user.role === Role.ADMIN && requester.role !== Role.ADMIN) {
+      throw new ForbiddenError('Só um administrador pode remover outro administrador');
+    }
 
     if (user.role === Role.ADMIN) {
       const otherAdmins = await prisma.user.count({
