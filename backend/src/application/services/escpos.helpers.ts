@@ -91,6 +91,10 @@ export interface TicketInput {
    * presente, logo antes da forma de pagamento. Hoje só a via combinada do motoboy usa
    * isso; pedido explícito do cliente pra ele conferir o valor sem abrir o sistema. */
   orderTotal?: number | null;
+  /** Taxa de entrega — impressa logo ABAIXO do total (só quando orderTotal também está
+   * presente), pedido explícito do cliente/dono: o motoboy confere quanto da cobrança é
+   * frete sem precisar abrir o sistema. null/undefined (ou 0) não imprime nada. */
+  deliveryFee?: number | null;
   /** Aviso em destaque logo abaixo do cabeçalho (ex.: "PEDIDO COM BEBIDA", "PEDIDO
    * TAMBEM TEM: PASTEL") — pra quem só vê ESTA via não esquecer que o pedido tem mais
    * coisa em outra estação/via. null/undefined não imprime nada (pedido comum, sem
@@ -241,6 +245,7 @@ export function renderTicket(input: TicketInput): Buffer {
   // que está sendo cobrado.
   if (input.orderTotal != null) {
     parts.push(line('--------------------------------'), line(`TOTAL DO PEDIDO: ${formatCurrency(input.orderTotal)}`));
+    if (input.deliveryFee) parts.push(line(`TAXA DE ENTREGA: ${formatCurrency(input.deliveryFee)}`));
   }
 
   parts.push(line('--------------------------------'), feedLines(4), PARTIAL_CUT);

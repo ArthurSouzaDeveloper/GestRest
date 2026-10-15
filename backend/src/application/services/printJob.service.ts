@@ -415,6 +415,7 @@ export const printJobService = {
             copyLabel: 'SEGUNDA VIA MOTOBOY',
             crossStationNotice: hasBeverages ? 'PEDIDO COM BEBIDAS' : null,
             orderTotal,
+            deliveryFee: Number(full.deliveryFee),
             itemsSummaryOnly: true,
             items: motoboySummaryItems(kitchenItems, juiceItems),
           }),

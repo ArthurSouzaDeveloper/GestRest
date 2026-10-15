@@ -708,6 +708,9 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
     expect(motoboyJob).toContain('PEDIDO COM BEBIDAS');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 31,00');
+    // Logo abaixo do total — pedido explícito do cliente/dono: motoboy confere quanto do
+    // valor é frete sem abrir o sistema.
+    expect(motoboyJob.indexOf('TAXA DE ENTREGA: R$ 5,00')).toBeGreaterThan(motoboyJob.indexOf('TOTAL DO PEDIDO'));
     expect(motoboyJob).toContain('1- COMIDA');
     expect(motoboyJob).toContain('2- SUCO');
     // Sem o preço/descrição por item que a via de cozinha/suco mostra — só a contagem.
@@ -794,6 +797,8 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 10,00');
     expect(motoboyJob).not.toContain('PEDIDO COM BEBIDAS');
+    // Bairro de taxa 0 — sem linha de taxa de entrega nenhuma (nem "R$ 0,00").
+    expect(motoboyJob).not.toContain('TAXA DE ENTREGA');
   });
 
   it('retirada com pastel E suco: cada via avisa da outra (sem via de motoboy, que é só de entrega)', async () => {
