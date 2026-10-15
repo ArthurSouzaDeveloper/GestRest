@@ -102,6 +102,32 @@ function juiceTypeSummary(categoryName: string): string {
   return name === 'sucos' ? 'SUCO' : 'BEBIDAS PRONTAS';
 }
 
+// 'COMIDA' é o fallback de kitchenTypeSummary pra uma categoria de cozinha que não bate
+// nenhuma das 3 famílias por nome (não deveria acontecer no cardápio real, mas por
+// segurança: nunca pode sumir item de uma via por categoria com nome fora do padrão,
+// mesmo critério defensivo de kitchenTypeSummary/categoryTypeLabel acima). Ordem fixa
+// reaproveitada tanto no resumo do motoboy quanto no aviso cruzado entre papéis de
+// cozinha abaixo.
+const KITCHEN_FAMILY_ORDER = ['PASTEL', 'MINI PIZZA', 'PORCAO', 'COMIDA'];
+
+/**
+ * Aviso cruzado impresso em CADA papel de cozinha (ex.: no papel do Pastel) listando o
+ * que mais o pedido tem — bebida (se houver) e os OUTROS tipos de cozinha presentes no
+ * pedido INTEIRO (Mini Pizza, Porção...), sem repetir o próprio tipo do papel. Antes
+ * disso o aviso era sempre o mesmo texto fixo "PEDIDO COM BEBIDA" em todo papel,
+ * ignorando se o pedido também tinha Mini Pizza/Porção — achado do cliente/dono: quem só
+ * vê o papel do Pastel não sabia que also tinha Porção esperando. null quando não há
+ * nada a avisar (nem bebida, nem outro tipo de cozinha).
+ */
+function kitchenCrossNotice(myType: string, kitchenTypesPresent: Set<string>, hasBeverages: boolean): string | null {
+  const parts: string[] = [];
+  if (hasBeverages) parts.push('BEBIDA');
+  for (const type of KITCHEN_FAMILY_ORDER) {
+    if (type !== myType && kitchenTypesPresent.has(type)) parts.push(type);
+  }
+  return parts.length > 0 ? `PEDIDO COM ${parts.join(', ')}` : null;
+}
+
 /**
  * Via do motoboy reduzida (pedido explícito do cliente/dono): em vez de listar cada
  * sabor/descrição/preço, mostra só 1 linha por família presente no pedido — PASTEL, MINI
@@ -111,10 +137,6 @@ function juiceTypeSummary(categoryName: string): string {
  * item em renderTicket.
  */
 function motoboySummaryItems(kitchenItems: CreatedOrderItem[], juiceItems: CreatedOrderItem[]): TicketItem[] {
-  // 'COMIDA' é o fallback de kitchenTypeSummary pra uma categoria de cozinha que não bate
-  // nenhuma das 3 famílias por nome (não deveria acontecer no cardápio real, mas por
-  // segurança: nunca pode sumir item da via do motoboy por categoria com nome fora do
-  // padrão, mesmo critério defensivo de kitchenTypeSummary/categoryTypeLabel acima).
   const order = ['PASTEL', 'MINI PIZZA', 'PORCAO', 'SUCO', 'BEBIDAS PRONTAS', 'COMIDA'];
   const counts = new Map<string, number>();
   for (const item of kitchenItems) {
@@ -164,7 +186,12 @@ function toTicketItem(item: CreatedOrderItem): TicketItem {
   }
   return {
     name: itemDisplayName(item.product.name, item.comboLabel),
-    typeLabel: categoryTypeLabel(item.product.category.name),
+    // Sem o prefixo "Pastel Salgado"/"Mini Pizza Doce"/etc. (ver categoryTypeLabel, ainda
+    // usado só pelo script diagnose-category-labels.ts) — pedido explícito do cliente/
+    // dono: cada papel da cozinha já sai dedicado a UM tipo de prato (cabeçalho "COZINHA -
+    // PASTEL" etc., ver enqueueForItems), então repetir o tipo em toda linha de sabor só
+    // ocupava espaço à toa.
+    typeLabel: null,
     description: isHouseSuggestion(item.product.category.name) ? null : item.product.description,
     quantity: item.quantity,
     unitPrice: Number(item.unitPrice),
@@ -311,7 +338,12 @@ export const printJobService = {
     // explícito do cliente pra economizar papel (esses dados já saem na via principal).
     // Se não tiver pastel, a via de mini pizza reconhece isso e vira a principal.
     const mainKitchenPriority = kitchenGroups.size > 0 ? Math.min(...kitchenGroups.keys()) : null;
+    // Famílias de cozinha presentes no pedido INTEIRO (não só nesta leva) — usado pelo
+    // aviso cruzado de cada papel abaixo, mesmo raciocínio de hasBeverages/kitchenSummary
+    // (full.items, não `items`/kitchenItems) já explicado ali em cima.
+    const fullKitchenTypesPresent = new Set(fullKitchenItems.map((i) => kitchenTypeSummary(i.product.category.name)));
     for (const [priority, groupItems] of [...kitchenGroups.entries()].sort(([a], [b]) => a - b)) {
+      const myType = kitchenTypeSummary(groupItems[0].product.category.name);
       await tx.printJob.create({
         data: {
           restaurantId: tenantId,
@@ -323,11 +355,14 @@ export const printJobService = {
             // Identifica o tipo no próprio cabeçalho ("COZINHA - PASTEL") — com vários
             // papéis de cozinha por pedido agora, precisa dar pra saber de qual é qual
             // sem ter que ler item por item.
-            headerOverride: `COZINHA - ${kitchenTypeSummary(groupItems[0].product.category.name)}`,
+            headerOverride: `COZINHA - ${myType}`,
             // Linha divisória depois de cada item, em qualquer via — pedido explícito do
             // cliente pra valer pra suco/bebida em geral também, não só comida.
             itemSeparator: true,
-            crossStationNotice: hasBeverages ? 'PEDIDO COM BEBIDA' : null,
+            // Sem preço (pedido explícito do cliente/dono: quem prepara não precisa do
+            // valor, só do sabor/quantidade) — ver hideItemPrice em renderTicket.
+            hideItemPrice: true,
+            crossStationNotice: kitchenCrossNotice(myType, fullKitchenTypesPresent, hasBeverages),
             minimalData: priority !== mainKitchenPriority,
             items: groupItems.map(toTicketItem),
           }),

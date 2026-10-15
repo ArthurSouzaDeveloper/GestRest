@@ -161,19 +161,35 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(miniPizzaPaper).toBeDefined();
     expect(porcaoPaper).toBeDefined();
 
-    expect(pastelPaper).toContain('1- Pastel Salgado - Mussarela');
-    expect(pastelPaper).toContain('1- Pastel Doce - Chocolate');
-    expect(pastelPaper).not.toContain('Mini Pizza');
-    expect(pastelPaper).not.toContain('Porcao');
+    // Sem o prefixo "Pastel Salgado -"/"Pastel Doce -" etc. (achado do cliente/dono: cada
+    // papel já sai dedicado a um tipo, repetir o tipo em toda linha de sabor era
+    // redundante) — só o sabor mesmo, e sem preço (ver hideItemPrice).
+    expect(pastelPaper).toContain('1- Mussarela');
+    expect(pastelPaper).toContain('1- Chocolate');
+    expect(pastelPaper).not.toContain('/ un.');
+    // O aviso cruzado no topo do papel AVISA que o pedido também tem Mini Pizza/Porção
+    // (achado do cliente/dono: antes só avisava de bebida) — mas nenhum SABOR de outro
+    // tipo aparece no corpo do papel.
+    expect(pastelPaper).toContain('PEDIDO COM BEBIDA, MINI PIZZA, PORCAO');
+    expect(pastelPaper).not.toContain('Calabresa');
+    expect(pastelPaper).not.toContain('Banana com Canela');
+    expect(pastelPaper).not.toContain('Batata Frita');
 
-    expect(miniPizzaPaper).toContain('1- Mini Pizza Salgada - Calabresa');
-    expect(miniPizzaPaper).toContain('1- Mini Pizza Doce - Banana com Canela');
-    expect(miniPizzaPaper).not.toContain('Pastel ');
-    expect(miniPizzaPaper).not.toContain('Porcao');
+    expect(miniPizzaPaper).toContain('1- Calabresa');
+    expect(miniPizzaPaper).toContain('1- Banana com Canela');
+    expect(miniPizzaPaper).not.toContain('/ un.');
+    expect(miniPizzaPaper).toContain('PEDIDO COM BEBIDA, PASTEL, PORCAO');
+    expect(miniPizzaPaper).not.toContain('Mussarela');
+    expect(miniPizzaPaper).not.toContain('Chocolate');
+    expect(miniPizzaPaper).not.toContain('Batata Frita');
 
-    expect(porcaoPaper).toContain('1- Porcao - Batata Frita');
-    expect(porcaoPaper).not.toContain('Pastel');
-    expect(porcaoPaper).not.toContain('Mini Pizza');
+    expect(porcaoPaper).toContain('1- Batata Frita');
+    expect(porcaoPaper).not.toContain('/ un.');
+    expect(porcaoPaper).toContain('PEDIDO COM BEBIDA, PASTEL, MINI PIZZA');
+    expect(porcaoPaper).not.toContain('Mussarela');
+    expect(porcaoPaper).not.toContain('Chocolate');
+    expect(porcaoPaper).not.toContain('Calabresa');
+    expect(porcaoPaper).not.toContain('Banana com Canela');
 
     // "Sucos" (categoria do juiceProductId, ver beforeAll) não bate em nenhuma das 3
     // famílias — continua sem prefixo nenhum, como já era antes desta mudança.
@@ -217,8 +233,9 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(kitchenJobs).toHaveLength(1);
     expect(kitchenJobs[0]).toContain('COZINHA - PASTEL');
     expect(kitchenJobs[0]).not.toContain('SUGESTAO DA CASA');
-    expect(kitchenJobs[0]).toContain('1- Pastel Salgado - Mussarela');
+    expect(kitchenJobs[0]).toContain('1- Mussarela');
     expect(kitchenJobs[0]).toContain('1- 2 Queijos');
+    expect(kitchenJobs[0]).not.toContain('/ un.');
   });
 
   it('com pastel no pedido: só a via de Pastel leva nome/telefone/endereço — Mini Pizza e Porção levam só o número do pedido', async () => {
@@ -417,10 +434,16 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).not.toContain('Monte o Seu Pastel');
     expect(text).not.toContain('escolha os ingredientes');
     expect(text).not.toContain('+ Catupiry');
-    // "Monte o Seu" não tem preço próprio (Product.price = 0) — o valor inteiro vem da
-    // base (Frango R$12) + adicional (Catupiry R$2) = R$14, não R$0 (achado de produção:
-    // o ticket saía com "R$ 0,00 / un." pra esses itens).
-    expect(text).toContain('R$ 14,00 / un.');
+    // Papel de cozinha não mostra mais preço nenhum (achado do cliente/dono, Passo 8 —
+    // ver hideItemPrice), então a checagem do valor certo (R$14 = base Frango R$12 +
+    // adicional Catupiry R$2, não R$0 — achado de produção original) sai do ticket e vai
+    // direto no item gravado no banco.
+    expect(text).not.toContain('/ un.');
+    const orderItem = await prisma.orderItem.findFirstOrThrow({ where: { orderId: order!.id } });
+    const additionalsTotal = (
+      await prisma.orderItemAdditional.findMany({ where: { orderItemId: orderItem.id } })
+    ).reduce((sum, a) => sum + Number(a.price), 0);
+    expect(Number(orderItem.unitPrice) + additionalsTotal).toBe(14);
   });
 
   it('"Monte o Seu Pastel" rejeita um sabor-base de OUTRA categoria (achado de auditoria: substituição de preço)', async () => {
@@ -573,7 +596,8 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).toContain('Rua das Laranjeiras, 123 - Apto 4');
     expect(text).toContain('Centro - Americana');
     expect(text).toContain('CEP: 13470-000');
-    expect(text).toContain('R$ 10,00 / un.');
+    // Papel de cozinha não mostra preço (achado do cliente/dono, Passo 8).
+    expect(text).not.toContain('/ un.');
   });
 
   it('só entrega sai em 2 vias (a segunda marcada); retirada e mesa saem em 1 via só', async () => {
