@@ -431,10 +431,10 @@ export function OrderComposer({
                       {qty > 0 && (
                         <button
                           onClick={() => setConfiguring({ product: p, index: draft.findIndex((d) => d.product.id === p.id) })}
-                          className="text-[#C9A9D6] hover:text-brand"
+                          className="-m-1.5 p-1.5 text-[#C9A9D6] hover:text-brand"
                           title="Personalizar"
                         >
-                          <Pencil size={14} />
+                          <Pencil size={20} />
                         </button>
                       )}
                       {qty === 0 ? (
@@ -495,10 +495,10 @@ export function OrderComposer({
                     {qty > 0 && (
                       <button
                         onClick={() => setConfiguring({ product: p, index: draft.findIndex((d) => d.product.id === p.id) })}
-                        className="text-gray-400 hover:text-brand"
+                        className="-m-1.5 p-1.5 text-gray-400 hover:text-brand"
                         title="Personalizar"
                       >
-                        <Pencil size={14} />
+                        <Pencil size={18} />
                       </button>
                     )}
                     {qty === 0 ? (
