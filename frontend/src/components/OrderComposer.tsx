@@ -153,6 +153,25 @@ function categoryDisplayName(name: string): string {
   return name.trim().toLowerCase() === 'bebidas' ? 'Bebidas Alcoólicas' : name;
 }
 
+/**
+ * Categorias de comida (estação COZINHA — pastel, mini pizza, porção) e Açaí/Cupuaçu (que
+ * vivem na aba "Sucos e Bebidas" por estação, mas são comida de copo com adicional de
+ * verdade) — ver addSimple abaixo. Pedido explícito do cliente/dono: sem isso, o cliente
+ * tocava num sabor pra adicionar e o pedido ia pra cozinha sem nenhum adicional, porque
+ * ninguém reparava no lápis "Personalizar". Sucos/Bebidas comuns ficam de fora de
+ * propósito (Sucos já tem seu próprio fluxo guiado; refrigerante/água não tem adicional
+ * nenhum pra oferecer).
+ */
+function categoryWantsAutoConfig(category: Category | undefined): boolean {
+  if (!category) return false;
+  if (category.station === 'KITCHEN') return true;
+  const name = category.name
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+  return name.includes('acai') || name.includes('cupuacu');
+}
+
 /** Product grid + item drafting used by the waiter to build an order. */
 export function OrderComposer({
   draft,
@@ -268,12 +287,20 @@ export function OrderComposer({
     }
     const idx = simpleIndex(product.id);
     if (idx >= 0) {
+      // Já tem uma linha "lisa" desse produto no carrinho (sem adicional/observação) — só
+      // soma quantidade, sem reabrir o modal a cada toque no "+".
       const next = [...draft];
       next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 };
       setDraft(next);
-    } else {
-      setDraft([...draft, { product, quantity: 1, notes: '', additionalIds: [], additionalsTotal: 0 }]);
+      return;
     }
+    // Primeira vez escolhendo esse sabor: comida/açaí/cupuaçu abrem direto a tela de
+    // adicionais, em vez de entrar liso no carrinho — ver categoryWantsAutoConfig.
+    if (categoryWantsAutoConfig(categoriesById.get(product.categoryId))) {
+      setConfiguring({ product, index: null });
+      return;
+    }
+    setDraft([...draft, { product, quantity: 1, notes: '', additionalIds: [], additionalsTotal: 0 }]);
   };
 
   const decSimple = (product: Product) => {
