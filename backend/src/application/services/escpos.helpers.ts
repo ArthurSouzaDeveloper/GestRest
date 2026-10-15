@@ -95,11 +95,12 @@ export interface TicketInput {
    * presente), pedido explícito do cliente/dono: o motoboy confere quanto da cobrança é
    * frete sem precisar abrir o sistema. null/undefined (ou 0) não imprime nada. */
   deliveryFee?: number | null;
-  /** Aviso em destaque logo abaixo do cabeçalho (ex.: "PEDIDO COM BEBIDA", "PEDIDO
-   * TAMBEM TEM: PASTEL") — pra quem só vê ESTA via não esquecer que o pedido tem mais
-   * coisa em outra estação/via. null/undefined não imprime nada (pedido comum, sem
-   * outra estação envolvida). Ver printJob.service.ts. */
-  crossStationNotice?: string | null;
+  /** Linha(s) em destaque logo abaixo do cabeçalho (ex.: "ITENS INCLUSOS: BEBIDA * MINI
+   * PIZZA") — pra quem só vê ESTA via não esquecer que o pedido tem mais coisa em outra
+   * estação/via, ou (na via principal) quais bebidas prontas também saem no pedido. Cada
+   * string do array vira uma linha própria; array vazio/null não imprime nada. Ver
+   * printJob.service.ts. */
+  crossStationNotice?: string[] | null;
   /** true imprime uma linha divisória depois de cada item (nome+descrição+preço+
    * adicionais+obs) — pedido explícito do cliente pra valer em toda via (cozinha, suco/
    * bebida em geral e a via combinada do motoboy), não só comida. */
@@ -184,8 +185,9 @@ export function renderTicket(input: TicketInput): Buffer {
   // o grande do cabeçalho) — a versão anterior tinha um traço grande ANTES e outro
   // DEPOIS do aviso, e por serem largura dupla cada um quebrava em 2 linhas na impressora,
   // gastando papel à toa (pedido do cliente pra economizar).
-  if (input.crossStationNotice) {
-    parts.push(line('--------------------------------'), HEADER_MODE_ON, line(input.crossStationNotice), BODY_MODE_ON);
+  if (input.crossStationNotice && input.crossStationNotice.length > 0) {
+    parts.push(line('--------------------------------'));
+    for (const notice of input.crossStationNotice) parts.push(HEADER_MODE_ON, line(notice), BODY_MODE_ON);
   }
 
   // Tamanho normal do corpo (não o grande do cabeçalho) — pedido do cliente pra

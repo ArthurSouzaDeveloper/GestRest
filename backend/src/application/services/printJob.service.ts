@@ -111,21 +111,26 @@ function juiceTypeSummary(categoryName: string): string {
 const KITCHEN_FAMILY_ORDER = ['PASTEL', 'MINI PIZZA', 'PORCAO', 'COMIDA'];
 
 /**
- * Aviso cruzado impresso em CADA papel de cozinha (ex.: no papel do Pastel) listando o
- * que mais o pedido tem — bebida (se houver) e os OUTROS tipos de cozinha presentes no
- * pedido INTEIRO (Mini Pizza, Porção...), sem repetir o próprio tipo do papel. Antes
- * disso o aviso era sempre o mesmo texto fixo "PEDIDO COM BEBIDA" em todo papel,
- * ignorando se o pedido também tinha Mini Pizza/Porção — achado do cliente/dono: quem só
- * vê o papel do Pastel não sabia que also tinha Porção esperando. null quando não há
- * nada a avisar (nem bebida, nem outro tipo de cozinha).
+ * Aviso cruzado impresso em CADA via (cozinha ou suqueiros) listando o que mais o pedido
+ * tem — as OUTRAS famílias presentes no pedido INTEIRO (Pastel, Mini Pizza, Porção, Suco,
+ * Bebida Pronta), sem repetir a própria família da via (excludeType — null na via dos
+ * suqueiros, que não está no conjunto kitchenTypesPresent de qualquer forma). Formato
+ * "ITENS INCLUSOS: X * Y" (achado do cliente/dono — antes era "PEDIDO COM X, Y", lista
+ * separada por vírgula). null quando não há nada a avisar.
  */
-function kitchenCrossNotice(myType: string, kitchenTypesPresent: Set<string>, hasBeverages: boolean): string | null {
+function kitchenFamiliesNotice(
+  excludeType: string | null,
+  kitchenTypesPresent: Set<string>,
+  hasRealSuco: boolean,
+  hasBebidaPronta: boolean,
+): string | null {
   const parts: string[] = [];
-  if (hasBeverages) parts.push('BEBIDA');
   for (const type of KITCHEN_FAMILY_ORDER) {
-    if (type !== myType && kitchenTypesPresent.has(type)) parts.push(type);
+    if (type !== excludeType && kitchenTypesPresent.has(type)) parts.push(type);
   }
-  return parts.length > 0 ? `PEDIDO COM ${parts.join(', ')}` : null;
+  if (hasRealSuco) parts.push('SUCO');
+  if (hasBebidaPronta) parts.push('BEBIDA PRONTA');
+  return parts.length > 0 ? `ITENS INCLUSOS: ${parts.join(' * ')}` : null;
 }
 
 /**
@@ -278,8 +283,15 @@ export const printJobService = {
     });
     const hasBeverages = full.items.some((i) => i.station === Station.JUICE_BAR);
     const fullKitchenItems = full.items.filter((i) => i.station === Station.KITCHEN);
-    const kitchenSummary = [...new Set(fullKitchenItems.map((i) => kitchenTypeSummary(i.product.category.name)))].join(
-      ', ',
+    // Suco de verdade (feito na hora) vs. bebida pronta (Açaí e Cupuaçu, Bebidas/água/
+    // refrigerante — sem preparo) — achado do cliente/dono: bebida pronta deixa de ser um
+    // item normal da via dos suqueiros (ver juiceTypeSummary) e passa a só ser MENCIONADA
+    // por nome na via principal do pedido (ver abaixo), nunca numa via de produção própria.
+    const fullHasRealSuco = full.items.some(
+      (i) => i.station === Station.JUICE_BAR && juiceTypeSummary(i.product.category.name) === 'SUCO',
+    );
+    const fullHasBebidaPronta = full.items.some(
+      (i) => i.station === Station.JUICE_BAR && juiceTypeSummary(i.product.category.name) !== 'SUCO',
     );
 
     let orderTotal: number | null = null;
@@ -317,6 +329,13 @@ export const printJobService = {
       (a, b) => kitchenSortPriority(a.product.category.name) - kitchenSortPriority(b.product.category.name),
     );
     const juiceItems = byStation.get(Station.JUICE_BAR) ?? [];
+    // Suco de verdade (vai pro corpo da via dos suqueiros, like sempre) vs. bebida pronta
+    // (sai do corpo — acha do cliente/dono — e só é mencionada por nome na via principal,
+    // ver abaixo). Nomes únicos (sem repetir "Coca-Cola" duas vezes se vieram em itens
+    // separados).
+    const realSucoItems = juiceItems.filter((i) => juiceTypeSummary(i.product.category.name) === 'SUCO');
+    const bebidaProntaItems = juiceItems.filter((i) => juiceTypeSummary(i.product.category.name) !== 'SUCO');
+    const bebidaProntaNames = [...new Set(bebidaProntaItems.map((i) => i.product.name))];
 
     // Cozinha: 1 papel por TIPO de prato presente no pedido (Pastel, Mini Pizza, Porção,
     // Sugestão da Casa), não mais 1 papel só com tudo junto — pedido explícito do cliente
@@ -332,18 +351,32 @@ export const printJobService = {
       group.push(item);
       kitchenGroups.set(priority, group);
     }
-    // A via de menor prioridade presente (Pastel se houver; senão Mini Pizza; senão
-    // Porção) é a "principal" do pedido e carrega nome/telefone/endereço/forma de
-    // pagamento/horário completos — as demais mostram só o número do pedido, pedido
-    // explícito do cliente pra economizar papel (esses dados já saem na via principal).
-    // Se não tiver pastel, a via de mini pizza reconhece isso e vira a principal.
-    const mainKitchenPriority = kitchenGroups.size > 0 ? Math.min(...kitchenGroups.keys()) : null;
+    // A via de menor prioridade presente entre TODAS as famílias do pedido (Pastel > Mini
+    // Pizza > Porção > Suco, nessa ordem — pedido explícito do cliente/dono) é a
+    // "principal" e carrega nome/telefone/endereço/forma de pagamento/horário completos —
+    // as demais (inclusive a via dos suqueiros, quando a cozinha também participa do
+    // pedido) mostram só o número do pedido, pra economizar papel (os dados já saem na
+    // via principal). SUCOS_PRIORITY é sempre maior que qualquer prioridade de cozinha
+    // (0-3), então só vence quando a cozinha não participa do pedido — ex.: pedido só de
+    // suco, ou só de bebida pronta sem suco nenhum.
+    const SUCOS_PRIORITY = 4;
+    const presentPriorities = [...kitchenGroups.keys()];
+    if (juiceItems.length > 0) presentPriorities.push(SUCOS_PRIORITY);
+    const mainPriority = presentPriorities.length > 0 ? Math.min(...presentPriorities) : null;
     // Famílias de cozinha presentes no pedido INTEIRO (não só nesta leva) — usado pelo
-    // aviso cruzado de cada papel abaixo, mesmo raciocínio de hasBeverages/kitchenSummary
+    // aviso cruzado de cada papel abaixo, mesmo raciocínio de hasBeverages/fullHasRealSuco
     // (full.items, não `items`/kitchenItems) já explicado ali em cima.
     const fullKitchenTypesPresent = new Set(fullKitchenItems.map((i) => kitchenTypeSummary(i.product.category.name)));
+    // Bebida pronta só é mencionada por nome na via principal, e só quando NÃO é entrega —
+    // numa entrega essa menção mora exclusivamente na via do motoboy (que já lista a
+    // contagem de "BEBIDAS PRONTAS" no corpo dela, ver motoboySummaryItems), pedido
+    // explícito do cliente/dono.
+    const showBebidaProntaNamesOnMainPaper = order.orderType !== 'DELIVERY' && bebidaProntaNames.length > 0;
     for (const [priority, groupItems] of [...kitchenGroups.entries()].sort(([a], [b]) => a - b)) {
       const myType = kitchenTypeSummary(groupItems[0].product.category.name);
+      const isMain = priority === mainPriority;
+      const notices = [kitchenFamiliesNotice(myType, fullKitchenTypesPresent, fullHasRealSuco, fullHasBebidaPronta)];
+      if (isMain && showBebidaProntaNamesOnMainPaper) notices.push(`BEBIDA PRONTA: ${bebidaProntaNames.join(' * ')}`);
       await tx.printJob.create({
         data: {
           restaurantId: tenantId,
@@ -362,17 +395,21 @@ export const printJobService = {
             // Sem preço (pedido explícito do cliente/dono: quem prepara não precisa do
             // valor, só do sabor/quantidade) — ver hideItemPrice em renderTicket.
             hideItemPrice: true,
-            crossStationNotice: kitchenCrossNotice(myType, fullKitchenTypesPresent, hasBeverages),
-            minimalData: priority !== mainKitchenPriority,
+            crossStationNotice: notices.filter((n): n is string => n != null),
+            minimalData: !isMain,
             items: groupItems.map(toTicketItem),
           }),
         },
       });
     }
 
-    // Suqueiros: via única com tudo que a estação prepara (sem a divisão por tipo da
-    // cozinha acima — o cliente só pediu a separação por papel pra cozinha).
+    // Suqueiros: via única com os sucos de verdade que a estação prepara (sem a divisão
+    // por tipo da cozinha acima — o cliente só pediu a separação por papel pra cozinha);
+    // bebida pronta não entra no corpo (ver realSucoItems/bebidaProntaItems acima).
     if (juiceItems.length > 0) {
+      const isMain = mainPriority === SUCOS_PRIORITY;
+      const notices = [kitchenFamiliesNotice(null, fullKitchenTypesPresent, false, false)];
+      if (isMain && showBebidaProntaNamesOnMainPaper) notices.push(`BEBIDA PRONTA: ${bebidaProntaNames.join(' * ')}`);
       await tx.printJob.create({
         data: {
           restaurantId: tenantId,
@@ -382,8 +419,9 @@ export const printJobService = {
             ...commonTicketFields,
             station: Station.JUICE_BAR,
             itemSeparator: true,
-            crossStationNotice: fullKitchenItems.length > 0 ? `PEDIDO TAMBEM TEM: ${kitchenSummary}` : null,
-            items: juiceItems.map(toTicketItem),
+            crossStationNotice: notices.filter((n): n is string => n != null),
+            minimalData: !isMain,
+            items: realSucoItems.map(toTicketItem),
           }),
         },
       });
@@ -413,7 +451,7 @@ export const printJobService = {
             // tracejado + "SEGUNDA VIA MOTOBOY" em tamanho normal.
             headerOverride: '',
             copyLabel: 'SEGUNDA VIA MOTOBOY',
-            crossStationNotice: hasBeverages ? 'PEDIDO COM BEBIDAS' : null,
+            crossStationNotice: hasBeverages ? ['ITENS INCLUSOS: BEBIDA'] : null,
             orderTotal,
             deliveryFee: Number(full.deliveryFee),
             itemsSummaryOnly: true,

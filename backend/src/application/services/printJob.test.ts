@@ -167,10 +167,12 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(pastelPaper).toContain('1- Mussarela');
     expect(pastelPaper).toContain('1- Chocolate');
     expect(pastelPaper).not.toContain('/ un.');
-    // O aviso cruzado no topo do papel AVISA que o pedido também tem Mini Pizza/Porção
-    // (achado do cliente/dono: antes só avisava de bebida) — mas nenhum SABOR de outro
-    // tipo aparece no corpo do papel.
-    expect(pastelPaper).toContain('PEDIDO COM BEBIDA, MINI PIZZA, PORCAO');
+    // O aviso cruzado no topo do papel AVISA que o pedido também tem Mini Pizza/Porção/
+    // Suco (achado do cliente/dono: formato "ITENS INCLUSOS: X * Y", separado por
+    // asterisco, no lugar do antigo "PEDIDO COM X, Y") — mas nenhum SABOR de outro tipo
+    // aparece no corpo do papel. Suco de verdade (categoria "Sucos" exata) entra como
+    // "SUCO", não o genérico "BEBIDA" de antes.
+    expect(pastelPaper).toContain('ITENS INCLUSOS: MINI PIZZA * PORCAO * SUCO');
     expect(pastelPaper).not.toContain('Calabresa');
     expect(pastelPaper).not.toContain('Banana com Canela');
     expect(pastelPaper).not.toContain('Batata Frita');
@@ -178,14 +180,14 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(miniPizzaPaper).toContain('1- Calabresa');
     expect(miniPizzaPaper).toContain('1- Banana com Canela');
     expect(miniPizzaPaper).not.toContain('/ un.');
-    expect(miniPizzaPaper).toContain('PEDIDO COM BEBIDA, PASTEL, PORCAO');
+    expect(miniPizzaPaper).toContain('ITENS INCLUSOS: PASTEL * PORCAO * SUCO');
     expect(miniPizzaPaper).not.toContain('Mussarela');
     expect(miniPizzaPaper).not.toContain('Chocolate');
     expect(miniPizzaPaper).not.toContain('Batata Frita');
 
     expect(porcaoPaper).toContain('1- Batata Frita');
     expect(porcaoPaper).not.toContain('/ un.');
-    expect(porcaoPaper).toContain('PEDIDO COM BEBIDA, PASTEL, MINI PIZZA');
+    expect(porcaoPaper).toContain('ITENS INCLUSOS: PASTEL * MINI PIZZA * SUCO');
     expect(porcaoPaper).not.toContain('Mussarela');
     expect(porcaoPaper).not.toContain('Chocolate');
     expect(porcaoPaper).not.toContain('Calabresa');
@@ -685,8 +687,10 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(kitchenJob).not.toContain('PEDIDO COM BEBIDAS');
     expect(kitchenJob).not.toContain('TOTAL DO PEDIDO');
     // Pedido também tem suco (via do suqueiros) — avisa quem só vê a via da cozinha, pra
-    // não esquecer de buscar o resto do pedido (pedido explícito do cliente).
-    expect(kitchenJob).toContain('PEDIDO COM BEBIDA');
+    // não esquecer de buscar o resto do pedido (pedido explícito do cliente). Formato novo
+    // "ITENS INCLUSOS: X" — suco de verdade (categoria "Sucos" exata) vira "SUCO", não o
+    // genérico "BEBIDA" de antes.
+    expect(kitchenJob).toContain('ITENS INCLUSOS: SUCO');
 
     expect(juiceJob).toContain('SUQUEIROS');
     expect(juiceJob).toContain('2- Suco');
@@ -696,7 +700,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(juiceJob).not.toContain('TOTAL DO PEDIDO');
     // Mesmo aviso na direção contrária — categoria de teste é "Cozinha" (genérica, ver
     // beforeAll), então cai no fallback "COMIDA" (não bate pastel/mini pizza/porção).
-    expect(juiceJob).toContain('PEDIDO TAMBEM TEM: COMIDA');
+    expect(juiceJob).toContain('ITENS INCLUSOS: COMIDA');
 
     // A via do motoboy não estampa "COZINHA" nem "SUQUEIROS" no topo (reúne as duas), nem
     // um cabeçalho grande próprio (removido a pedido do cliente pra economizar papel) —
@@ -706,7 +710,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     // serviço em online). Categoria de cozinha do fixture é "Cozinha" (genérica, sem bater
     // pastel/mini pizza/porção por nome) — cai no fallback "COMIDA" (ver motoboySummaryItems).
     expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
-    expect(motoboyJob).toContain('PEDIDO COM BEBIDAS');
+    expect(motoboyJob).toContain('ITENS INCLUSOS: BEBIDA');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 31,00');
     // Logo abaixo do total — pedido explícito do cliente/dono: motoboy confere quanto do
     // valor é frete sem abrir o sistema.
@@ -833,8 +837,123 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const kitchenJob = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
     const juiceJob = jobs.find((j) => j.station === Station.JUICE_BAR)!.payload.toString('ascii');
 
-    expect(kitchenJob).toContain('PEDIDO COM BEBIDA');
-    expect(juiceJob).toContain('PEDIDO TAMBEM TEM: PASTEL');
+    expect(kitchenJob).toContain('ITENS INCLUSOS: SUCO');
+    expect(juiceJob).toContain('ITENS INCLUSOS: PASTEL');
+
+    // Passo 3 (achado do cliente/dono): com pastel E suco no mesmo pedido, só a via
+    // principal (Pastel, maior prioridade — PASTEL > MINI PIZZA > PORÇÃO > SUCOS) leva
+    // nome/telefone do cliente; a via dos suqueiros vira resumida (só o número do pedido),
+    // mesmo sendo a única via de suco. Generaliza a regra que já existia só entre papéis
+    // de cozinha pra incluir suco também.
+    expect(kitchenJob).toContain('Cliente Retirada Mista');
+    expect(kitchenJob).toContain('Tel: 11999990008');
+    expect(juiceJob).not.toContain('Cliente Retirada Mista');
+    expect(juiceJob).not.toContain('Tel:');
+  });
+
+  it('pedido só de suco (sem cozinha nenhuma): a via dos suqueiros vira a principal e leva os dados completos do cliente', async () => {
+    // Passo 3 (achado do cliente/dono): "endereço e dados do cliente só constar na via dos
+    // suqueiros se o pedido tiver apenas suco" — sem nenhum item de cozinha no pedido, a
+    // via dos suqueiros é a única via de produção e vira a principal.
+    const zone = await prisma.deliveryZone.create({ data: { name: 'Zona Só Suco', fee: 0, restaurantId } });
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Só Suco',
+      customerPhone: '11999990012',
+      customerCpf: '10000003700',
+      declaredPaymentMethod: PaymentMethod.PIX,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua Só Suco',
+      deliveryNumber: '1',
+      items: [{ productId: juiceProductId, quantity: 1 }],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const juiceJob = (
+      await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id, station: Station.JUICE_BAR } })
+    ).payload.toString('ascii');
+    // toAscii() tira acento pro ticket (compatibilidade da impressora) — "Só" vira "So".
+    expect(juiceJob).toContain('Cliente So Suco');
+    expect(juiceJob).toContain('Tel: 11999990012');
+    expect(juiceJob).toContain('Rua So Suco, 1');
+  });
+
+  it('Passo 8: bebida pronta sai do corpo da via dos suqueiros e só é mencionada por nome na via principal (retirada)', async () => {
+    const pasteis = await prisma.category.create({
+      data: { name: 'Pastéis Salgados Bebida Pronta', station: Station.KITCHEN, restaurantId },
+    });
+    const bebidas = await prisma.category.create({ data: { name: 'Bebidas Prontas Teste', station: Station.JUICE_BAR, restaurantId } });
+    const pastel = await prisma.product.create({ data: { name: 'Calabresa', price: 12, categoryId: pasteis.id, restaurantId } });
+    const cerveja = await prisma.product.create({ data: { name: 'Cerveja Long Neck', price: 9, categoryId: bebidas.id, restaurantId } });
+
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente Bebida Pronta',
+      customerPhone: '11999990013',
+      customerCpf: '10000007455',
+      declaredPaymentMethod: PaymentMethod.PIX,
+      items: [
+        { productId: pastel.id, quantity: 1 },
+        { productId: juiceProductId, quantity: 1 }, // Suco de verdade
+        { productId: cerveja.id, quantity: 2 }, // Bebida pronta
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    const kitchenJob = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
+    const juiceJob = jobs.find((j) => j.station === Station.JUICE_BAR)!.payload.toString('ascii');
+
+    // Via principal (Pastel, maior prioridade) menciona a bebida pronta por nome.
+    expect(kitchenJob).toContain('BEBIDA PRONTA: Cerveja Long Neck');
+    expect(kitchenJob).toContain('ITENS INCLUSOS: SUCO * BEBIDA PRONTA');
+
+    // Via dos suqueiros continua com o suco de verdade no corpo, mas SEM a cerveja — ela
+    // não é mais um item normal dessa via (achado do cliente/dono, Passo 8).
+    expect(juiceJob).toContain('1- Suco');
+    expect(juiceJob).not.toContain('Cerveja');
+    // E não é a via principal aqui (Pastel é) — sem a menção de bebida pronta nela.
+    expect(juiceJob).not.toContain('BEBIDA PRONTA:');
+  });
+
+  it('Passo 8: numa ENTREGA, bebida pronta só é mencionada na via do motoboy, nunca nos papéis de produção', async () => {
+    const pasteis = await prisma.category.create({
+      data: { name: 'Pastéis Salgados Bebida Entrega', station: Station.KITCHEN, restaurantId },
+    });
+    const bebidas = await prisma.category.create({ data: { name: 'Bebidas Prontas Entrega', station: Station.JUICE_BAR, restaurantId } });
+    const pastel = await prisma.product.create({ data: { name: 'Calabresa', price: 12, categoryId: pasteis.id, restaurantId } });
+    const refrigerante = await prisma.product.create({ data: { name: 'Coca-Cola Lata', price: 7, categoryId: bebidas.id, restaurantId } });
+
+    const zone = await prisma.deliveryZone.create({ data: { name: 'Zona Bebida Entrega', fee: 0, restaurantId } });
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Bebida Entrega',
+      customerPhone: '11999990014',
+      customerCpf: '10000011134',
+      declaredPaymentMethod: PaymentMethod.PIX,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua Bebida Entrega',
+      deliveryNumber: '1',
+      items: [
+        { productId: pastel.id, quantity: 1 },
+        { productId: refrigerante.id, quantity: 1 },
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    const kitchenJob = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
+    const motoboyJob = jobs.find((j) => j.payload.toString('ascii').includes('SEGUNDA VIA MOTOBOY'))!.payload.toString('ascii');
+
+    // Nada de "Coca-Cola" nem "BEBIDA PRONTA:" no papel de cozinha — numa entrega essa
+    // menção mora só na via do motoboy (achado do cliente/dono).
+    expect(kitchenJob).not.toContain('Coca-Cola');
+    expect(kitchenJob).not.toContain('BEBIDA PRONTA:');
+    // A via do motoboy já lista a contagem no corpo dela (Passo 7, sem mudança aqui).
+    expect(motoboyJob).toContain('1- BEBIDAS PRONTAS');
   });
 
   it('verifyAgentKey() só valida a chave certa do tenant certo', async () => {

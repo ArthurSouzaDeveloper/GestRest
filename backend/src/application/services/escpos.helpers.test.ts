@@ -421,15 +421,15 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      crossStationNotice: 'PEDIDO COM BEBIDAS',
+      crossStationNotice: ['ITENS INCLUSOS: BEBIDA'],
       items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
-    expect(comAviso).toContain('PEDIDO COM BEBIDAS');
+    expect(comAviso).toContain('ITENS INCLUSOS: BEBIDA');
     // Logo abaixo do cabeçalho — antes de qualquer outra informação do pedido.
-    expect(comAviso.indexOf('PEDIDO COM BEBIDAS')).toBeLessThan(comAviso.indexOf('PEDIDO #1'));
+    expect(comAviso.indexOf('ITENS INCLUSOS: BEBIDA')).toBeLessThan(comAviso.indexOf('PEDIDO #1'));
 
     // Texto livre — usado também pras vias de cozinha/suco avisando da OUTRA estação
-    // (ver printJob.service.ts), não só "PEDIDO COM BEBIDAS" da via do motoboy.
+    // (ver printJob.service.ts), não só a via do motoboy.
     const outroTexto = renderTicket({
       station: Station.JUICE_BAR,
       tableNumber: null,
@@ -439,10 +439,29 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      crossStationNotice: 'PEDIDO TAMBEM TEM: PASTEL, PORCAO',
+      crossStationNotice: ['ITENS INCLUSOS: PASTEL * PORCAO'],
       items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
-    expect(outroTexto).toContain('PEDIDO TAMBEM TEM: PASTEL, PORCAO');
+    expect(outroTexto).toContain('ITENS INCLUSOS: PASTEL * PORCAO');
+
+    // Mais de uma linha (ex.: aviso de família + menção de bebida pronta na via principal,
+    // ver printJob.service.ts#enqueueForItems) — cada string do array vira uma linha
+    // própria, nessa ordem.
+    const duasLinhas = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.PICKUP,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      crossStationNotice: ['ITENS INCLUSOS: SUCO * BEBIDA PRONTA', 'BEBIDA PRONTA: Cerveja Long Neck'],
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    }).toString('ascii');
+    expect(duasLinhas).toContain('ITENS INCLUSOS: SUCO * BEBIDA PRONTA');
+    expect(duasLinhas).toContain('BEBIDA PRONTA: Cerveja Long Neck');
+    expect(duasLinhas.indexOf('ITENS INCLUSOS')).toBeLessThan(duasLinhas.indexOf('BEBIDA PRONTA: Cerveja'));
   });
 
   it('orderTotal imprime "TOTAL DO PEDIDO" abaixo do último item (não junto dos dados do cliente no topo); ausente, não imprime nada', () => {
