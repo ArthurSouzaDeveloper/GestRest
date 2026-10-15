@@ -11,6 +11,12 @@ const HEADER_MODE_ON = Buffer.from([ESC, 0x21, 0x38]);
 // do cliente pra aumentar a fonte de tudo, mas sem perder o destaque do prato acima, que
 // continua maior por ter largura dupla também).
 const BODY_MODE_ON = Buffer.from([ESC, 0x21, 0x18]);
+// Tamanho normal (sem negrito, sem altura/largura dupla) — só pro traço separador ENTRE
+// itens (ver itemSeparator), pedido explícito do cliente/dono pra economizar papel: o
+// traço em si não precisa ser lido de longe como o nome do prato, só separar visualmente
+// um item do próximo. O texto de verdade (nome, descrição, preço) continua do mesmo
+// tamanho de sempre — só o espaço ocupado pelo traço fica menor.
+const NORMAL_MODE_ON = Buffer.from([ESC, 0x21, 0x00]);
 const feedLines = (n: number) => Buffer.from([ESC, 0x64, n]);
 const PARTIAL_CUT = Buffer.from([GS, 0x56, 0x01]);
 
@@ -239,7 +245,7 @@ export function renderTicket(input: TicketInput): Buffer {
     if (!input.hideItemPrice) parts.push(line(`  ${formatCurrency(item.unitPrice)} / un.`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
-    if (input.itemSeparator) parts.push(line('----------------------------'));
+    if (input.itemSeparator) parts.push(NORMAL_MODE_ON, line('----------------------------'), BODY_MODE_ON);
   }
 
   // Abaixo do ÚLTIMO item, não mais junto dos dados do cliente no topo — pedido explícito

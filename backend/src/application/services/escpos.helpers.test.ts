@@ -536,9 +536,36 @@ describe('renderTicket', () => {
       ],
     }).toString('ascii');
     // Uma linha por item (2 itens = 2 separadores), cada um depois de tudo daquele item.
-    expect(comSeparador.split('\n').filter((l) => l === itemSeparatorLine)).toHaveLength(2);
+    // Prefixo \x1b!\x00 (não === itemSeparatorLine puro) porque a troca pro tamanho
+    // normal (ESC ! 0x00, ver teste de bytes abaixo) vira um prefixo de bytes de controle
+    // colado na mesma linha, antes do traço em si — e precisa ser EXATO (não endsWith),
+    // senão a moldura do ticket (linha de 32 traços) também bateria, já que contém 28
+    // traços seguidos no final dela.
+    const prefixedItemSeparatorLine = '\x1b!\x00' + itemSeparatorLine;
+    expect(comSeparador.split('\n').filter((l) => l === prefixedItemSeparatorLine)).toHaveLength(2);
     const separatorAfterObs = comSeparador.indexOf('obs: sem cebola');
     const separatorLine = comSeparador.indexOf(itemSeparatorLine, separatorAfterObs);
     expect(separatorLine).toBeGreaterThan(separatorAfterObs);
+
+    // O traço em si sai em tamanho NORMAL (ESC ! 0x00), não no tamanho dobrado do resto do
+    // corpo — pedido explícito do cliente/dono pra economizar papel sem diminuir a fonte
+    // do texto de verdade (nome/descrição/preço). Volta pro tamanho de corpo (ESC ! 0x18)
+    // logo depois, pro próximo item continuar grande.
+    const comSeparadorBytes = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DINE_IN,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      itemSeparator: true,
+      items: [{ name: 'Carne', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    });
+    const normalModeBeforeDash = Buffer.from([0x1b, 0x21, 0x00, ...Buffer.from('-'.repeat(28), 'ascii')]);
+    const bodyModeAfterDash = Buffer.from([...Buffer.from('-'.repeat(28), 'ascii'), 0x0a, 0x1b, 0x21, 0x18]);
+    expect(comSeparadorBytes.includes(normalModeBeforeDash)).toBe(true);
+    expect(comSeparadorBytes.includes(bodyModeAfterDash)).toBe(true);
   });
 });
