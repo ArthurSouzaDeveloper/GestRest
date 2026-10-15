@@ -1,15 +1,15 @@
 /**
  * Desfaz a categoria "Frapês" (criada por reorder-categories-add-frapes-rei-do-suco.ts) —
  * pedido do cliente/dono: a aba separada confundia, os 3 sabores devem aparecer dentro de
- * "Sucos" como sabor avulso ("Sabores especiais" no site público — ver
- * JuiceBuilder.tsx#groupByFruit, que já trata produtos sem o padrão "Fruta (Base)" assim).
+ * "Sucos" igual qualquer fruta — fruta + base, só que com uma única base disponível
+ * ("Frapê"), em vez de preço fixo direto. Ver JuiceBuilder.tsx#groupByFruit: um produto
+ * nomeado "Fruta (Base)" entra no fluxo normal de "escolha a fruta -> escolha a base";
+ * com uma base só, a Etapa 2 mostra um único botão "Frapê" pra tocar.
  *
- * Renomeia ao mover (tira o prefixo/sufixo "Frapê"):
- *   Frapê Doce de Leite              -> Doce de Leite
- *   Frappuccino (frapê de cappuccino) -> Cappuccino
- *   Frapê de Ovomaltine              -> Ovomaltine
- * O novo nome "Cappuccino" (sem parênteses) é proposital: um nome com "Algo (Algo)" seria
- * lido pelo JuiceBuilder como fruta+base de um combo de verdade, não como sabor avulso.
+ * Renomeia ao mover (vira "Fruta (Frapê)" — mesmo padrão do importador de sucos):
+ *   Frapê Doce de Leite              -> Doce de Leite (Frapê)
+ *   Frappuccino (frapê de cappuccino) -> Cappuccino (Frapê)
+ *   Frapê de Ovomaltine              -> Ovomaltine (Frapê)
  *
  * No fim, apaga a categoria "Frapês" (fica vazia depois da mudança acima).
  *
@@ -33,9 +33,9 @@ function parseArgs(argv: string[]): Record<string, string> {
 }
 
 const RENAME: Record<string, string> = {
-  'Frapê Doce de Leite': 'Doce de Leite',
-  'Frappuccino (frapê de cappuccino)': 'Cappuccino',
-  'Frapê de Ovomaltine': 'Ovomaltine',
+  'Frapê Doce de Leite': 'Doce de Leite (Frapê)',
+  'Frappuccino (frapê de cappuccino)': 'Cappuccino (Frapê)',
+  'Frapê de Ovomaltine': 'Ovomaltine (Frapê)',
 };
 
 async function main() {
@@ -67,7 +67,8 @@ async function main() {
 
   const products = await prisma.product.findMany({ where: { restaurantId: rid, categoryId: frapes.id } });
   for (const p of products) {
-    const newName = RENAME[p.name] ?? p.name.replace(/^Frapê (?:de )?/i, '').replace(/\s*\(frapê[^)]*\)\s*$/i, '').trim();
+    const cleaned = p.name.replace(/^Frapê (?:de )?/i, '').replace(/\s*\(frapê[^)]*\)\s*$/i, '').trim();
+    const newName = RENAME[p.name] ?? `${cleaned} (Frapê)`;
     await prisma.product.update({ where: { id: p.id }, data: { categoryId: sucos.id, name: newName } });
     console.log(`Movido: "${p.name}" -> Sucos, como "${newName}".`);
   }
