@@ -176,6 +176,11 @@ model Restaurant {
   // cai num distintivo com as iniciais do nome.
   brandColor String?
   logoUrl    String?
+  // Foto(s) do cardápio físico, pra "Só quero ver o cardápio" no site público oferecer o
+  // download direto em vez de só a navegação interativa (pedido do cliente/dono) — ver
+  // branding.service.ts#updateMenuPhotos. Array vazio = nenhuma foto configurada ainda
+  // (nesse caso o site cai de volta no comportamento antigo, navegação interativa só).
+  menuPhotoUrls String[] @default([])
 
   // Aceite automático de pedidos online (delivery/retirada): quando true, o pedido já
   // nasce aberto (OPEN) em vez de aguardar aceite manual (PENDING) — ver

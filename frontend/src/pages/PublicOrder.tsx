@@ -173,6 +173,9 @@ interface PublicRestaurant {
   deliveryPricingMode: 'ZONE' | 'DISTANCE_BANDS';
   brandColor: string | null;
   logoUrl: string | null;
+  /** Foto(s) do cardápio físico (ver branding.service.ts/set-menu-photos-*.ts) — array
+   * vazio quando o restaurante ainda não tem nenhuma configurada. */
+  menuPhotoUrls: string[];
 }
 
 interface CustomerOrderSummary {
@@ -569,6 +572,7 @@ export default function PublicOrder() {
           slug={slug}
           restaurantName={restaurant.name}
           logoUrl={restaurant.logoUrl}
+          menuPhotoUrls={restaurant.menuPhotoUrls}
           onPick={(kind) => {
             if (kind === 'MENU') {
               setOrderKind(null);
@@ -862,14 +866,21 @@ function IntroStep({
   slug,
   restaurantName,
   logoUrl,
+  menuPhotoUrls,
   onPick,
 }: {
   slug: string;
   restaurantName: string;
   logoUrl: string | null;
+  menuPhotoUrls: string[];
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
   const [kind, setKind] = useState<OrderKind>('DELIVERY');
+  // Pedido explícito do cliente/dono: "Só quero ver o cardápio" dá acesso à foto de
+  // verdade do cardápio físico (com botão de baixar), em vez de só a navegação
+  // interativa. Sem nenhuma foto configurada ainda pro restaurante (menuPhotoUrls vazio),
+  // cai de volta no comportamento antigo (direto pro cardápio interativo).
+  const [showMenuPhotos, setShowMenuPhotos] = useState(false);
 
   const { data: eta } = useQuery({
     queryKey: ['public-eta', slug, kind],
@@ -945,13 +956,46 @@ function IntroStep({
             </button>
             <button
               className="mt-4 w-full text-center text-[14px] font-bold text-[#1E1024] underline underline-offset-2"
-              onClick={() => onPick('MENU')}
+              onClick={() => (menuPhotoUrls.length > 0 ? setShowMenuPhotos(true) : onPick('MENU'))}
             >
               Só quero ver o cardápio
             </button>
           </div>
         </div>
       </div>
+
+      {showMenuPhotos && (
+        <div className="fixed inset-0 z-[70] flex flex-col bg-black/70 p-4" onClick={() => setShowMenuPhotos(false)}>
+          <div
+            className="mx-auto flex w-full max-w-lg flex-1 flex-col overflow-hidden rounded-[28px] bg-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#1E1024]/10 px-5 py-4">
+              <h2 className="text-[16px] font-extrabold text-[#1E1024]">Cardápio</h2>
+              <button
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1E1024]/5 text-[#1E1024]"
+                onClick={() => setShowMenuPhotos(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {menuPhotoUrls.map((url, i) => (
+                <div key={url} className="space-y-2">
+                  <img src={url} alt={`Cardápio — página ${i + 1}`} className="w-full rounded-2xl border border-[#1E1024]/10" />
+                  <a
+                    href={url}
+                    download
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-[13.5px] font-bold text-white"
+                  >
+                    Baixar página {i + 1}
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mx-auto mt-auto flex w-full max-w-md flex-col items-center gap-2.5 pb-6 pt-8 lg:max-w-5xl">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">

@@ -173,6 +173,7 @@ export const superadminService = {
         deliveryPricingMode: true,
         brandColor: true,
         logoUrl: true,
+        menuPhotoUrls: true,
       },
     });
     if (!r) throw new NotFoundError('Restaurante');
