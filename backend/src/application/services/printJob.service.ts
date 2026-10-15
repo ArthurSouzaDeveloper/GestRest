@@ -86,6 +86,56 @@ function kitchenTypeSummary(categoryName: string): string {
   return 'COMIDA';
 }
 
+/**
+ * Mesmo critério de família usado acima, mas pro lado dos suqueiros: "Sucos" (feito na
+ * hora, fruta+base) vira SUCO; qualquer outra categoria da estação (Açaí e Cupuaçu,
+ * Bebidas/água/refrigerante...) vira BEBIDAS PRONTAS — pedido explícito do cliente/dono
+ * pra via resumida do motoboy (ver motoboySummaryItems). Nome exato "Sucos" (não um
+ * includes solto) porque "Açaí e Cupuaçu" não deve cair aqui por engano.
+ */
+function juiceTypeSummary(categoryName: string): string {
+  const name = categoryName
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+  return name === 'sucos' ? 'SUCO' : 'BEBIDAS PRONTAS';
+}
+
+/**
+ * Via do motoboy reduzida (pedido explícito do cliente/dono): em vez de listar cada
+ * sabor/descrição/preço, mostra só 1 linha por família presente no pedido — PASTEL, MINI
+ * PIZZA, PORCAO, SUCO, BEBIDAS PRONTAS, nessa ordem — com a quantidade total de cada uma.
+ * Família ausente no pedido não aparece (sem linha "0-"). Usada com
+ * TicketInput.itemsSummaryOnly, que suprime descrição/preço/adicionais/observação por
+ * item em renderTicket.
+ */
+function motoboySummaryItems(kitchenItems: CreatedOrderItem[], juiceItems: CreatedOrderItem[]): TicketItem[] {
+  // 'COMIDA' é o fallback de kitchenTypeSummary pra uma categoria de cozinha que não bate
+  // nenhuma das 3 famílias por nome (não deveria acontecer no cardápio real, mas por
+  // segurança: nunca pode sumir item da via do motoboy por categoria com nome fora do
+  // padrão, mesmo critério defensivo de kitchenTypeSummary/categoryTypeLabel acima).
+  const order = ['PASTEL', 'MINI PIZZA', 'PORCAO', 'SUCO', 'BEBIDAS PRONTAS', 'COMIDA'];
+  const counts = new Map<string, number>();
+  for (const item of kitchenItems) {
+    const key = kitchenTypeSummary(item.product.category.name);
+    counts.set(key, (counts.get(key) ?? 0) + item.quantity);
+  }
+  for (const item of juiceItems) {
+    const key = juiceTypeSummary(item.product.category.name);
+    counts.set(key, (counts.get(key) ?? 0) + item.quantity);
+  }
+  return order
+    .filter((key) => (counts.get(key) ?? 0) > 0)
+    .map((key) => ({
+      name: key,
+      quantity: counts.get(key)!,
+      description: null,
+      unitPrice: 0,
+      additionals: [],
+    }));
+}
+
 /** Um item de pedido -> item de ticket, com as mesmas regras de conteúdo em qualquer
  * ticket que o item apareça (via normal por estação, ou a via combinada do motoboy
  * abaixo) — extraído pra não duplicar (e arriscar desalinhar) essa lógica nos dois
@@ -330,8 +380,8 @@ export const printJobService = {
             copyLabel: 'SEGUNDA VIA MOTOBOY',
             crossStationNotice: hasBeverages ? 'PEDIDO COM BEBIDAS' : null,
             orderTotal,
-            itemSeparator: true,
-            items: [...kitchenItems, ...juiceItems].map(toTicketItem),
+            itemsSummaryOnly: true,
+            items: motoboySummaryItems(kitchenItems, juiceItems),
           }),
         },
       });

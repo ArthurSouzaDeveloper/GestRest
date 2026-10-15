@@ -106,6 +106,13 @@ export interface TicketInput {
    * impressos na via principal (pastel). Ver printJob.service.ts: só é true pra um grupo
    * de cozinha que NÃO é o de menor prioridade presente no pedido. */
   minimalData?: boolean;
+  /** true imprime só "QUANTIDADE- NOME" de cada item (sem descrição/preço/adicionais/
+   * observação nem linha divisória entre eles) — pedido explícito do cliente pra via do
+   * motoboy: ele só precisa saber SE tem pastel/mini pizza/porção/suco/bebida pronta e
+   * QUANTAS unidades de cada, não o sabor de cada uma (quem empacotou já conferiu isso
+   * nas vias de produção). Ver printJob.service.ts, onde os `items` passados nesse modo já
+   * vêm como contagem por família, não os itens reais do pedido. */
+  itemsSummaryOnly?: boolean;
 }
 
 /**
@@ -216,6 +223,7 @@ export function renderTicket(input: TicketInput): Buffer {
     const label = item.typeLabel ? `${item.typeLabel} - ${item.name}` : item.name;
     // "1-" em vez de "1x" — pedido explícito do cliente, em toda categoria e toda via.
     parts.push(HEADER_MODE_ON, line(`${item.quantity}- ${label}`), BODY_MODE_ON);
+    if (input.itemsSummaryOnly) continue;
     if (item.description) parts.push(line(`  ${item.description}`));
     parts.push(line(`  ${formatCurrency(item.unitPrice)} / un.`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));

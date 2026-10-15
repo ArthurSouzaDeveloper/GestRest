@@ -676,15 +676,74 @@ describe('fila de impressão térmica (PrintJob)', () => {
 
     // A via do motoboy não estampa "COZINHA" nem "SUQUEIROS" no topo (reúne as duas), nem
     // um cabeçalho grande próprio (removido a pedido do cliente pra economizar papel) —
-    // traz TODOS os itens do pedido juntos numa via só, avisa que tem bebida e mostra o
-    // total (10 do pastel + 2×8 dos sucos + 5 de taxa de entrega, sem serviço em online).
+    // traz só a CONTAGEM por família (achado do cliente/dono: a via estava detalhada
+    // demais, o motoboy só precisa saber se tem e quantos de cada tipo), avisa que tem
+    // bebida e mostra o total (10 do pastel + 2×8 dos sucos + 5 de taxa de entrega, sem
+    // serviço em online). Categoria de cozinha do fixture é "Cozinha" (genérica, sem bater
+    // pastel/mini pizza/porção por nome) — cai no fallback "COMIDA" (ver motoboySummaryItems).
     expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
     expect(motoboyJob).toContain('PEDIDO COM BEBIDAS');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 31,00');
-    expect(motoboyJob).toContain('1- Pastel');
-    expect(motoboyJob).toContain('2- Suco');
+    expect(motoboyJob).toContain('1- COMIDA');
+    expect(motoboyJob).toContain('2- SUCO');
+    // Sem o preço/descrição por item que a via de cozinha/suco mostra — só a contagem.
+    expect(motoboyJob).not.toContain('R$ 10,00 / un.');
+    expect(motoboyJob).not.toContain('R$ 8,00 / un.');
     expect(motoboyJob).not.toContain('COZINHA');
     expect(motoboyJob).not.toContain('SUQUEIROS');
+  });
+
+  it('via do motoboy agrupa por família (Pastel, Mini Pizza, Porção, Suco, Bebidas Prontas) com a quantidade de cada, achado do cliente/dono', async () => {
+    const pasteis = await prisma.category.create({
+      data: { name: 'Pastéis Salgados Motoboy', station: Station.KITCHEN, restaurantId },
+    });
+    const miniPizza = await prisma.category.create({
+      data: { name: 'Mini Pizza Salgada Motoboy', station: Station.KITCHEN, restaurantId },
+    });
+    const porcoes = await prisma.category.create({ data: { name: 'Porções Motoboy', station: Station.KITCHEN, restaurantId } });
+    const acai = await prisma.category.create({ data: { name: 'Açaí e Cupuaçu Motoboy', station: Station.JUICE_BAR, restaurantId } });
+
+    const pastel = await prisma.product.create({ data: { name: 'Calabresa', price: 14, categoryId: pasteis.id, restaurantId } });
+    const pastel2 = await prisma.product.create({ data: { name: 'Frango', price: 14, categoryId: pasteis.id, restaurantId } });
+    const pizza = await prisma.product.create({ data: { name: 'Marguerita', price: 16, categoryId: miniPizza.id, restaurantId } });
+    const porcao = await prisma.product.create({ data: { name: 'Batata Frita', price: 20, categoryId: porcoes.id, restaurantId } });
+    const acaiProduto = await prisma.product.create({ data: { name: 'Açaí 500ml', price: 19, categoryId: acai.id, restaurantId } });
+
+    const zone = await prisma.deliveryZone.create({ data: { name: 'Zona Resumo Motoboy', fee: 0, restaurantId } });
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Resumo',
+      customerPhone: '11999990009',
+      customerCpf: '10000029696',
+      declaredPaymentMethod: PaymentMethod.PIX,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua Resumo',
+      deliveryNumber: '1',
+      items: [
+        { productId: pastel.id, quantity: 2 },
+        { productId: pastel2.id, quantity: 1 }, // soma com o de cima: 3 na família PASTEL
+        { productId: pizza.id, quantity: 1 },
+        { productId: porcao.id, quantity: 1 },
+        { productId: juiceProductId, quantity: 2 }, // Suco
+        { productId: acaiProduto.id, quantity: 1 }, // Bebidas Prontas (não é "Sucos")
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const motoboyJob = (
+      await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } })
+    ).payload.toString('ascii');
+    expect(motoboyJob).toContain('3- PASTEL');
+    expect(motoboyJob).toContain('1- MINI PIZZA');
+    expect(motoboyJob).toContain('1- PORCAO');
+    expect(motoboyJob).toContain('2- SUCO');
+    expect(motoboyJob).toContain('1- BEBIDAS PRONTAS');
+    // Nenhum nome de sabor/produto real aparece — só a contagem por família.
+    expect(motoboyJob).not.toContain('Calabresa');
+    expect(motoboyJob).not.toContain('Frango');
+    expect(motoboyJob).not.toContain('Marguerita');
+    expect(motoboyJob).not.toContain('Açaí 500ml');
   });
 
   it('entrega só com item de cozinha (sem bebida) não mostra o aviso de bebidas na via do motoboy', async () => {
