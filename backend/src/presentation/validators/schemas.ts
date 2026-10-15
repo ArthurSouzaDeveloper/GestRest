@@ -260,7 +260,9 @@ export const publicOrderSchema = z
     deliveryNumber: text(z.string().min(1).max(20)).optional(),
     deliveryCep: z.string().max(12).optional(),
     deliveryComplement: text(z.string().max(200)).optional(),
-    declaredPaymentMethod: z.enum(['PIX', 'CASH', 'CREDIT', 'DEBIT']),
+    // Sem PIX (tirado do site público a pedido do cliente/dono) — continua existindo pro
+    // caixa interno (Cashier.tsx), que tem o próprio schema de pagamento presencial.
+    declaredPaymentMethod: z.enum(['CASH', 'CREDIT', 'DEBIT']),
     changeFor: z.number().positive().optional(),
     notes: text(z.string().max(300)).optional(),
     // Honeypot: campo invisível pro cliente real; bot que preenche todo input do form cai
