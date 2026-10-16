@@ -458,7 +458,7 @@ export default function PublicOrder() {
   const canContinuePayment =
     !!paymentMethod && (!paymentNeedsChange || !wantsChange || (changeFor !== '' && Number(changeFor) >= total));
 
-  // Quem clicou em "Só quero ver o cardápio" na Capa pula a escolha de Entrega/Retirada —
+  // Quem clicou em "Ver cardápio" na Capa pula a escolha de Entrega/Retirada —
   // se tentar avançar pro Carrinho/Pagamento/Revisão sem isso definido, manda de volta pra
   // Dados pra escolher (sem isso, a Revisão ficava em branco e dava pra finalizar sem endereço).
   useEffect(() => {
@@ -876,7 +876,7 @@ function IntroStep({
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
   const [kind, setKind] = useState<OrderKind>('DELIVERY');
-  // Pedido explícito do cliente/dono: "Só quero ver o cardápio" dá acesso à foto de
+  // Pedido explícito do cliente/dono: "Ver cardápio" dá acesso à foto de
   // verdade do cardápio físico (com botão de baixar), em vez de só a navegação
   // interativa. Sem nenhuma foto configurada ainda pro restaurante (menuPhotoUrls vazio),
   // cai de volta no comportamento antigo (direto pro cardápio interativo).
@@ -958,7 +958,7 @@ function IntroStep({
               className="mt-4 w-full text-center text-[14px] font-bold text-[#1E1024] underline underline-offset-2"
               onClick={() => (menuPhotoUrls.length > 0 ? setShowMenuPhotos(true) : onPick('MENU'))}
             >
-              Só quero ver o cardápio
+              Ver cardápio
             </button>
           </div>
         </div>
