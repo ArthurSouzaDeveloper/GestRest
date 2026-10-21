@@ -15,11 +15,13 @@ import {
 } from '../../application/services/deliveryPricing.service';
 import { etaSettingsService } from '../../application/services/eta.service';
 import { autoAcceptService } from '../../application/services/autoAccept.service';
+import { autoDeliverPickupService } from '../../application/services/autoDeliverPickup.service';
 import { printerSettingsService } from '../../application/services/printerSettings.service';
 import {
   additionalSchema,
   additionalUpdateSchema,
   autoAcceptSchema,
+  autoDeliverPickupSchema,
   categorySchema,
   categoryUpdateSchema,
   deliveryDistanceBandSchema,
@@ -242,6 +244,20 @@ router.patch(
   admin,
   validateBody(autoAcceptSchema),
   asyncHandler(async (req, res) => res.json(await autoAcceptService.update(tid(req), req.body))),
+);
+
+// ── Entrega automática de RETIRADA — fecha sozinho (mesmo efeito de "Marcar Entregue") um
+// pedido de retirada que ficou "Pronto" por N minutos sem a equipe clicar. Restrito a
+// ADMIN, mesmo critério das outras configurações operacionais. Nunca se aplica a DELIVERY. ──
+router.get(
+  '/auto-deliver-pickup',
+  asyncHandler(async (req, res) => res.json(await autoDeliverPickupService.get(tid(req)))),
+);
+router.patch(
+  '/auto-deliver-pickup',
+  admin,
+  validateBody(autoDeliverPickupSchema),
+  asyncHandler(async (req, res) => res.json(await autoDeliverPickupService.update(tid(req), req.body))),
 );
 
 // ── Impressora térmica (ponte local) — configuração de conexão, geração da chave de

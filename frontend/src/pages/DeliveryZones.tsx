@@ -5,7 +5,14 @@ import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
-import type { DeliveryDistanceBand, DeliveryPricingMode, DeliveryPricingSettings, DeliveryZone, EtaSettings } from '../types';
+import type {
+  AutoDeliverPickupSettings,
+  DeliveryDistanceBand,
+  DeliveryPricingMode,
+  DeliveryPricingSettings,
+  DeliveryZone,
+  EtaSettings,
+} from '../types';
 
 export default function DeliveryZones() {
   // A aba visitada é um estado local, separado do modo de fato ativo (settings.mode) —
@@ -31,6 +38,7 @@ export default function DeliveryZones() {
       />
 
       <EtaSettingsCard />
+      <AutoDeliverPickupCard />
 
       <div className="mb-6 flex gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
         <button
@@ -171,6 +179,100 @@ function EtaSettingsCard() {
                   onChange={(e) => setDeliveryMinutes(e.target.value)}
                 />
               </div>
+            </div>
+          )}
+
+          {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end">
+            <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>
+              Salvar
+            </button>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Entrega automática de RETIRADA — quando ligada, um pedido de retirada que fica "Pronto"
+ * e passa N minutos sem a equipe clicar em "Marcar Entregue" é fechado sozinho (mesmo
+ * efeito desse clique). Nunca se aplica a entrega (delivery), só a retirada. Escrita
+ * restrita a ADMIN (ver catalog.routes.ts), mesmo critério do tempo estimado.
+ */
+function AutoDeliverPickupCard() {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('ADMIN');
+  const qc = useQueryClient();
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['auto-deliver-pickup'],
+    queryFn: async () => (await api.get<AutoDeliverPickupSettings>('/catalog/auto-deliver-pickup')).data,
+  });
+
+  const [enabled, setEnabled] = useState(false);
+  const [minutes, setMinutes] = useState('15');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!settings) return;
+    setEnabled(settings.minutes !== null);
+    if (settings.minutes !== null) setMinutes(String(settings.minutes));
+  }, [settings]);
+
+  const save = useMutation({
+    mutationFn: async () => api.patch('/catalog/auto-deliver-pickup', { minutes: enabled ? Number(minutes) : null }),
+    onSuccess: () => {
+      setError('');
+      qc.invalidateQueries({ queryKey: ['auto-deliver-pickup'] });
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+
+  if (isLoading || !settings) return null;
+
+  return (
+    <Card className="mb-6">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Entrega automática de retirada</h3>
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+            settings.minutes !== null ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+          }`}
+        >
+          {settings.minutes !== null ? `Ligado — ${settings.minutes} min` : 'Desligado'}
+        </span>
+      </div>
+
+      {!isAdmin ? (
+        <p className="text-sm text-gray-500">
+          {settings.minutes !== null
+            ? `Um pedido de retirada "Pronto" é marcado como entregue sozinho depois de ${settings.minutes} min sem clique. Só administradores podem alterar.`
+            : 'Desligado: a equipe precisa clicar em "Marcar Entregue" pra cada retirada. Só administradores podem alterar.'}
+        </p>
+      ) : (
+        <>
+          <p className="mb-3 text-sm text-gray-500">
+            Pedido de retirada que fica "Pronto" é marcado como entregue sozinho depois do tempo abaixo, sem
+            precisar clicar em "Marcar Entregue". Nunca se aplica a entrega (delivery) — lá o clique continua
+            manual, porque também confirma que o motoboy saiu com o pedido.
+          </p>
+          <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+            Ativar entrega automática de retirada
+          </label>
+
+          {enabled && (
+            <div className="mb-3 max-w-[200px]">
+              <label className="label">Minutos parado em "Pronto"</label>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                max={120}
+                value={minutes}
+                onChange={(e) => setMinutes(e.target.value)}
+              />
             </div>
           )}
 

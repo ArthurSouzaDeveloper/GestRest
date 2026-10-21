@@ -212,6 +212,11 @@ export interface EtaSettings {
   deliveryMinutes: number | null;
 }
 
+/** null = desligado; N = fecha sozinho uma retirada "Pronto" depois de N minutos sem clique. */
+export interface AutoDeliverPickupSettings {
+  minutes: number | null;
+}
+
 export interface ProductionTicket {
   id: string;
   orderId: string;

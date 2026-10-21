@@ -125,7 +125,18 @@ async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = p
     status = allDone ? OrderStatus.READY_FOR_PAYMENT : OrderStatus.IN_PRODUCTION;
   }
 
-  await tx.order.update({ where: { id: orderId }, data: { status } });
+  // readyAt marca quando o pedido ENTROU em READY_FOR_PAYMENT (pra entrega automática de
+  // retirada contar o tempo parado "Pronto" — ver autoDeliverPickup.service.ts). Só carimba
+  // na transição (não re-stampa se já estava pronto) e zera se sair desse estado (ex.: item
+  // novo adicionado depois de tudo pronto empurra de volta pra IN_PRODUCTION).
+  const data: Prisma.OrderUpdateInput = { status };
+  if (status === OrderStatus.READY_FOR_PAYMENT) {
+    if (order.status !== OrderStatus.READY_FOR_PAYMENT) data.readyAt = new Date();
+  } else if (order.readyAt) {
+    data.readyAt = null;
+  }
+
+  await tx.order.update({ where: { id: orderId }, data });
   // Pedido online (delivery/retirada) não tem mesa — nada a sincronizar nesse caso.
   if (order.tableId) await syncTableStatus(order.tableId, tx);
 }

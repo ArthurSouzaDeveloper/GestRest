@@ -4,6 +4,17 @@ import { env } from './config/env';
 import { logger } from './config/logger';
 import { connectDatabase, disconnectDatabase } from './config/prisma';
 import { initSocket } from './socket';
+import { autoDeliverPickupService } from './application/services/autoDeliverPickup.service';
+
+// Varredura da entrega automática de retirada (ver autoDeliverPickup.service.ts) — roda só
+// aqui no processo de verdade, nunca em teste (vitest sobe createApp() direto, sem passar
+// por bootstrap()). Intervalo curto o bastante pra não atrasar a experiência do cliente,
+// mas sem sobrecarregar o banco — a query em si é barata (poucos tenants com a flag ligada).
+const AUTO_DELIVER_PICKUP_SWEEP_INTERVAL_MS = 60_000;
+
+function runAutoDeliverPickupSweep(): void {
+  autoDeliverPickupService.sweep().catch((err) => logger.error('auto_deliver_pickup_sweep_failed', { error: err }));
+}
 
 async function bootstrap(): Promise<void> {
   await connectDatabase();
@@ -18,8 +29,12 @@ async function bootstrap(): Promise<void> {
     if (!env.isProd) logger.info(`API docs at http://localhost:${env.port}/api/docs`);
   });
 
+  runAutoDeliverPickupSweep();
+  const sweepInterval = setInterval(runAutoDeliverPickupSweep, AUTO_DELIVER_PICKUP_SWEEP_INTERVAL_MS);
+
   const shutdown = async (signal: string) => {
     logger.info(`${signal} received, shutting down...`);
+    clearInterval(sweepInterval);
     server.close();
     await disconnectDatabase();
     process.exit(0);

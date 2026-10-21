@@ -189,6 +189,14 @@ model Restaurant {
   // estimado, EtaMode acima).
   autoAcceptOnlineOrders Boolean @default(false)
 
+  // Entrega automática de RETIRADA: quando preenchido (minutos > 0), um pedido de retirada
+  // que fica "Pronto" (READY_FOR_PAYMENT) e passa esse tempo sem a equipe clicar em "Marcar
+  // Entregue" é fechado sozinho (mesmo efeito de paymentService.deliverOnline) — ver
+  // autoDeliverPickup.service.ts. null = desligado (comportamento de sempre, clique manual).
+  // Nunca se aplica a DELIVERY (ali o clique também confirma que o motoboy saiu com o
+  // pedido, não dá pra assumir isso sozinho) nem DINE_IN (fora desse fluxo online).
+  autoDeliverPickupMinutes Int?
+
   // Impressora térmica de rede (ESC/POS via TCP) usada pra imprimir os tickets de
   // produção — uma só, compartilhada entre Cozinha e Suqueiros (o ticket indica a
   // estação no cabeçalho). Nulo = impressão automática desligada pra esse restaurante
@@ -480,6 +488,11 @@ model Order {
   changeFor             Decimal?       @db.Decimal(10, 2) // "troco pra quanto", se Dinheiro
   acceptedAt            DateTime? // quando a equipe aceitou um pedido online (PENDING -> OPEN)
   estimatedReadyAt      DateTime? // previsão travada no momento da confirmação, calculada por eta.service a partir da fila
+  // Timestamp de quando o pedido entrou em READY_FOR_PAYMENT pela última vez (ver
+  // order.service.ts#syncOrderStatus) — usado pelo sweep de entrega automática de retirada
+  // (autoDeliverPickup.service.ts) pra saber há quanto tempo está pronto. Zera se o pedido
+  // sair de READY_FOR_PAYMENT (ex.: item novo adicionado depois de tudo pronto).
+  readyAt               DateTime?
 
   openedAt  DateTime  @default(now())
   closedAt  DateTime?

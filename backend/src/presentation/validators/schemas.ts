@@ -166,6 +166,9 @@ export const deliveryPricingSettingsSchema = z
 // que sabe o que já está salvo.
 export const autoAcceptSchema = z.object({ enabled: z.boolean() }).strict();
 
+// null desliga; 1–120 minutos parado em "Pronto" antes de fechar sozinho uma retirada.
+export const autoDeliverPickupSchema = z.object({ minutes: z.number().int().min(1).max(120).nullable() }).strict();
+
 export const printerSettingsSchema = z
   .object({
     printerHost: z.string().min(1).max(255),
