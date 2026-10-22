@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { OrderStatus, PaymentMethod, Role } from '@prisma/client';
+import { OrderStatus, PaymentMethod, ProductionStatus, Role, Station } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { ConflictError } from '../../utils/errors';
 import { paymentService } from './payment.service';
@@ -82,5 +82,70 @@ describe('concorrência — pagamento e edição de pedido', () => {
 
     const finalOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     expect(finalOrder.version).toBe(1);
+  });
+});
+
+/**
+ * Cozinha/Suqueiros marcam todos os itens de um bloco de uma vez (Promise.all em
+ * ProductionBoard.tsx). Sem o lock da linha do pedido em syncOrderStatus(), cada transação
+ * recalculava o status sem enxergar o item marcado pela outra, e o pedido ficava preso em
+ * IN_PRODUCTION com todos os itens DONE.
+ */
+describe('concorrência — marcar vários itens como prontos ao mesmo tempo', () => {
+  let restaurantId: string;
+  let userId: string;
+  let productId: string;
+
+  beforeAll(async () => {
+    const restaurant = await prisma.restaurant.create({
+      data: { name: 'Teste Itens Simultâneos', slug: `teste-itens-${randomUUID()}` },
+    });
+    restaurantId = restaurant.id;
+    const user = await prisma.user.create({
+      data: {
+        name: 'Cozinheiro Teste',
+        email: `cozinha-${randomUUID()}@teste.local`,
+        passwordHash: 'x',
+        role: Role.COOK,
+        restaurantId,
+      },
+    });
+    userId = user.id;
+    const category = await prisma.category.create({
+      data: { name: 'Categoria', station: Station.KITCHEN, restaurantId },
+    });
+    productId = (
+      await prisma.product.create({ data: { name: 'Pastel', price: 10, categoryId: category.id, restaurantId } })
+    ).id;
+  });
+
+  afterAll(async () => {
+    await prisma.auditLog.deleteMany({ where: { restaurantId } });
+    await prisma.orderItem.deleteMany({ where: { order: { restaurantId } } });
+    await prisma.order.deleteMany({ where: { restaurantId } });
+    await prisma.user.deleteMany({ where: { restaurantId } });
+    await prisma.restaurant.delete({ where: { id: restaurantId } });
+  });
+
+  it('todos os itens DONE em paralelo: o pedido termina READY_FOR_PAYMENT', async () => {
+    for (let round = 0; round < 5; round++) {
+      const order = await prisma.order.create({
+        data: { restaurantId, status: OrderStatus.IN_PRODUCTION, serviceRate: 0 },
+      });
+      const items = await Promise.all(
+        [0, 1, 2, 3].map(() =>
+          prisma.orderItem.create({
+            data: { orderId: order.id, productId, unitPrice: 10, station: Station.KITCHEN, status: ProductionStatus.WAITING },
+          }),
+        ),
+      );
+      const ctx = { userId, tenantId: restaurantId, role: Role.COOK };
+
+      await Promise.all(items.map((it) => orderService.setItemStatus(it.id, ProductionStatus.DONE, ctx)));
+
+      const finalOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+      expect(finalOrder.status).toBe(OrderStatus.READY_FOR_PAYMENT);
+      expect(finalOrder.readyAt).not.toBeNull();
+    }
   });
 });
