@@ -771,9 +771,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
     });
     await autoAcceptService.update(restaurantId, { enabled: false });
 
-    const motoboyJob = (
-      await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } })
-    ).payload.toString('ascii');
+    // As vias de um pedido nascem na mesma transação (mesmo createdAt), então não dá pra
+    // achar a do motoboy por ordem de criação — identifica pelo rótulo.
+    const motoboyJob = (await prisma.printJob.findMany({ where: { orderId: order.id } }))
+      .map((j) => j.payload.toString('ascii'))
+      .find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
     expect(motoboyJob).toContain('3- PASTEL');
     expect(motoboyJob).toContain('1- MINI PIZZA');
     expect(motoboyJob).toContain('1- PORCAO');
@@ -818,9 +820,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
     });
     await autoAcceptService.update(restaurantId, { enabled: false });
 
-    const motoboyJob = (
-      await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } })
-    ).payload.toString('ascii');
+    // As vias de um pedido nascem na mesma transação (mesmo createdAt), então não dá pra
+    // achar a do motoboy por ordem de criação — identifica pelo rótulo.
+    const motoboyJob = (await prisma.printJob.findMany({ where: { orderId: order.id } }))
+      .map((j) => j.payload.toString('ascii'))
+      .find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
     expect(motoboyJob).toContain('1- Coca-Cola 2L');
     expect(motoboyJob).toContain('3- Cerveja Long Neck');
   });
@@ -843,9 +847,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
     });
     await autoAcceptService.update(restaurantId, { enabled: false });
 
-    const motoboyJob = (
-      await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } })
-    ).payload.toString('ascii');
+    // As vias de um pedido nascem na mesma transação (mesmo createdAt), então não dá pra
+    // achar a do motoboy por ordem de criação — identifica pelo rótulo.
+    const motoboyJob = (await prisma.printJob.findMany({ where: { orderId: order.id } }))
+      .map((j) => j.payload.toString('ascii'))
+      .find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
     expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 10,00');
     expect(motoboyJob).not.toContain('PEDIDO COM BEBIDAS');
