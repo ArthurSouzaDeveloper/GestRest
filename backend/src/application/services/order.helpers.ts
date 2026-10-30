@@ -186,21 +186,49 @@ export function serializeOrder(order: OrderWithRelations) {
 }
 
 /**
- * Versão enxuta pro link público de acompanhamento — o id do pedido (não-adivinhável)
- * já funciona como a "senha" desse link, mas mesmo assim não expõe telefone do cliente,
- * endereço completo nem o id interno do caixa que registrou o pagamento (presentes em
- * serializeOrder(), pensado pra tela autenticada da equipe).
+ * Versão pro link público de acompanhamento (e pro "Ver meus pedidos") — o id do pedido
+ * (UUID, não-adivinhável) já funciona como a "senha" desse link. Mostra o pedido como o
+ * cliente montou: itens com adicionais, observação e preço, taxa de entrega, forma de
+ * pagamento escolhida e o endereço de entrega que ele mesmo digitou (pedido do dono, pro
+ * cliente conseguir rever pedidos antigos). Continua sem expor telefone/CPF do cliente nem
+ * o id interno do caixa que registrou o pagamento (presentes em serializeOrder(), pensado
+ * pra tela autenticada da equipe).
  */
 export function serializePublicStatus(order: OrderWithRelations) {
+  const totals = computeTotals(order);
+  const isDelivery = order.orderType === 'DELIVERY';
   return {
     number: order.number,
     status: order.status,
     orderType: order.orderType,
+    createdAt: order.createdAt,
     estimatedReadyAt: order.estimatedReadyAt,
     acceptedAt: order.acceptedAt,
+    notes: order.notes,
     items: order.items
       .filter((i) => i.status !== 'CANCELLED')
-      .map((i) => ({ name: itemDisplayName(i.product.name, i.comboLabel), quantity: i.quantity, status: i.status })),
-    total: computeTotals(order).total,
+      .map((i) => ({
+        name: itemDisplayName(i.product.name, i.comboLabel),
+        quantity: i.quantity,
+        status: i.status,
+        unitPrice: Number(i.unitPrice),
+        notes: i.notes,
+        additionals: i.additionals.map((a) => ({ name: a.name, price: Number(a.price) })),
+        lineTotal: money((Number(i.unitPrice) + i.additionals.reduce((acc, a) => acc + Number(a.price), 0)) * i.quantity),
+      })),
+    subtotal: totals.subtotal,
+    discount: totals.discount,
+    deliveryFee: totals.deliveryFee,
+    total: totals.total,
+    paymentMethod: order.declaredPaymentMethod,
+    changeFor: order.changeFor !== null ? Number(order.changeFor) : null,
+    deliveryAddress: isDelivery
+      ? {
+          street: order.deliveryStreet,
+          number: order.deliveryNumber,
+          complement: order.deliveryComplement,
+          zone: order.deliveryZone?.name ?? null,
+        }
+      : null,
   };
 }
