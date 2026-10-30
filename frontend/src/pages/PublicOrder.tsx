@@ -165,6 +165,27 @@ type OrderKind = 'DELIVERY' | 'PICKUP';
 /** Subset of PaymentMethod the public site offers — sem vale-refeição (só faz sentido
  * presencial) nem PIX (tirado a pedido do cliente/dono). */
 type PublicPaymentMethod = Extract<PaymentMethod, 'CASH' | 'CREDIT' | 'DEBIT'>;
+/** Resposta do cliente sobre troco quando paga em Dinheiro. null = ainda não respondeu. */
+type ChangeChoice = 'YES' | 'NO' | null;
+
+/**
+ * Regra única de "dá pra avançar do Pagamento?" — usada tanto pela própria tela
+ * (PaymentStep) quanto pelo resumo lateral do desktop, que tem o seu próprio botão
+ * Continuar. Em Dinheiro, responder sobre o troco é obrigatório; respondendo "preciso",
+ * o valor ainda tem que cobrir o total.
+ */
+function canSubmitPayment(
+  paymentMethod: PublicPaymentMethod | '',
+  changeChoice: ChangeChoice,
+  changeFor: string,
+  total: number,
+): boolean {
+  if (!paymentMethod) return false;
+  if (paymentMethod !== 'CASH') return true;
+  if (changeChoice === null) return false;
+  if (changeChoice === 'NO') return true;
+  return changeFor !== '' && Number(changeFor) >= total;
+}
 
 interface PublicRestaurant {
   name: string;
@@ -303,10 +324,11 @@ export default function PublicOrder() {
   const [draft, setDraft] = useState<DraftItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PublicPaymentMethod | ''>('');
   const [changeFor, setChangeFor] = useState('');
-  // Confirmação explícita (checkbox), não mais inferida de "campo vazio = sem troco" —
-  // pedido explícito do cliente/dono: antes dava pra esquecer de preencher por engano e
-  // ninguém percebia que era intencional. Só importa quando paymentMethod é CASH.
-  const [wantsChange, setWantsChange] = useState(false);
+  // Escolha explícita e OBRIGATÓRIA (não um checkbox que começa desmarcado): sem responder
+  // "preciso"/"não preciso", o cliente não avança — pedido explícito do cliente/dono, que
+  // antes não sabia diferenciar "não quer troco" de "esqueceu de preencher". null = ainda
+  // não respondeu. Só importa quando paymentMethod é CASH.
+  const [changeChoice, setChangeChoice] = useState<ChangeChoice>(null);
   // Honeypot — nome propositalmente neutro pra não colidir com autofill do navegador
   // (campos chamados "website"/"empresa" são alvo comum de autofill, o que barraria
   // um cliente de verdade sem ele nunca ter digitado nada aqui).
@@ -452,11 +474,9 @@ export default function PublicOrder() {
         ? deliveryLat !== null && deliveryLng !== null && !!deliveryQuote && !quoteOutOfRange && deliveryNumber.trim()
         : deliveryZoneId && deliveryStreet.trim() && deliveryNumber.trim()));
 
-  // Mesma regra de PaymentStep, recalculada aqui só pra habilitar/desabilitar o botão
-  // "Continuar" do resumo lateral (lg:) — a tela em si continua validando por conta própria.
-  const paymentNeedsChange = paymentMethod === 'CASH';
-  const canContinuePayment =
-    !!paymentMethod && (!paymentNeedsChange || !wantsChange || (changeFor !== '' && Number(changeFor) >= total));
+  // Habilita/desabilita o botão "Continuar" do resumo lateral (lg:) — mesma regra que a
+  // própria tela de Pagamento usa, via canSubmitPayment().
+  const canContinuePayment = canSubmitPayment(paymentMethod, changeChoice, changeFor, total);
 
   // Quem clicou em "Ver cardápio" na Capa pula a escolha de Entrega/Retirada —
   // se tentar avançar pro Carrinho/Pagamento/Revisão sem isso definido, manda de volta pra
@@ -486,7 +506,7 @@ export default function PublicOrder() {
             }
           : {}),
         declaredPaymentMethod: paymentMethod,
-        changeFor: paymentMethod === 'CASH' && wantsChange && changeFor ? Number(changeFor) : undefined,
+        changeFor: paymentMethod === 'CASH' && changeChoice === 'YES' && changeFor ? Number(changeFor) : undefined,
         gr_hp: grHp || undefined,
         items: draft.map((d) => ({
           productId: d.product.id,
@@ -689,8 +709,8 @@ export default function PublicOrder() {
             setPaymentMethod={setPaymentMethod}
             changeFor={changeFor}
             setChangeFor={setChangeFor}
-            wantsChange={wantsChange}
-            setWantsChange={setWantsChange}
+            changeChoice={changeChoice}
+            setChangeChoice={setChangeChoice}
             total={total}
             onContinue={() => setStep(orderKind ? 'review' : 'details')}
           />
@@ -1724,8 +1744,8 @@ function PaymentStep({
   setPaymentMethod,
   changeFor,
   setChangeFor,
-  wantsChange,
-  setWantsChange,
+  changeChoice,
+  setChangeChoice,
   total,
   onContinue,
 }: {
@@ -1733,13 +1753,13 @@ function PaymentStep({
   setPaymentMethod: (m: PublicPaymentMethod) => void;
   changeFor: string;
   setChangeFor: (v: string) => void;
-  wantsChange: boolean;
-  setWantsChange: (v: boolean) => void;
+  changeChoice: ChangeChoice;
+  setChangeChoice: (v: ChangeChoice) => void;
   total: number;
   onContinue: () => void;
 }) {
   const needsChange = paymentMethod === 'CASH';
-  const canContinue = !!paymentMethod && (!needsChange || !wantsChange || (changeFor !== '' && Number(changeFor) >= total));
+  const canContinue = canSubmitPayment(paymentMethod, changeChoice, changeFor, total);
 
   return (
     <div className="space-y-4">
@@ -1767,28 +1787,40 @@ function PaymentStep({
 
       {needsChange && (
         <div className="mt-4">
-          {/* Checkbox explícito em vez de inferir "campo vazio = sem troco" — pedido
-              explícito do cliente/dono: dava pra esquecer de preencher por engano e
-              ninguém sabia se foi intencional ou esquecimento. */}
-          <button
-            type="button"
-            onClick={() => {
-              setWantsChange(!wantsChange);
-              if (wantsChange) setChangeFor('');
-            }}
-            className="flex w-full items-center gap-2.5 rounded-2xl border-2 border-[#1E1024]/10 bg-white p-3.5 text-left"
-          >
-            <span
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border-2 ${
-                wantsChange ? 'border-brand bg-brand' : 'border-[#1E1024]/20'
-              }`}
-            >
-              {wantsChange && <Check size={13} strokeWidth={3.5} className="text-white" />}
-            </span>
-            <span className="text-[13.5px] font-bold text-[#1E1024]">Preciso de troco</span>
-          </button>
+          {/* Escolha obrigatória entre duas opções, em vez de um checkbox que já nasce
+              desmarcado: sem responder, o Continuar fica bloqueado — pedido explícito do
+              cliente/dono, que antes não sabia diferenciar "não quer troco" de
+              "esqueceu de preencher". */}
+          <p className="mb-2 text-[13.5px] font-bold text-[#1E1024]">Você vai precisar de troco?</p>
+          <div className="flex flex-col gap-2.5">
+            {([
+              { key: 'YES', label: 'Sim, preciso de troco' },
+              { key: 'NO', label: 'Não preciso de troco' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  setChangeChoice(key);
+                  if (key === 'NO') setChangeFor('');
+                }}
+                className={`flex w-full items-center gap-2.5 rounded-2xl border-2 p-3.5 text-left transition ${
+                  changeChoice === key ? 'border-brand bg-brand-100' : 'border-[#1E1024]/10 bg-white'
+                }`}
+              >
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                    changeChoice === key ? 'border-brand bg-brand' : 'border-[#1E1024]/20'
+                  }`}
+                >
+                  {changeChoice === key && <Check size={13} strokeWidth={3.5} className="text-white" />}
+                </span>
+                <span className="text-[13.5px] font-bold text-[#1E1024]">{label}</span>
+              </button>
+            ))}
+          </div>
 
-          {wantsChange && (
+          {changeChoice === 'YES' && (
             <div className="mt-3">
               <label className={FIELD_LABEL}>Troco pra quanto?</label>
               <input
