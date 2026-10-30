@@ -52,8 +52,6 @@ export interface TicketItem {
   /** Descrição do produto do cardápio (ex.: "Frango, geleia de pimenta, bacon, queijo e
    * cream cheese.") — nem todo produto tem uma cadastrada. */
   description: string | null;
-  /** Preço unitário (por item, já com o valor certo pra combos — ver createOrderItems). */
-  unitPrice: number;
   notes?: string | null;
   additionals: string[];
 }
@@ -128,11 +126,6 @@ export interface TicketInput {
    * nas vias de produção). Ver printJob.service.ts, onde os `items` passados nesse modo já
    * vêm como contagem por família, não os itens reais do pedido. */
   itemsSummaryOnly?: boolean;
-  /** true omite a linha de preço unitário de cada item (descrição/adicionais/observação
-   * continuam) — pedido explícito do cliente pra via da cozinha: quem prepara não precisa
-   * do valor, só do sabor/quantidade. Ver printJob.service.ts (só os papéis de cozinha
-   * usam isso; suco/motoboy continuam como antes). */
-  hideItemPrice?: boolean;
 }
 
 /**
@@ -247,7 +240,6 @@ export function renderTicket(input: TicketInput): Buffer {
     parts.push(HEADER_MODE_ON, line(`${item.quantity}- ${label}`), BODY_MODE_ON);
     if (input.itemsSummaryOnly) continue;
     if (item.description) parts.push(line(`  ${item.description}`));
-    if (!input.hideItemPrice) parts.push(line(`  ${formatCurrency(item.unitPrice)} / un.`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
     if (input.itemSeparator) parts.push(NORMAL_MODE_ON, line('----------------------------'), BODY_MODE_ON);

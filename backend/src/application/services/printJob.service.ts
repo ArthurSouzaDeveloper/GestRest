@@ -30,20 +30,6 @@ export function categoryTypeLabel(categoryName: string): string | null {
 }
 
 /**
- * "Sugestões da Casa" (doce ou salgada) tem sabores fixos/curados — a cozinha já sabe de
- * cor o que leva dentro, então repetir a descrição do produto no ticket só ocupa espaço.
- * Pedido explícito do cliente. Comparação por conteúdo (não string exata), mesmo motivo
- * de categoryTypeLabel acima: sobrevive a uma renomeação da categoria no cardápio.
- */
-function isHouseSuggestion(categoryName: string): boolean {
-  return categoryName
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .includes('sugest');
-}
-
-/**
  * Ordem fixa dos itens/papéis da cozinha (e da parte de cozinha da via combinada do
  * motoboy, que continua numa via só) — pedido explícito do cliente pra sempre sair na
  * mesma sequência, não a ordem em que o cliente escolheu os itens no site. Cada valor
@@ -188,7 +174,6 @@ function motoboySummaryItems(kitchenItems: CreatedOrderItem[], juiceItems: Creat
     name,
     quantity,
     description: null,
-    unitPrice: 0,
     additionals: [],
   });
   return order.flatMap((key) => {
@@ -208,18 +193,11 @@ function toTicketItem(item: CreatedOrderItem): TicketItem {
   // do cliente: no lugar do nome genérico, o título vira a lista de ingredientes
   // escolhidos em CAIXA ALTA, sem tipo/descrição (ambos genéricos aqui).
   if (item.product.isCustom) {
-    // "Monte o Seu" não tem preço próprio (Product.price = 0, "Preço pela montagem") — o
-    // valor inteiro vem da base + adicionais escolhidos, gravados em item.additionals (ver
-    // createOrderItems em order.service.ts). item.unitPrice sozinho ficaria zerado no
-    // ticket se não somasse os adicionais aqui, mesmo cálculo que computeTotals já faz pro
-    // total do pedido.
-    const additionalsTotal = item.additionals.reduce((sum, a) => sum + Number(a.price), 0);
     return {
       name: item.additionals.map((a) => a.name.toUpperCase()).join(', '),
       typeLabel: null,
       description: null,
       quantity: item.quantity,
-      unitPrice: Number(item.unitPrice) + additionalsTotal,
       notes: item.notes,
       additionals: [],
     };
@@ -232,9 +210,11 @@ function toTicketItem(item: CreatedOrderItem): TicketItem {
     // PASTEL" etc., ver enqueueForItems), então repetir o tipo em toda linha de sabor só
     // ocupava espaço à toa.
     typeLabel: null,
-    description: isHouseSuggestion(item.product.category.name) ? null : item.product.description,
+    // Pastel (salgado, doce e Sugestões da Casa) sai sem descrição: a cozinha já sabe de cor
+    // o que leva em cada um, repetir só ocupa papel — pedido explícito do cliente/dono.
+    // Mini pizza e porção continuam com a descrição do cardápio.
+    description: kitchenTypeSummary(item.product.category.name) === 'PASTEL' ? null : item.product.description,
     quantity: item.quantity,
-    unitPrice: Number(item.unitPrice),
     notes: item.notes,
     additionals: item.additionals.map((a) => a.name),
   };
@@ -393,9 +373,19 @@ export const printJobService = {
     // via principal). SUCOS_PRIORITY é sempre maior que qualquer prioridade de cozinha
     // (0-3), então só vence quando a cozinha não participa do pedido — ex.: pedido só de
     // suco, ou só de bebida pronta sem suco nenhum.
+    //
+    // A via dos suqueiros só existe quando o pedido tem SUCO de verdade — pedido explícito
+    // do cliente/dono: sem suco, não imprime via dos suqueiros nenhuma (nem em branco).
+    // Única exceção: mesa/retirada com SÓ bebida pronta e nenhuma via de cozinha — sem ela o
+    // pedido não sairia em papel nenhum e ninguém saberia que existe; aqui a via carrega os
+    // dados do cliente e a lista de bebidas (nunca fica em branco). Entrega não precisa
+    // disso: a via do motoboy já cobre o pedido inteiro.
     const SUCOS_PRIORITY = 4;
+    const printJuicePaper =
+      realSucoItems.length > 0 ||
+      (juiceItems.length > 0 && kitchenGroups.size === 0 && order.orderType !== 'DELIVERY');
     const presentPriorities = [...kitchenGroups.keys()];
-    if (juiceItems.length > 0) presentPriorities.push(SUCOS_PRIORITY);
+    if (printJuicePaper) presentPriorities.push(SUCOS_PRIORITY);
     const mainPriority = presentPriorities.length > 0 ? Math.min(...presentPriorities) : null;
     // Famílias de cozinha presentes no pedido INTEIRO (não só nesta leva) — usado pelo
     // aviso cruzado de cada papel abaixo, mesmo raciocínio de hasBeverages/fullHasRealSuco
@@ -430,9 +420,6 @@ export const printJobService = {
             // Linha divisória depois de cada item, em qualquer via — pedido explícito do
             // cliente pra valer pra suco/bebida em geral também, não só comida.
             itemSeparator: true,
-            // Sem preço (pedido explícito do cliente/dono: quem prepara não precisa do
-            // valor, só do sabor/quantidade) — ver hideItemPrice em renderTicket.
-            hideItemPrice: true,
             crossStationNotice: notices,
             crossStationNoticeDetail: isMain ? bebidaProntaDetail : [],
             minimalData: !isMain,
@@ -445,7 +432,7 @@ export const printJobService = {
     // Suqueiros: via única com os sucos de verdade que a estação prepara (sem a divisão
     // por tipo da cozinha acima — o cliente só pediu a separação por papel pra cozinha);
     // bebida pronta não entra no corpo (ver realSucoItems/bebidaProntaItems acima).
-    if (juiceItems.length > 0) {
+    if (printJuicePaper) {
       const isMain = mainPriority === SUCOS_PRIORITY;
       // Mesma regra dos papéis de cozinha: o bloco só sai quando esta é a via principal
       // (pedido só de suco/bebida). hasRealSuco=false porque esta É a via do suco — não

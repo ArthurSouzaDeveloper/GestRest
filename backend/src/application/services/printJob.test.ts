@@ -1017,6 +1017,156 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(motoboyJob).not.toContain('BEBIDAS PRONTAS');
   });
 
+  it('pedido sem suco de verdade NÃO imprime via dos suqueiros (nem em branco), mesmo com bebida pronta', async () => {
+    const pasteis = await prisma.category.create({
+      data: { name: 'Pastéis Salgados Sem Suco', station: Station.KITCHEN, restaurantId },
+    });
+    const bebidas = await prisma.category.create({
+      data: { name: 'Bebidas Sem Suco', station: Station.JUICE_BAR, restaurantId },
+    });
+    const pastel = await prisma.product.create({ data: { name: 'Calabresa', price: 12, categoryId: pasteis.id, restaurantId } });
+    const coca = await prisma.product.create({ data: { name: 'Coca-Cola Lata', price: 7, categoryId: bebidas.id, restaurantId } });
+
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente Sem Suco',
+      customerPhone: '11999990021',
+      customerCpf: '10000011134',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [
+        { productId: pastel.id, quantity: 1 },
+        { productId: coca.id, quantity: 1 },
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    expect(jobs.map((j) => j.station)).toEqual([Station.KITCHEN]);
+    // A bebida continua listada — na via principal da cozinha.
+    expect(jobs[0].payload.toString('ascii')).toContain('(Coca-Cola Lata)');
+  });
+
+  it('pedido só de bebida pronta (retirada, sem cozinha) ainda sai em UMA via, com os dados do cliente e a bebida — nunca em branco', async () => {
+    const bebidas = await prisma.category.create({
+      data: { name: 'Bebidas Só Bebida', station: Station.JUICE_BAR, restaurantId },
+    });
+    const guarana = await prisma.product.create({ data: { name: 'Guaraná Lata', price: 6, categoryId: bebidas.id, restaurantId } });
+
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente So Bebida',
+      customerPhone: '11999990022',
+      customerCpf: '10000003700',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId: guarana.id, quantity: 2 }],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    expect(jobs).toHaveLength(1);
+    const text = jobs[0].payload.toString('ascii');
+    expect(text).toContain('Cliente So Bebida');
+    expect(text).toContain('(2 Guarana Lata)');
+  });
+
+  it('entrega só de bebida pronta: só a via do motoboy, sem via de suqueiros em branco', async () => {
+    const bebidas = await prisma.category.create({
+      data: { name: 'Bebidas Entrega Só Bebida', station: Station.JUICE_BAR, restaurantId },
+    });
+    const agua = await prisma.product.create({ data: { name: 'Agua Mineral', price: 3, categoryId: bebidas.id, restaurantId } });
+    const zone = await prisma.deliveryZone.create({ data: { name: 'Zona So Bebida', fee: 0, restaurantId } });
+
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Entrega Bebida',
+      customerPhone: '11999990023',
+      customerCpf: '10000007455',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua Bebida',
+      deliveryNumber: '9',
+      items: [{ productId: agua.id, quantity: 1 }],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].payload.toString('ascii')).toContain('SEGUNDA VIA MOTOBOY');
+  });
+
+  it('nenhum pastel sai com descrição (salgado, doce nem Sugestão da Casa); mini pizza e porção continuam com a do cardápio', async () => {
+    const mk = (name: string) => prisma.category.create({ data: { name, station: Station.KITCHEN, restaurantId } });
+    const salgados = await mk('Pastéis Salgados Descrição');
+    const doces = await mk('Pastéis Doces Descrição');
+    const sugestoes = await mk('Sugestão da Casa Descrição');
+    const miniPizza = await mk('Mini Pizza Salgada Descrição');
+    const porcoes = await mk('Porções Descrição');
+    const prod = (name: string, description: string, categoryId: string) =>
+      prisma.product.create({ data: { name, description, price: 10, categoryId, restaurantId } });
+    const pSalgado = await prod('Carne Seca', 'DESC-PASTEL-SALGADO', salgados.id);
+    const pDoce = await prod('Romeu e Julieta', 'DESC-PASTEL-DOCE', doces.id);
+    const pSugestao = await prod('Marguerita', 'DESC-SUGESTAO', sugestoes.id);
+    const pPizza = await prod('Atum', 'DESC-MINI-PIZZA', miniPizza.id);
+    const pPorcao = await prod('Batata', 'DESC-PORCAO', porcoes.id);
+
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente Descrição',
+      customerPhone: '11999990024',
+      customerCpf: '10000029696',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [pSalgado, pDoce, pSugestao, pPizza, pPorcao].map((p) => ({ productId: p.id, quantity: 1 })),
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const all = (await prisma.printJob.findMany({ where: { orderId: order.id } }))
+      .map((j) => j.payload.toString('ascii'))
+      .join('\n');
+    expect(all).toContain('1- Carne Seca');
+    expect(all).toContain('1- Romeu e Julieta');
+    expect(all).toContain('1- Marguerita');
+    expect(all).not.toContain('DESC-PASTEL-SALGADO');
+    expect(all).not.toContain('DESC-PASTEL-DOCE');
+    expect(all).not.toContain('DESC-SUGESTAO');
+    expect(all).toContain('DESC-MINI-PIZZA');
+    expect(all).toContain('DESC-PORCAO');
+  });
+
+  it('nenhuma via (cozinha, suqueiros ou motoboy) imprime preço unitário; o total só aparece no fim da via do motoboy', async () => {
+    const zone = await prisma.deliveryZone.create({ data: { name: 'Zona Sem Preço Unitário', fee: 5, restaurantId } });
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'DELIVERY',
+      customerName: 'Cliente Sem Preço',
+      customerPhone: '11999990025',
+      customerCpf: '10000045503',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      deliveryZoneId: zone.id,
+      deliveryStreet: 'Rua Sem Preço',
+      deliveryNumber: '1',
+      items: [
+        { productId: kitchenProductId, quantity: 1 }, // R$ 10
+        { productId: juiceProductId, quantity: 1 }, // R$ 8
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    expect(jobs).toHaveLength(3);
+    const texts = jobs.map((j) => j.payload.toString('ascii'));
+    for (const text of texts) {
+      expect(text).not.toContain('/ un.');
+      expect(text).not.toContain('R$ 10,00');
+      expect(text).not.toContain('R$ 8,00');
+    }
+    const motoboy = texts.find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
+    expect(motoboy).toContain('TOTAL DO PEDIDO: R$ 23,00');
+  });
+
   it('verifyAgentKey() só valida a chave certa do tenant certo', async () => {
     const { key } = await printerSettingsService.generateAgentKey(restaurantId, { userId: waiterId });
 
