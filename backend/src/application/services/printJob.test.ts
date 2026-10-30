@@ -1215,7 +1215,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(all).toContain('DESC-PORCAO');
   });
 
-  it('nenhuma via (cozinha, suqueiros ou motoboy) imprime preço unitário; o total só aparece no fim da via do motoboy', async () => {
+  it('nenhuma via (cozinha, suqueiros ou motoboy) imprime preço unitário; em entrega o total só aparece no fim da via do motoboy', async () => {
     const zone = await prisma.deliveryZone.create({ data: { name: 'Zona Sem Preço Unitário', fee: 5, restaurantId } });
     await autoAcceptService.update(restaurantId, { enabled: true });
     const order = await orderService.openPublic(restaurantId, {
@@ -1244,6 +1244,50 @@ describe('fila de impressão térmica (PrintJob)', () => {
     }
     const motoboy = texts.find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
     expect(motoboy).toContain('TOTAL DO PEDIDO: R$ 23,00');
+  });
+
+  it('retirada com cozinha e suco: o total sai só no fim da via principal (cozinha), não na dos suqueiros', async () => {
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente Total Retirada',
+      customerPhone: '11999990041',
+      customerCpf: '10000041041',
+      declaredPaymentMethod: PaymentMethod.PIX,
+      items: [
+        { productId: kitchenProductId, quantity: 1 }, // R$ 10
+        { productId: juiceProductId, quantity: 2 }, // R$ 8 cada
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id }, orderBy: { createdAt: 'asc' } });
+    expect(jobs).toHaveLength(2);
+    const [kitchenJob, juiceJob] = jobs.map((j) => j.payload.toString('ascii'));
+    expect(kitchenJob).toContain('Cliente Total Retirada');
+    expect(kitchenJob).toContain('TOTAL DO PEDIDO: R$ 26,00');
+    expect(kitchenJob.indexOf('TOTAL DO PEDIDO')).toBeGreaterThan(kitchenJob.indexOf('1- Pastel'));
+    expect(kitchenJob).not.toContain('TAXA DE ENTREGA');
+    expect(juiceJob).not.toContain('TOTAL DO PEDIDO');
+  });
+
+  it('retirada só de suco: o total sai na via dos suqueiros (a principal)', async () => {
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente Total Suco',
+      customerPhone: '11999990042',
+      customerCpf: '10000042013',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId: juiceProductId, quantity: 3 }],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    expect(jobs).toHaveLength(1);
+    const text = jobs[0].payload.toString('ascii');
+    expect(text).toContain('SUQUEIROS');
+    expect(text).toContain('TOTAL DO PEDIDO: R$ 24,00');
   });
 
   it('verifyAgentKey() só valida a chave certa do tenant certo', async () => {
