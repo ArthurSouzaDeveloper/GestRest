@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { deriveBrandVars } from '../lib/publicBrand';
+import { DELIVERY_CLOSED_MESSAGE, useDeliveryClosed } from '../lib/deliveryHours';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -32,6 +33,17 @@ function formatClock(iso: string): string {
 }
 
 /** Nota de previsão reaproveitada nas telas de Dados/Carrinho/Revisão — some se a estimativa ainda não carregou. */
+/** Recado do corte noturno (ver lib/deliveryHours.ts) — só aparece quando Entrega está fechada. */
+function DeliveryClosedNote({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <div className="flex items-center gap-2 rounded-2xl bg-[#1E1024] px-4 py-3 text-sm font-bold text-white">
+      <Store size={14} className="shrink-0" />
+      <span>{DELIVERY_CLOSED_MESSAGE}</span>
+    </div>
+  );
+}
+
 function EtaNote({ eta }: { eta?: EtaEstimate }) {
   if (!eta) return null;
   return (
@@ -301,6 +313,7 @@ export default function PublicOrder() {
   const { slug = '' } = useParams();
   const [step, setStep] = useState<Step>('intro');
   const [orderKind, setOrderKind] = useState<OrderKind | null>(null);
+  const deliveryClosed = useDeliveryClosed();
   // Pré-preenche com a identidade salva neste navegador de um pedido anterior (ver
   // readSavedCustomer) — pedido explícito do cliente/dono: quem já pediu não deveria
   // precisar redigitar nome/telefone a cada visita.
@@ -464,8 +477,16 @@ export default function PublicOrder() {
   const subtotal = draft.reduce((a, d) => a + draftItemUnitPrice(d) * d.quantity, 0);
   const total = subtotal + deliveryFee;
 
+  // Bateu 23h com o cliente ainda escolhendo em Dados: troca pra Retirada na frente dele
+  // (o botão Entrega fica desabilitado). Depois de Dados não troca sozinho, pra ninguém
+  // confirmar uma retirada sem perceber — ali quem barra é o backend, com o mesmo recado.
+  useEffect(() => {
+    if (deliveryClosed && orderKind === 'DELIVERY' && step === 'details') setOrderKind('PICKUP');
+  }, [deliveryClosed, orderKind, step]);
+
   const canContinueDetails =
     !!orderKind &&
+    !(deliveryClosed && orderKind === 'DELIVERY') &&
     customerName.trim().length >= 2 &&
     customerPhone.trim().length >= 8 &&
     isValidCpf(normalizeCpf(customerCpf)) &&
@@ -593,6 +614,7 @@ export default function PublicOrder() {
           restaurantName={restaurant.name}
           logoUrl={restaurant.logoUrl}
           menuPhotoUrls={restaurant.menuPhotoUrls}
+          deliveryClosed={deliveryClosed}
           onPick={(kind) => {
             if (kind === 'MENU') {
               setOrderKind(null);
@@ -639,6 +661,7 @@ export default function PublicOrder() {
             slug={slug}
             orderKind={orderKind}
             onChangeKind={setOrderKind}
+            deliveryClosed={deliveryClosed}
             customerName={customerName}
             setCustomerName={setCustomerName}
             customerPhone={customerPhone}
@@ -887,15 +910,20 @@ function IntroStep({
   restaurantName,
   logoUrl,
   menuPhotoUrls,
+  deliveryClosed,
   onPick,
 }: {
   slug: string;
   restaurantName: string;
   logoUrl: string | null;
   menuPhotoUrls: string[];
+  deliveryClosed: boolean;
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
-  const [kind, setKind] = useState<OrderKind>('DELIVERY');
+  const [kind, setKind] = useState<OrderKind>(deliveryClosed ? 'PICKUP' : 'DELIVERY');
+  useEffect(() => {
+    if (deliveryClosed) setKind('PICKUP');
+  }, [deliveryClosed]);
   // Pedido explícito do cliente/dono: "Ver cardápio" dá acesso à foto de
   // verdade do cardápio físico (com botão de baixar), em vez de só a navegação
   // interativa. Sem nenhuma foto configurada ainda pro restaurante (menuPhotoUrls vazio),
@@ -950,9 +978,10 @@ function IntroStep({
             <h6 className="mb-2 text-[15px] font-bold text-[#1E1024]">Como você quer receber?</h6>
             <div className="flex gap-1.5 rounded-full bg-white p-1.5">
               <button
-                className={`flex-1 rounded-full py-3 text-[15px] font-bold transition ${
+                className={`flex-1 rounded-full py-3 text-[15px] font-bold transition disabled:cursor-not-allowed disabled:text-[#1E1024]/30 ${
                   kind === 'DELIVERY' ? 'bg-brand text-white' : 'text-[#1E1024]'
                 }`}
+                disabled={deliveryClosed}
                 onClick={() => setKind('DELIVERY')}
               >
                 Entrega
@@ -967,7 +996,8 @@ function IntroStep({
               </button>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3 space-y-2">
+              <DeliveryClosedNote show={deliveryClosed} />
               <EtaNote eta={eta} />
             </div>
 
@@ -1329,6 +1359,7 @@ function DetailsStep({
   slug,
   orderKind,
   onChangeKind,
+  deliveryClosed,
   customerName,
   setCustomerName,
   customerPhone,
@@ -1369,6 +1400,7 @@ function DetailsStep({
   slug: string;
   orderKind: OrderKind | null;
   onChangeKind: (kind: OrderKind) => void;
+  deliveryClosed: boolean;
   customerName: string;
   setCustomerName: (v: string) => void;
   customerPhone: string;
@@ -1414,9 +1446,10 @@ function DetailsStep({
 
       <div className="mb-[18px] flex gap-1 rounded-2xl border border-[#1E1024]/10 bg-white p-1">
         <button
-          className={`flex-1 rounded-full py-3 text-[15px] font-bold transition ${
+          className={`flex-1 rounded-full py-3 text-[15px] font-bold transition disabled:cursor-not-allowed disabled:text-[#6B4A78]/30 ${
             orderKind === 'DELIVERY' ? 'bg-brand text-white' : 'text-[#6B4A78]'
           }`}
+          disabled={deliveryClosed}
           onClick={() => onChangeKind('DELIVERY')}
         >
           Entrega
@@ -1434,6 +1467,8 @@ function DetailsStep({
       {!orderKind && (
         <p className="-mt-3 text-[11.5px] text-[#6B4A78]">Escolha Entrega ou Retirada pra continuar.</p>
       )}
+
+      <DeliveryClosedNote show={deliveryClosed} />
 
       <EtaNote eta={eta} />
 

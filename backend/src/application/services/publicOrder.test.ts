@@ -218,4 +218,40 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
     const result = await publicOrderService.customerLogin(slug, 'Nome Errado', '10000014826');
     expect(result).toEqual({ name: null, orders: [], addresses: [] });
   });
+  it('depois das 23h (horário de SP) o site recusa entrega e aceita retirada', async () => {
+    const meiaNoiteEmSP = new Date('2026-10-30T03:00:00Z');
+    await expect(
+      publicOrderService.createOrder(
+        slug,
+        {
+          orderType: 'DELIVERY',
+          customerName: 'Cliente Noturno',
+          customerPhone: '19990001111',
+          customerCpf: '10000014826',
+          deliveryZoneId: zoneId,
+          deliveryStreet: 'Rua da Lua',
+          deliveryNumber: '23',
+          declaredPaymentMethod: PaymentMethod.CASH,
+          items: [{ productId, quantity: 1 }],
+        },
+        undefined,
+        meiaNoiteEmSP,
+      ),
+    ).rejects.toThrow('Após as 23h, somente pedidos por retirada.');
+
+    const pickup = await publicOrderService.createOrder(
+      slug,
+      {
+        orderType: 'PICKUP',
+        customerName: 'Cliente Noturno',
+        customerPhone: '19990001111',
+        customerCpf: '10000014826',
+        declaredPaymentMethod: PaymentMethod.CASH,
+        items: [{ productId, quantity: 1 }],
+      },
+      undefined,
+      meiaNoiteEmSP,
+    );
+    expect(pickup.orderType).toBe('PICKUP');
+  });
 });
