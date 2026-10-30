@@ -217,6 +217,10 @@ export interface AutoDeliverPickupSettings {
   minutes: number | null;
 }
 
+export interface AutoCompleteSettings {
+  marginMinutes: number | null;
+}
+
 export interface ProductionTicket {
   id: string;
   orderId: string;

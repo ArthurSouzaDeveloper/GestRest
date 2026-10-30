@@ -5,6 +5,7 @@ import { logger } from './config/logger';
 import { connectDatabase, disconnectDatabase } from './config/prisma';
 import { initSocket } from './socket';
 import { autoDeliverPickupService } from './application/services/autoDeliverPickup.service';
+import { autoCompleteService } from './application/services/autoComplete.service';
 
 // Varredura da entrega automática de retirada (ver autoDeliverPickup.service.ts) — roda só
 // aqui no processo de verdade, nunca em teste (vitest sobe createApp() direto, sem passar
@@ -14,6 +15,8 @@ const AUTO_DELIVER_PICKUP_SWEEP_INTERVAL_MS = 60_000;
 
 function runAutoDeliverPickupSweep(): void {
   autoDeliverPickupService.sweep().catch((err) => logger.error('auto_deliver_pickup_sweep_failed', { error: err }));
+  // Conclusão automática pelo tempo estimado (ver autoComplete.service.ts) — mesmo intervalo.
+  autoCompleteService.sweep().catch((err) => logger.error('auto_complete_sweep_failed', { error: err }));
 }
 
 async function bootstrap(): Promise<void> {

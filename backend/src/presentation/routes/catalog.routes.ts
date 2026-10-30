@@ -16,12 +16,14 @@ import {
 import { etaSettingsService } from '../../application/services/eta.service';
 import { autoAcceptService } from '../../application/services/autoAccept.service';
 import { autoDeliverPickupService } from '../../application/services/autoDeliverPickup.service';
+import { autoCompleteService } from '../../application/services/autoComplete.service';
 import { printerSettingsService } from '../../application/services/printerSettings.service';
 import {
   additionalSchema,
   additionalUpdateSchema,
   autoAcceptSchema,
   autoDeliverPickupSchema,
+  autoCompleteSchema,
   categorySchema,
   categoryUpdateSchema,
   deliveryDistanceBandSchema,
@@ -258,6 +260,19 @@ router.patch(
   admin,
   validateBody(autoDeliverPickupSchema),
   asyncHandler(async (req, res) => res.json(await autoDeliverPickupService.update(tid(req), req.body))),
+);
+
+// ── Conclusão automática pelo tempo estimado — pedido online (retirada ou entrega) que passa
+// do horário previsto + margem é marcado pronto e entregue sozinho. Restrito a ADMIN. ──
+router.get(
+  '/auto-complete',
+  asyncHandler(async (req, res) => res.json(await autoCompleteService.get(tid(req)))),
+);
+router.patch(
+  '/auto-complete',
+  admin,
+  validateBody(autoCompleteSchema),
+  asyncHandler(async (req, res) => res.json(await autoCompleteService.update(tid(req), req.body))),
 );
 
 // ── Impressora térmica (ponte local) — configuração de conexão, geração da chave de
