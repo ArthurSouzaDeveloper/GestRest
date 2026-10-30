@@ -1,8 +1,30 @@
+import type { Request } from 'express';
 import rateLimit from 'express-rate-limit';
+import { verifyAccessToken } from '../../utils/auth';
+
+/**
+ * Funcionário logado conta pelo próprio usuário, não pelo IP: todas as telas do
+ * restaurante (cozinha, suqueiros, caixa, garçons, motoboys no Wi-Fi) saem pelo mesmo IP
+ * público do roteador, e no pico elas somam mais de 300 consultas/min — por IP, a equipe
+ * inteira dividia um limite só e as telas paravam de atualizar com 429. Token inválido
+ * ou ausente (site público, tentativa de abuso) continua contando por IP.
+ */
+export function staffOrIpKey(req: Request): string {
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    try {
+      return `user:${verifyAccessToken(header.slice(7)).sub}`;
+    } catch {
+      // token inválido/expirado: cai no limite por IP
+    }
+  }
+  return req.ip ?? 'unknown';
+}
 
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 300,
+  keyGenerator: staffOrIpKey,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: { code: 'RATE_LIMITED', message: 'Muitas requisições. Tente novamente.' } },

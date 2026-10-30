@@ -102,6 +102,13 @@ function broadcastProductionUpdate(tenantId: string, orderId: string, stations: 
 
 /** Recomputes order status from item statuses and syncs the table (across ALL of its comandas). */
 async function syncOrderStatus(orderId: string, tx: Prisma.TransactionClient = prisma) {
+  // Trava a linha do pedido ANTES de ler os itens: a Cozinha/Suqueiros marcam todos os
+  // itens de um bloco de uma vez (Promise.all em ProductionBoard.tsx), e sem o lock cada
+  // transação recalculava o status sem enxergar o item que a outra acabou de marcar — o
+  // pedido ficava preso em IN_PRODUCTION com todos os itens DONE (sumia do Caixa e o
+  // "entregue" dava 409). Com o lock, a segunda espera a primeira commitar e, como a
+  // leitura abaixo é um comando novo (READ COMMITTED), já enxerga os dois itens prontos.
+  await tx.$executeRaw`SELECT 1 FROM orders WHERE id = ${orderId} FOR UPDATE`;
   const order = await tx.order.findUnique({
     where: { id: orderId },
     include: { items: true },
