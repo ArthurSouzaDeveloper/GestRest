@@ -88,6 +88,22 @@ function juiceTypeSummary(categoryName: string): string {
   return name === 'sucos' ? 'SUCO' : 'BEBIDAS PRONTAS';
 }
 
+/**
+ * Açaí e Cupuaçu: categoria da estação dos suqueiros que deixou de ser "bebida pronta" e
+ * ganhou via própria ("AÇAÍ / CUPUAÇU") — pedido explícito do cliente/dono, junto com a
+ * aba principal própria no cardápio. É montado na hora com adicionais, então quem prepara
+ * precisa do item completo (obs/adicionais), não só da menção por nome na via principal.
+ */
+function isAcaiCategory(categoryName: string): boolean {
+  const name = categoryName
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+  return name.includes('acai') || name.includes('cupuacu');
+}
+
+const ACAI_HEADER = 'AÇAÍ / CUPUAÇU';
+
 // 'COMIDA' é o fallback de kitchenTypeSummary pra uma categoria de cozinha que não bate
 // nenhuma das 3 famílias por nome (não deveria acontecer no cardápio real, mas por
 // segurança: nunca pode sumir item de uma via por categoria com nome fora do padrão,
@@ -113,6 +129,7 @@ function includedItemsNotice(
   excludeType: string | null,
   kitchenTypesPresent: Set<string>,
   hasRealSuco: boolean,
+  hasAcai: boolean,
   hasBebidaPronta: boolean,
 ): string[] {
   const families: string[] = [];
@@ -120,6 +137,7 @@ function includedItemsNotice(
     if (type !== excludeType && kitchenTypesPresent.has(type)) families.push(type);
   }
   if (hasRealSuco) families.push('SUCO');
+  if (hasAcai) families.push(ACAI_HEADER);
   if (hasBebidaPronta) families.push('BEBIDA PRONTA');
   return families.length > 0 ? ['* ITENS INCLUSOS', ...families.map((f) => `* ${f}`)] : [];
 }
@@ -299,15 +317,21 @@ export const printJobService = {
       },
     });
     const fullKitchenItems = full.items.filter((i) => i.station === Station.KITCHEN);
-    // Suco de verdade (feito na hora) vs. bebida pronta (Açaí e Cupuaçu, Bebidas/água/
-    // refrigerante — sem preparo) — achado do cliente/dono: bebida pronta deixa de ser um
+    // Suco de verdade (feito na hora) vs. bebida pronta (Bebidas/água/refrigerante — sem
+    // preparo; Açaí e Cupuaçu tem via própria, ver isAcaiCategory) — achado do cliente/dono: bebida pronta deixa de ser um
     // item normal da via dos suqueiros (ver juiceTypeSummary) e passa a só ser MENCIONADA
     // por nome na via principal do pedido (ver abaixo), nunca numa via de produção própria.
     const fullHasRealSuco = full.items.some(
       (i) => i.station === Station.JUICE_BAR && juiceTypeSummary(i.product.category.name) === 'SUCO',
     );
+    const fullHasAcai = full.items.some(
+      (i) => i.station === Station.JUICE_BAR && isAcaiCategory(i.product.category.name),
+    );
     const fullBebidaProntaItems = full.items.filter(
-      (i) => i.station === Station.JUICE_BAR && juiceTypeSummary(i.product.category.name) !== 'SUCO',
+      (i) =>
+        i.station === Station.JUICE_BAR &&
+        juiceTypeSummary(i.product.category.name) !== 'SUCO' &&
+        !isAcaiCategory(i.product.category.name),
     );
     const fullHasBebidaPronta = fullBebidaProntaItems.length > 0;
 
@@ -350,6 +374,11 @@ export const printJobService = {
     // (sai do corpo — acha do cliente/dono — e só é mencionada por nome na via principal,
     // ver abaixo).
     const realSucoItems = juiceItems.filter((i) => juiceTypeSummary(i.product.category.name) === 'SUCO');
+    // Açaí/Cupuaçu sai numa via própria (ver isAcaiCategory), fora da via dos suqueiros.
+    const acaiItems = juiceItems.filter((i) => isAcaiCategory(i.product.category.name));
+    const bebidaProntaItems = juiceItems.filter(
+      (i) => juiceTypeSummary(i.product.category.name) !== 'SUCO' && !isAcaiCategory(i.product.category.name),
+    );
 
     // Cozinha: 1 papel por TIPO de prato presente no pedido (Pastel, Mini Pizza, Porção,
     // Sugestão da Casa), não mais 1 papel só com tudo junto — pedido explícito do cliente
@@ -380,12 +409,21 @@ export const printJobService = {
     // pedido não sairia em papel nenhum e ninguém saberia que existe; aqui a via carrega os
     // dados do cliente e a lista de bebidas (nunca fica em branco). Entrega não precisa
     // disso: a via do motoboy já cobre o pedido inteiro.
+    //
+    // Açaí/Cupuaçu vem por último na prioridade (ACAI_PRIORITY): só vira a via principal
+    // num pedido sem cozinha nem suco.
     const SUCOS_PRIORITY = 4;
+    const ACAI_PRIORITY = 5;
+    const printAcaiPaper = acaiItems.length > 0;
     const printJuicePaper =
       realSucoItems.length > 0 ||
-      (juiceItems.length > 0 && kitchenGroups.size === 0 && order.orderType !== 'DELIVERY');
+      (bebidaProntaItems.length > 0 &&
+        kitchenGroups.size === 0 &&
+        !printAcaiPaper &&
+        order.orderType !== 'DELIVERY');
     const presentPriorities = [...kitchenGroups.keys()];
     if (printJuicePaper) presentPriorities.push(SUCOS_PRIORITY);
+    if (printAcaiPaper) presentPriorities.push(ACAI_PRIORITY);
     const mainPriority = presentPriorities.length > 0 ? Math.min(...presentPriorities) : null;
     // Famílias de cozinha presentes no pedido INTEIRO (não só nesta leva) — usado pelo
     // aviso cruzado de cada papel abaixo, mesmo raciocínio de hasBeverages/fullHasRealSuco
@@ -403,7 +441,7 @@ export const printJobService = {
       // as vias secundárias já saem resumidas (minimalData) e quem as pega está preparando
       // um tipo específico — a conferência do pedido inteiro acontece na via principal.
       const notices = isMain
-        ? includedItemsNotice(myType, fullKitchenTypesPresent, fullHasRealSuco, fullHasBebidaPronta)
+        ? includedItemsNotice(myType, fullKitchenTypesPresent, fullHasRealSuco, fullHasAcai, fullHasBebidaPronta)
         : [];
       await tx.printJob.create({
         data: {
@@ -438,7 +476,7 @@ export const printJobService = {
       // (pedido só de suco/bebida). hasRealSuco=false porque esta É a via do suco — não
       // faz sentido ela avisar de si mesma.
       const notices = isMain
-        ? includedItemsNotice(null, fullKitchenTypesPresent, false, fullHasBebidaPronta)
+        ? includedItemsNotice(null, fullKitchenTypesPresent, false, fullHasAcai, fullHasBebidaPronta)
         : [];
       await tx.printJob.create({
         data: {
@@ -453,6 +491,33 @@ export const printJobService = {
             crossStationNoticeDetail: isMain ? bebidaProntaDetail : [],
             minimalData: !isMain,
             items: realSucoItems.map(toTicketItem),
+          }),
+        },
+      });
+    }
+
+    // Açaí/Cupuaçu: via própria com cada item completo (obs e adicionais), mesmo formato
+    // das demais vias de produção — pedido explícito do cliente/dono. Mesma estação dos
+    // suqueiros (a categoria continua JUICE_BAR), só com cabeçalho próprio.
+    if (printAcaiPaper) {
+      const isMain = mainPriority === ACAI_PRIORITY;
+      const notices = isMain
+        ? includedItemsNotice(null, fullKitchenTypesPresent, fullHasRealSuco, false, fullHasBebidaPronta)
+        : [];
+      await tx.printJob.create({
+        data: {
+          restaurantId: tenantId,
+          orderId,
+          station: Station.JUICE_BAR,
+          payload: renderTicket({
+            ...commonTicketFields,
+            station: Station.JUICE_BAR,
+            headerOverride: ACAI_HEADER,
+            itemSeparator: true,
+            crossStationNotice: notices,
+            crossStationNoticeDetail: isMain ? bebidaProntaDetail : [],
+            minimalData: !isMain,
+            items: acaiItems.map(toTicketItem),
           }),
         },
       });
