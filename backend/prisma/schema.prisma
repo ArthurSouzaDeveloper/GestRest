@@ -197,6 +197,13 @@ model Restaurant {
   // pedido, não dá pra assumir isso sozinho) nem DINE_IN (fora desse fluxo online).
   autoDeliverPickupMinutes Int?
 
+  // Conclusão automática pelo tempo estimado (pedido do dono): um pedido online (retirada OU
+  // entrega) aceito que passa do horário previsto (Order.estimatedReadyAt, o mesmo mostrado
+  // ao cliente) + esta margem é marcado pronto e entregue sozinho — mesmo efeito de terminar
+  // os itens na produção e clicar "Marcar Entregue". Ver autoComplete.service.ts.
+  // null = desligado. Padrão 10 min: já nasce ligado, que é o que o dono pediu.
+  autoCompleteMarginMinutes Int? @default(10)
+
   // Impressora térmica de rede (ESC/POS via TCP) usada pra imprimir os tickets de
   // produção — uma só, compartilhada entre Cozinha e Suqueiros (o ticket indica a
   // estação no cabeçalho). Nulo = impressão automática desligada pra esse restaurante

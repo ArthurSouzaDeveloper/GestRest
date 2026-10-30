@@ -6,6 +6,7 @@ import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import type {
+  AutoCompleteSettings,
   AutoDeliverPickupSettings,
   DeliveryDistanceBand,
   DeliveryPricingMode,
@@ -38,6 +39,7 @@ export default function DeliveryZones() {
       />
 
       <EtaSettingsCard />
+      <AutoCompleteCard />
       <AutoDeliverPickupCard />
 
       <div className="mb-6 flex gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
@@ -179,6 +181,104 @@ function EtaSettingsCard() {
                   onChange={(e) => setDeliveryMinutes(e.target.value)}
                 />
               </div>
+            </div>
+          )}
+
+          {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end">
+            <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>
+              Salvar
+            </button>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Conclusão automática pelo tempo estimado — pedido online (retirada ou entrega) aceito que
+ * passa do horário previsto mostrado ao cliente + a margem abaixo é marcado pronto e
+ * entregue sozinho (ver autoComplete.service.ts). Ligada por padrão com 10 min. Escrita
+ * restrita a ADMIN, mesmo critério do tempo estimado.
+ */
+function AutoCompleteCard() {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('ADMIN');
+  const qc = useQueryClient();
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['auto-complete'],
+    queryFn: async () => (await api.get<AutoCompleteSettings>('/catalog/auto-complete')).data,
+  });
+
+  const [enabled, setEnabled] = useState(true);
+  const [minutes, setMinutes] = useState('10');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!settings) return;
+    setEnabled(settings.marginMinutes !== null);
+    if (settings.marginMinutes !== null) setMinutes(String(settings.marginMinutes));
+  }, [settings]);
+
+  const save = useMutation({
+    mutationFn: async () =>
+      api.patch('/catalog/auto-complete', { marginMinutes: enabled ? Number(minutes) : null }),
+    onSuccess: () => {
+      setError('');
+      qc.invalidateQueries({ queryKey: ['auto-complete'] });
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+
+  if (isLoading || !settings) return null;
+
+  const on = settings.marginMinutes !== null;
+
+  return (
+    <Card className="mb-6">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Conclusão automática pelo tempo estimado</h3>
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+            on ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+          }`}
+        >
+          {on ? `Ligado — previsto + ${settings.marginMinutes} min` : 'Desligado'}
+        </span>
+      </div>
+
+      {!isAdmin ? (
+        <p className="text-sm text-gray-500">
+          {on
+            ? `Pedidos de retirada e entrega são marcados como prontos e entregues sozinhos ${settings.marginMinutes} min depois do horário previsto. Só administradores podem alterar.`
+            : 'Desligado: a equipe conclui cada pedido manualmente. Só administradores podem alterar.'}
+        </p>
+      ) : (
+        <>
+          <p className="mb-3 text-sm text-gray-500">
+            Pedido de retirada ou entrega já aceito que passa do horário previsto (o mesmo mostrado ao cliente,
+            definido no tempo estimado acima) mais a margem abaixo é marcado como pronto e entregue sozinho, e
+            entra no caixa com a forma de pagamento escolhida pelo cliente. Pedidos aguardando aceite ou
+            cancelados nunca são mexidos.
+          </p>
+          <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+            Ativar conclusão automática
+          </label>
+
+          {enabled && (
+            <div className="mb-3 max-w-[200px]">
+              <label className="label">Margem depois do previsto (min)</label>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={120}
+                value={minutes}
+                onChange={(e) => setMinutes(e.target.value)}
+              />
             </div>
           )}
 
