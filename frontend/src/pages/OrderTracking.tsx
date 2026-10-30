@@ -2,19 +2,35 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Check, Clock, ShoppingBag, ChefHat, PartyPopper, XCircle } from 'lucide-react';
 import api from '../lib/api';
-import { brl } from '../lib/format';
-import { Spinner } from '../components/ui';
+import { brl, dateTime } from '../lib/format';
+import { Spinner, paymentMethodLabels } from '../components/ui';
 import { deriveBrandVars } from '../lib/publicBrand';
-import type { OrderStatus, OrderType } from '../types';
+import type { OrderStatus, OrderType, PaymentMethod } from '../types';
 
 interface PublicOrderStatus {
   number: number;
   status: OrderStatus;
   orderType: OrderType;
+  createdAt: string;
   estimatedReadyAt: string | null;
   acceptedAt: string | null;
-  items: { name: string; quantity: number; status: string }[];
+  notes: string | null;
+  items: {
+    name: string;
+    quantity: number;
+    status: string;
+    unitPrice: number;
+    notes: string | null;
+    additionals: { name: string; price: number }[];
+    lineTotal: number;
+  }[];
+  subtotal: number;
+  discount: number;
+  deliveryFee: number;
   total: number;
+  paymentMethod: PaymentMethod | null;
+  changeFor: number | null;
+  deliveryAddress: { street: string | null; number: string | null; complement: string | null; zone: string | null } | null;
 }
 
 interface PublicRestaurant {
@@ -95,6 +111,9 @@ export default function OrderTracking() {
         <div className="mx-auto max-w-md">
           <span className="text-xs font-semibold text-white/75">{restaurant?.name ?? 'Acompanhar pedido'}</span>
           <h1 className="mt-0.5 text-xl font-extrabold text-white">Pedido #{order.number}</h1>
+          <p className="mt-0.5 text-xs text-white/75">
+            {isPickup ? 'Retirada' : 'Entrega'} · feito em {dateTime(order.createdAt)}
+          </p>
         </div>
       </div>
 
@@ -162,18 +181,79 @@ export default function OrderTracking() {
 
         <div className="mt-6 rounded-[6px] border border-[#14161C]/10 bg-white p-4">
           <div className="text-sm font-semibold text-[#14161C]">Itens</div>
-          <div className="mt-2 space-y-1.5 text-sm">
+          <div className="mt-2 space-y-2.5 text-sm">
             {order.items.map((item, i) => (
-              <div key={i} className="flex justify-between text-gray-600">
-                <span>{item.quantity}× {item.name}</span>
+              <div key={i} className="text-gray-600">
+                <div className="flex justify-between gap-3">
+                  <span className="font-medium text-[#14161C]">
+                    {item.quantity}× {item.name}
+                  </span>
+                  <span className="shrink-0">{brl(item.lineTotal)}</span>
+                </div>
+                {item.quantity > 1 && <div className="text-xs text-gray-400">{brl(item.unitPrice)} cada</div>}
+                {item.additionals.map((a, j) => (
+                  <div key={j} className="flex justify-between gap-3 pl-3 text-xs text-gray-500">
+                    <span>+ {a.name}</span>
+                    {a.price > 0 && <span className="shrink-0">{brl(a.price)}</span>}
+                  </div>
+                ))}
+                {item.notes && <div className="pl-3 text-xs italic text-gray-500">Obs.: {item.notes}</div>}
               </div>
             ))}
           </div>
-          <div className="mt-3 flex justify-between border-t border-gray-100 pt-3 text-sm font-semibold text-[#14161C] dark:border-gray-800">
-            <span>Total</span>
-            <span>{brl(order.total)}</span>
+          <div className="mt-3 space-y-1 border-t border-gray-100 pt-3 text-sm text-gray-600">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{brl(order.subtotal)}</span>
+            </div>
+            {order.discount > 0 && (
+              <div className="flex justify-between">
+                <span>Desconto</span>
+                <span>-{brl(order.discount)}</span>
+              </div>
+            )}
+            {!isPickup && (
+              <div className="flex justify-between">
+                <span>Taxa de entrega</span>
+                <span>{order.deliveryFee > 0 ? brl(order.deliveryFee) : 'Grátis'}</span>
+              </div>
+            )}
+            <div className="flex justify-between pt-1 font-semibold text-[#14161C]">
+              <span>Total</span>
+              <span>{brl(order.total)}</span>
+            </div>
           </div>
         </div>
+
+        {(order.paymentMethod || order.deliveryAddress || order.notes) && (
+          <div className="mt-3 space-y-2.5 rounded-[6px] border border-[#14161C]/10 bg-white p-4 text-sm text-gray-600">
+            {order.paymentMethod && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Pagamento</div>
+                <div>
+                  {paymentMethodLabels[order.paymentMethod]}
+                  {order.paymentMethod === 'CASH' && order.changeFor ? ` · troco para ${brl(order.changeFor)}` : ''}
+                </div>
+              </div>
+            )}
+            {order.deliveryAddress && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Endereço de entrega</div>
+                <div>
+                  {[order.deliveryAddress.street, order.deliveryAddress.number].filter(Boolean).join(', ')}
+                  {order.deliveryAddress.complement ? ` · ${order.deliveryAddress.complement}` : ''}
+                </div>
+                {order.deliveryAddress.zone && <div className="text-xs text-gray-500">{order.deliveryAddress.zone}</div>}
+              </div>
+            )}
+            {order.notes && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Observação do pedido</div>
+                <div className="italic">{order.notes}</div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
