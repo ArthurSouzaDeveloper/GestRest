@@ -127,18 +127,22 @@ const KITCHEN_FAMILY_ORDER = ['PASTEL', 'MINI PIZZA', 'PORCAO', 'COMIDA'];
  */
 function includedItemsNotice(
   excludeType: string | null,
-  kitchenTypesPresent: Set<string>,
-  hasRealSuco: boolean,
-  hasAcai: boolean,
-  hasBebidaPronta: boolean,
+  kitchenTypeCounts: Map<string, number>,
+  sucoQty: number,
+  acaiQty: number,
+  bebidaProntaQty: number,
 ): string[] {
+  // Quantidade de cada família na frente ("2- PASTEL", mesmo formato da via do motoboy) —
+  // pedido explícito do cliente/dono: só o nome da família não dizia quantos itens
+  // conferir na via principal.
   const families: string[] = [];
   for (const type of KITCHEN_FAMILY_ORDER) {
-    if (type !== excludeType && kitchenTypesPresent.has(type)) families.push(type);
+    const qty = kitchenTypeCounts.get(type) ?? 0;
+    if (type !== excludeType && qty > 0) families.push(`${qty}- ${type}`);
   }
-  if (hasRealSuco) families.push('SUCO');
-  if (hasAcai) families.push(ACAI_HEADER);
-  if (hasBebidaPronta) families.push('BEBIDA PRONTA');
+  if (sucoQty > 0) families.push(`${sucoQty}- SUCO`);
+  if (acaiQty > 0) families.push(`${acaiQty}- ${ACAI_HEADER}`);
+  if (bebidaProntaQty > 0) families.push(`${bebidaProntaQty}- BEBIDA PRONTA`);
   return families.length > 0 ? ['* ITENS INCLUSOS', ...families.map((f) => `* ${f}`)] : [];
 }
 
@@ -321,11 +325,12 @@ export const printJobService = {
     // preparo; Açaí e Cupuaçu tem via própria, ver isAcaiCategory) — achado do cliente/dono: bebida pronta deixa de ser um
     // item normal da via dos suqueiros (ver juiceTypeSummary) e passa a só ser MENCIONADA
     // por nome na via principal do pedido (ver abaixo), nunca numa via de produção própria.
-    const fullHasRealSuco = full.items.some(
-      (i) => i.station === Station.JUICE_BAR && juiceTypeSummary(i.product.category.name) === 'SUCO',
+    const sumQty = (items: { quantity: number }[]) => items.reduce((a, i) => a + i.quantity, 0);
+    const fullSucoQty = sumQty(
+      full.items.filter((i) => i.station === Station.JUICE_BAR && juiceTypeSummary(i.product.category.name) === 'SUCO'),
     );
-    const fullHasAcai = full.items.some(
-      (i) => i.station === Station.JUICE_BAR && isAcaiCategory(i.product.category.name),
+    const fullAcaiQty = sumQty(
+      full.items.filter((i) => i.station === Station.JUICE_BAR && isAcaiCategory(i.product.category.name)),
     );
     const fullBebidaProntaItems = full.items.filter(
       (i) =>
@@ -333,7 +338,7 @@ export const printJobService = {
         juiceTypeSummary(i.product.category.name) !== 'SUCO' &&
         !isAcaiCategory(i.product.category.name),
     );
-    const fullHasBebidaPronta = fullBebidaProntaItems.length > 0;
+    const fullBebidaProntaQty = sumQty(fullBebidaProntaItems);
 
     let orderTotal: number | null = null;
     if (order.orderType === 'DELIVERY') {
@@ -426,9 +431,13 @@ export const printJobService = {
     if (printAcaiPaper) presentPriorities.push(ACAI_PRIORITY);
     const mainPriority = presentPriorities.length > 0 ? Math.min(...presentPriorities) : null;
     // Famílias de cozinha presentes no pedido INTEIRO (não só nesta leva) — usado pelo
-    // aviso cruzado de cada papel abaixo, mesmo raciocínio de hasBeverages/fullHasRealSuco
+    // aviso cruzado de cada papel abaixo, mesmo raciocínio de hasBeverages/fullSucoQty
     // (full.items, não `items`/kitchenItems) já explicado ali em cima.
-    const fullKitchenTypesPresent = new Set(fullKitchenItems.map((i) => kitchenTypeSummary(i.product.category.name)));
+    const fullKitchenTypeCounts = new Map<string, number>();
+    for (const i of fullKitchenItems) {
+      const key = kitchenTypeSummary(i.product.category.name);
+      fullKitchenTypeCounts.set(key, (fullKitchenTypeCounts.get(key) ?? 0) + i.quantity);
+    }
     // O nome de cada bebida pronta sai logo abaixo do "* BEBIDA PRONTA" do aviso, só na via
     // principal — inclusive em entrega, onde a via do motoboy também lista as bebidas por
     // nome (ver motoboySummaryItems): quem monta a sacola precisa da lista tanto quanto
@@ -441,7 +450,7 @@ export const printJobService = {
       // as vias secundárias já saem resumidas (minimalData) e quem as pega está preparando
       // um tipo específico — a conferência do pedido inteiro acontece na via principal.
       const notices = isMain
-        ? includedItemsNotice(myType, fullKitchenTypesPresent, fullHasRealSuco, fullHasAcai, fullHasBebidaPronta)
+        ? includedItemsNotice(myType, fullKitchenTypeCounts, fullSucoQty, fullAcaiQty, fullBebidaProntaQty)
         : [];
       await tx.printJob.create({
         data: {
@@ -473,10 +482,10 @@ export const printJobService = {
     if (printJuicePaper) {
       const isMain = mainPriority === SUCOS_PRIORITY;
       // Mesma regra dos papéis de cozinha: o bloco só sai quando esta é a via principal
-      // (pedido só de suco/bebida). hasRealSuco=false porque esta É a via do suco — não
+      // (pedido só de suco/bebida). suco=0 porque esta É a via do suco — não
       // faz sentido ela avisar de si mesma.
       const notices = isMain
-        ? includedItemsNotice(null, fullKitchenTypesPresent, false, fullHasAcai, fullHasBebidaPronta)
+        ? includedItemsNotice(null, fullKitchenTypeCounts, 0, fullAcaiQty, fullBebidaProntaQty)
         : [];
       await tx.printJob.create({
         data: {
@@ -502,7 +511,7 @@ export const printJobService = {
     if (printAcaiPaper) {
       const isMain = mainPriority === ACAI_PRIORITY;
       const notices = isMain
-        ? includedItemsNotice(null, fullKitchenTypesPresent, fullHasRealSuco, false, fullHasBebidaPronta)
+        ? includedItemsNotice(null, fullKitchenTypeCounts, fullSucoQty, 0, fullBebidaProntaQty)
         : [];
       await tx.printJob.create({
         data: {

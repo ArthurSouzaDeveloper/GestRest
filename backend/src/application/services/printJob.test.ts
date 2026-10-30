@@ -173,9 +173,9 @@ describe('fila de impressão térmica (PrintJob)', () => {
     // aparece no corpo do papel. Suco de verdade (categoria "Sucos" exata) entra como
     // "SUCO", não o genérico "BEBIDA" de antes.
     expect(pastelPaper).toContain('* ITENS INCLUSOS\n');
-    expect(pastelPaper).toContain('* MINI PIZZA\n');
-    expect(pastelPaper).toContain('* PORCAO\n');
-    expect(pastelPaper).toContain('* SUCO\n');
+    expect(pastelPaper).toContain('* 2- MINI PIZZA\n');
+    expect(pastelPaper).toContain('* 1- PORCAO\n');
+    expect(pastelPaper).toContain('* 1- SUCO\n');
     expect(pastelPaper).not.toContain('ITENS INCLUSOS: ');
     expect(pastelPaper).not.toContain('Calabresa');
     expect(pastelPaper).not.toContain('Banana com Canela');
@@ -697,7 +697,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     // por linha — suco de verdade (categoria "Sucos" exata) vira "SUCO", não o genérico
     // "BEBIDA" de antes.
     expect(kitchenJob).toContain('* ITENS INCLUSOS\n');
-    expect(kitchenJob).toContain('* SUCO\n');
+    expect(kitchenJob).toContain('* 2- SUCO\n');
 
     expect(juiceJob).toContain('SUQUEIROS');
     expect(juiceJob).toContain('2- Suco');
@@ -893,7 +893,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
 
     // Só a via principal (Pastel) leva o bloco; a dos suqueiros, secundária, não leva.
     expect(kitchenJob).toContain('* ITENS INCLUSOS\n');
-    expect(kitchenJob).toContain('* SUCO\n');
+    expect(kitchenJob).toContain('* 1- SUCO\n');
     expect(juiceJob).not.toContain('ITENS INCLUSOS');
 
     // Passo 3 (achado do cliente/dono): com pastel E suco no mesmo pedido, só a via
@@ -965,11 +965,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
     // Via principal (Pastel, maior prioridade) lista as famílias uma por linha, com bebida
     // pronta por ÚLTIMO, e logo abaixo o nome de cada bebida com a quantidade.
     expect(kitchenJob).toContain('* ITENS INCLUSOS\n');
-    expect(kitchenJob).toContain('* SUCO\n');
-    expect(kitchenJob).toContain('* BEBIDA PRONTA\n');
+    expect(kitchenJob).toContain('* 1- SUCO\n');
+    expect(kitchenJob).toContain('* 2- BEBIDA PRONTA\n');
     expect(kitchenJob).toContain('(2 Cerveja Long Neck)');
-    expect(kitchenJob.indexOf('* BEBIDA PRONTA\n')).toBeGreaterThan(kitchenJob.indexOf('* SUCO\n'));
-    expect(kitchenJob.indexOf('(2 Cerveja Long Neck)')).toBeGreaterThan(kitchenJob.indexOf('* BEBIDA PRONTA\n'));
+    expect(kitchenJob.indexOf('* 2- BEBIDA PRONTA\n')).toBeGreaterThan(kitchenJob.indexOf('* 1- SUCO\n'));
+    expect(kitchenJob.indexOf('(2 Cerveja Long Neck)')).toBeGreaterThan(kitchenJob.indexOf('* 2- BEBIDA PRONTA\n'));
 
     // Via dos suqueiros continua com o suco de verdade no corpo, mas SEM a cerveja — ela
     // não é mais um item normal dessa via (achado do cliente/dono, Passo 8).
@@ -1012,7 +1012,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     // Agora a via principal TAMBÉM lista a bebida por nome em entrega (antes essa menção
     // morava só na via do motoboy) — quem monta a sacola precisa da lista tanto quanto
     // quem entrega, pedido explícito do cliente/dono a partir da via anotada pelo lead.
-    expect(kitchenJob).toContain('* BEBIDA PRONTA\n');
+    expect(kitchenJob).toContain('* 1- BEBIDA PRONTA\n');
     expect(kitchenJob).toContain('(Coca-Cola Lata)');
     // A bebida continua fora do CORPO da via de produção (não é item de preparo) — só a
     // menção no aviso do topo, antes da primeira linha divisória de item.
@@ -1142,7 +1142,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(acaiPaper).not.toContain('Cliente Via Acai');
     const pastelPaper = texts.find((t) => t.includes('COZINHA - PASTEL'))!;
     expect(pastelPaper).toContain('Cliente Via Acai');
-    expect(pastelPaper).toContain('* ACAI / CUPUACU\n');
+    expect(pastelPaper).toContain('* 1- ACAI / CUPUACU\n');
     expect(pastelPaper).not.toContain('BEBIDA PRONTA');
     // Via dos suqueiros só com o suco.
     const juicePaper = texts.find((t) => t.includes('SUQUEIROS'))!;
