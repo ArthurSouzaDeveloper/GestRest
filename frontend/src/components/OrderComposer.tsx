@@ -81,7 +81,7 @@ export function draftItemLabel(item: DraftItem): string {
 type TopGroup = 'COMIDAS' | 'BEBIDAS' | 'ACAI';
 
 const TOP_GROUP_LABELS: Record<TopGroup, string> = {
-  COMIDAS: 'Pastéis e Mini Pizzas',
+  COMIDAS: 'Pastéis, Mini Pizza e Porções',
   BEBIDAS: 'Sucos e Bebidas',
   ACAI: 'Açaí e Cupuaçu',
 };
@@ -379,7 +379,7 @@ export function OrderComposer({
 
         {!searching && (
           <>
-            {/* Grupo principal: 3 blocos — Pastéis e Mini Pizzas / Sucos e Bebidas / Açaí e
+            {/* Grupo principal: 3 blocos — Pastéis, Mini Pizza e Porções / Sucos e Bebidas / Açaí e
                 Cupuaçu. Água e Refrigerantes viraram chip dentro de Sucos e Bebidas (ver
                 abaixo) em vez de aba própria. */}
             <div className="mb-2 grid grid-cols-3 gap-2">
