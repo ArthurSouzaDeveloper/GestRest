@@ -177,6 +177,7 @@ const ADICIONAIS_SALGADOS: [string, number][] = [
   ['Guacamole Apimentada 200ml', 8.0],
   ['Purê de Batata', 3.0],
   ['Molho de Alho', 2.0],
+  ['Barbecue', 2.0],
   ['Cream Cheese', 4.5],
   ['Cebola Caramelizada', 2.5],
   ['Cebola Defumada', 2.5],
