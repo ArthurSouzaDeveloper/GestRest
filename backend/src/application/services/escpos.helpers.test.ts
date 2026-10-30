@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OrderType, PaymentMethod, Station } from '@prisma/client';
-import { renderTicket } from './escpos.helpers';
+import { mergeIdenticalItems, renderTicket } from './escpos.helpers';
 
 const PLACED_AT = new Date('2026-09-17T12:00:00Z');
 
@@ -596,5 +596,65 @@ describe('renderTicket', () => {
     const bodyModeAfterDash = Buffer.from([...Buffer.from('-'.repeat(28), 'ascii'), 0x0a, 0x1b, 0x21, 0x18]);
     expect(comSeparadorBytes.includes(normalModeBeforeDash)).toBe(true);
     expect(comSeparadorBytes.includes(bodyModeAfterDash)).toBe(true);
+  });
+});
+
+describe('mergeIdenticalItems', () => {
+  it('junta itens iguais pedidos em momentos diferentes e soma a quantidade, mantendo a ordem', () => {
+    const merged = mergeIdenticalItems([
+      { name: 'Xadrez', description: null, quantity: 1, additionals: [] },
+      { name: 'CHEDDAR, FRANGO', description: null, quantity: 1, additionals: [] },
+      { name: 'CATUPIRY, FRANGO', description: null, quantity: 1, additionals: [] },
+      { name: 'FRANGO, CHEDDAR', description: null, quantity: 2, additionals: [] },
+    ]);
+    expect(merged.map((i) => `${i.quantity}- ${i.name}`)).toEqual([
+      '1- Xadrez',
+      '3- CHEDDAR, FRANGO',
+      '1- CATUPIRY, FRANGO',
+    ]);
+  });
+
+  it('não junta itens com observação ou adicionais diferentes', () => {
+    const merged = mergeIdenticalItems([
+      { name: 'CARNE', description: null, quantity: 1, additionals: [] },
+      { name: 'CARNE', description: null, quantity: 1, notes: 'Acrescentar brocolis', additionals: [] },
+      { name: 'CARNE', description: null, quantity: 1, additionals: ['Barbecue'] },
+      { name: 'CARNE', description: null, quantity: 1, notes: '  ', additionals: [] },
+      { name: 'CARNE', description: null, quantity: 1, additionals: ['Barbecue'] },
+    ]);
+    expect(merged.map((i) => [i.quantity, i.notes ?? null, i.additionals])).toEqual([
+      [2, null, []],
+      [1, 'Acrescentar brocolis', []],
+      [2, null, ['Barbecue']],
+    ]);
+  });
+
+  it('não altera os itens de entrada', () => {
+    const items = [
+      { name: 'CARNE', description: null, quantity: 1, additionals: [] },
+      { name: 'CARNE', description: null, quantity: 1, additionals: [] },
+    ];
+    mergeIdenticalItems(items);
+    expect(items[0].quantity).toBe(1);
+  });
+
+  it('a via impressa sai com uma linha só para os itens iguais', () => {
+    const text = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.PICKUP,
+      orderNumber: 4,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      items: [
+        { name: 'CHEDDAR, FRANGO', description: null, quantity: 1, additionals: [] },
+        { name: 'CARNE', description: null, quantity: 1, additionals: [] },
+        { name: 'CHEDDAR, FRANGO', description: null, quantity: 1, additionals: [] },
+      ],
+    }).toString('latin1');
+    expect(text).toContain('2- CHEDDAR, FRANGO');
+    expect(text).not.toContain('1- CHEDDAR, FRANGO');
   });
 });

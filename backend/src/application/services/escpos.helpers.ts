@@ -56,6 +56,41 @@ export interface TicketItem {
   additionals: string[];
 }
 
+/**
+ * Junta numa linha só os itens IGUAIS da via, somando a quantidade — pedido explícito do
+ * cliente/dono: quem pede "Frango Cheddar", depois outro sabor, depois "Frango Cheddar" de
+ * novo saía com duas linhas "1- CHEDDAR, FRANGO" soltas na via, em vez de "2- CHEDDAR,
+ * FRANGO". Igual = mesmo nome, tipo, descrição, adicionais e observação; item com obs
+ * diferente continua separado (quem prepara precisa ver a obs de cada um). A ordem dos
+ * ingredientes no nome e nos adicionais não importa ("FRANGO, CHEDDAR" = "CHEDDAR,
+ * FRANGO"). Mantém a posição da primeira ocorrência. Só mexe na impressão: o pedido, os
+ * preços e o total continuam exatamente como foram lançados.
+ */
+export function mergeIdenticalItems(items: TicketItem[]): TicketItem[] {
+  const sortedParts = (text: string) =>
+    text
+      .split(',')
+      .map((p) => p.trim().toLowerCase())
+      .sort()
+      .join(',');
+  const keyOf = (item: TicketItem) =>
+    JSON.stringify([
+      sortedParts(item.name),
+      item.typeLabel ?? null,
+      item.description ?? null,
+      item.notes?.trim() || null,
+      item.additionals.map((a) => a.trim().toLowerCase()).sort(),
+    ]);
+  const merged = new Map<string, TicketItem>();
+  for (const item of items) {
+    const key = keyOf(item);
+    const existing = merged.get(key);
+    if (existing) existing.quantity += item.quantity;
+    else merged.set(key, { ...item });
+  }
+  return [...merged.values()];
+}
+
 export interface TicketDeliveryAddress {
   street: string;
   number: string;
@@ -228,7 +263,7 @@ export function renderTicket(input: TicketInput): Buffer {
   }
   parts.push(line('--------------------------------'));
 
-  for (const item of input.items) {
+  for (const item of mergeIdenticalItems(input.items)) {
     // Pedido do dono do restaurante: nome, quantidade, descrição e valor — sem a
     // categoria crua do produto (nem cozinha, nem suqueiros), só o tipo do prato
     // (pastel/mini pizza/porção) quando informado, prefixado ao nome do sabor.
