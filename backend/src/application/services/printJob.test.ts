@@ -184,20 +184,16 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(miniPizzaPaper).toContain('1- Calabresa');
     expect(miniPizzaPaper).toContain('1- Banana com Canela');
     expect(miniPizzaPaper).not.toContain('/ un.');
-    expect(miniPizzaPaper).toContain('* ITENS INCLUSOS\n');
-    expect(miniPizzaPaper).toContain('* PASTEL\n');
-    expect(miniPizzaPaper).toContain('* PORCAO\n');
-    expect(miniPizzaPaper).toContain('* SUCO\n');
+    // Via secundária (Pastel é a principal): sem o bloco "ITENS INCLUSOS" nenhum — ele é
+    // exclusivo da via principal (pedido explícito do cliente/dono).
+    expect(miniPizzaPaper).not.toContain('ITENS INCLUSOS');
     expect(miniPizzaPaper).not.toContain('Mussarela');
     expect(miniPizzaPaper).not.toContain('Chocolate');
     expect(miniPizzaPaper).not.toContain('Batata Frita');
 
     expect(porcaoPaper).toContain('1- Batata Frita');
     expect(porcaoPaper).not.toContain('/ un.');
-    expect(porcaoPaper).toContain('* ITENS INCLUSOS\n');
-    expect(porcaoPaper).toContain('* PASTEL\n');
-    expect(porcaoPaper).toContain('* MINI PIZZA\n');
-    expect(porcaoPaper).toContain('* SUCO\n');
+    expect(porcaoPaper).not.toContain('ITENS INCLUSOS');
     expect(porcaoPaper).not.toContain('Mussarela');
     expect(porcaoPaper).not.toContain('Chocolate');
     expect(porcaoPaper).not.toContain('Calabresa');
@@ -709,20 +705,21 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(juiceJob).not.toContain('SEGUNDA VIA MOTOBOY');
     expect(juiceJob).not.toContain('PEDIDO COM BEBIDAS');
     expect(juiceJob).not.toContain('TOTAL DO PEDIDO');
-    // Mesmo aviso na direção contrária — categoria de teste é "Cozinha" (genérica, ver
-    // beforeAll), então cai no fallback "COMIDA" (não bate pastel/mini pizza/porção).
-    expect(juiceJob).toContain('* ITENS INCLUSOS\n');
-    expect(juiceJob).toContain('* COMIDA\n');
+    // A via dos suqueiros aqui é secundária (a cozinha é a principal), então NÃO leva o
+    // bloco "ITENS INCLUSOS" — ele é exclusivo da via principal.
+    expect(juiceJob).not.toContain('ITENS INCLUSOS');
 
     // A via do motoboy não estampa "COZINHA" nem "SUQUEIROS" no topo (reúne as duas), nem
     // um cabeçalho grande próprio (removido a pedido do cliente pra economizar papel) —
     // traz só a CONTAGEM por família (achado do cliente/dono: a via estava detalhada
-    // demais, o motoboy só precisa saber se tem e quantos de cada tipo), avisa que tem
-    // bebida e mostra o total (10 do pastel + 2×8 dos sucos + 5 de taxa de entrega, sem
-    // serviço em online). Categoria de cozinha do fixture é "Cozinha" (genérica, sem bater
-    // pastel/mini pizza/porção por nome) — cai no fallback "COMIDA" (ver motoboySummaryItems).
+    // demais, o motoboy só precisa saber se tem e quantos de cada tipo) e o total (10 do
+    // pastel + 2×8 dos sucos + 5 de taxa de entrega, sem serviço em online). Categoria de
+    // cozinha do fixture é "Cozinha" (genérica, sem bater pastel/mini pizza/porção por
+    // nome) — cai no fallback "COMIDA" (ver motoboySummaryItems).
     expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
-    expect(motoboyJob).toContain('ITENS INCLUSOS: BEBIDA');
+    // Sem bloco "ITENS INCLUSOS": ele é exclusivo da via principal, e aqui seria redundante
+    // — o corpo desta via já lista o pedido inteiro.
+    expect(motoboyJob).not.toContain('ITENS INCLUSOS');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 31,00');
     // Logo abaixo do total — pedido explícito do cliente/dono: motoboy confere quanto do
     // valor é frete sem abrir o sistema.
@@ -888,10 +885,10 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const kitchenJob = jobs.find((j) => j.station === Station.KITCHEN)!.payload.toString('ascii');
     const juiceJob = jobs.find((j) => j.station === Station.JUICE_BAR)!.payload.toString('ascii');
 
+    // Só a via principal (Pastel) leva o bloco; a dos suqueiros, secundária, não leva.
     expect(kitchenJob).toContain('* ITENS INCLUSOS\n');
     expect(kitchenJob).toContain('* SUCO\n');
-    expect(juiceJob).toContain('* ITENS INCLUSOS\n');
-    expect(juiceJob).toContain('* PASTEL\n');
+    expect(juiceJob).not.toContain('ITENS INCLUSOS');
 
     // Passo 3 (achado do cliente/dono): com pastel E suco no mesmo pedido, só a via
     // principal (Pastel, maior prioridade — PASTEL > MINI PIZZA > PORÇÃO > SUCOS) leva

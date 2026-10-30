@@ -318,7 +318,6 @@ export const printJobService = {
         },
       },
     });
-    const hasBeverages = full.items.some((i) => i.station === Station.JUICE_BAR);
     const fullKitchenItems = full.items.filter((i) => i.station === Station.KITCHEN);
     // Suco de verdade (feito na hora) vs. bebida pronta (Açaí e Cupuaçu, Bebidas/água/
     // refrigerante — sem preparo) — achado do cliente/dono: bebida pronta deixa de ser um
@@ -410,7 +409,12 @@ export const printJobService = {
     for (const [priority, groupItems] of [...kitchenGroups.entries()].sort(([a], [b]) => a - b)) {
       const myType = kitchenTypeSummary(groupItems[0].product.category.name);
       const isMain = priority === mainPriority;
-      const notices = includedItemsNotice(myType, fullKitchenTypesPresent, fullHasRealSuco, fullHasBebidaPronta);
+      // Só a via principal leva o bloco "ITENS INCLUSOS" (pedido explícito do cliente/dono):
+      // as vias secundárias já saem resumidas (minimalData) e quem as pega está preparando
+      // um tipo específico — a conferência do pedido inteiro acontece na via principal.
+      const notices = isMain
+        ? includedItemsNotice(myType, fullKitchenTypesPresent, fullHasRealSuco, fullHasBebidaPronta)
+        : [];
       await tx.printJob.create({
         data: {
           restaurantId: tenantId,
@@ -443,10 +447,12 @@ export const printJobService = {
     // bebida pronta não entra no corpo (ver realSucoItems/bebidaProntaItems acima).
     if (juiceItems.length > 0) {
       const isMain = mainPriority === SUCOS_PRIORITY;
-      // hasRealSuco=false: esta É a via do suco, não faz sentido ela avisar de si mesma.
-      // Bebida pronta só entra como família quando esta é a via principal — é ela que
-      // carrega os nomes logo abaixo; fora disso quem lista é a via principal da cozinha.
-      const notices = includedItemsNotice(null, fullKitchenTypesPresent, false, isMain && fullHasBebidaPronta);
+      // Mesma regra dos papéis de cozinha: o bloco só sai quando esta é a via principal
+      // (pedido só de suco/bebida). hasRealSuco=false porque esta É a via do suco — não
+      // faz sentido ela avisar de si mesma.
+      const notices = isMain
+        ? includedItemsNotice(null, fullKitchenTypesPresent, false, fullHasBebidaPronta)
+        : [];
       await tx.printJob.create({
         data: {
           restaurantId: tenantId,
@@ -489,7 +495,10 @@ export const printJobService = {
             // tracejado + "SEGUNDA VIA MOTOBOY" em tamanho normal.
             headerOverride: '',
             copyLabel: 'SEGUNDA VIA MOTOBOY',
-            crossStationNotice: hasBeverages ? ['ITENS INCLUSOS: BEBIDA'] : null,
+            // Sem "ITENS INCLUSOS" aqui: o bloco é exclusivo da via principal, e nesta via
+            // ele seria redundante de qualquer forma — o corpo dela já lista o pedido
+            // inteiro (famílias + cada bebida por nome, ver motoboySummaryItems).
+            crossStationNotice: null,
             orderTotal,
             deliveryFee: Number(full.deliveryFee),
             itemsSummaryOnly: true,
