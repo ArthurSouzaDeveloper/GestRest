@@ -340,9 +340,9 @@ export const printJobService = {
     );
     const fullBebidaProntaQty = sumQty(fullBebidaProntaItems);
 
-    // Entrega: impresso na via do motoboy. Retirada: impresso no fim da via principal
-    // (pedido explícito do cliente/dono: quem entrega o pedido no balcão confere quanto
-    // cobrar, igual o motoboy faz). Mesa não leva total — paga no caixa.
+    // Retirada e entrega: impresso no fim da via principal de produção (pedido explícito
+    // do cliente/dono: quem monta/entrega o pedido confere quanto cobrar), e em entrega
+    // também na via do motoboy. Mesa não leva total — paga no caixa.
     let orderTotal: number | null = null;
     if (order.orderType === 'DELIVERY' || order.orderType === 'PICKUP') {
       // Mesma fórmula de order.helpers.ts#computeTotals (subtotal - desconto + serviço +
@@ -358,9 +358,9 @@ export const printJobService = {
       const serviceFee = round(((subtotal - discount) * Number(full.serviceRate)) / 100);
       orderTotal = round(subtotal - discount + serviceFee + Number(full.deliveryFee));
     }
-    // Total que vai na via principal de produção — só em retirada (em entrega o total já
-    // sai na via do motoboy, logo abaixo).
-    const mainPaperTotal = order.orderType === 'PICKUP' ? orderTotal : null;
+    // Via principal de produção leva o mesmo total da via do motoboy, inclusive a linha da
+    // taxa de entrega logo abaixo (null/0 em retirada, que não imprime a linha).
+    const mainPaperDeliveryFee = order.orderType === 'DELIVERY' ? Number(full.deliveryFee) : null;
 
     const commonTicketFields = {
       tableNumber: order.table?.number ?? null,
@@ -476,7 +476,8 @@ export const printJobService = {
             crossStationNotice: notices,
             crossStationNoticeDetail: isMain ? bebidaProntaDetail : [],
             minimalData: !isMain,
-            orderTotal: isMain ? mainPaperTotal : null,
+            orderTotal: isMain ? orderTotal : null,
+            deliveryFee: isMain ? mainPaperDeliveryFee : null,
             items: groupItems.map(toTicketItem),
           }),
         },
@@ -506,7 +507,8 @@ export const printJobService = {
             crossStationNotice: notices,
             crossStationNoticeDetail: isMain ? bebidaProntaDetail : [],
             minimalData: !isMain,
-            orderTotal: isMain ? mainPaperTotal : null,
+            orderTotal: isMain ? orderTotal : null,
+            deliveryFee: isMain ? mainPaperDeliveryFee : null,
             items: realSucoItems.map(toTicketItem),
           }),
         },
@@ -534,7 +536,8 @@ export const printJobService = {
             crossStationNotice: notices,
             crossStationNoticeDetail: isMain ? bebidaProntaDetail : [],
             minimalData: !isMain,
-            orderTotal: isMain ? mainPaperTotal : null,
+            orderTotal: isMain ? orderTotal : null,
+            deliveryFee: isMain ? mainPaperDeliveryFee : null,
             items: acaiItems.map(toTicketItem),
           }),
         },

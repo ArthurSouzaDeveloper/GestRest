@@ -691,7 +691,8 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(kitchenJob).not.toContain('Suco');
     expect(kitchenJob).not.toContain('SEGUNDA VIA MOTOBOY');
     expect(kitchenJob).not.toContain('PEDIDO COM BEBIDAS');
-    expect(kitchenJob).not.toContain('TOTAL DO PEDIDO');
+    // Via principal (cozinha) leva o total do pedido inteiro, igual a do motoboy.
+    expect(kitchenJob).toContain('TOTAL DO PEDIDO: R$ 31,00');
     // Pedido também tem suco (via do suqueiros) — avisa quem só vê a via da cozinha, pra
     // não esquecer de buscar o resto do pedido (pedido explícito do cliente). Uma família
     // por linha — suco de verdade (categoria "Sucos" exata) vira "SUCO", não o genérico
@@ -1215,7 +1216,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(all).toContain('DESC-PORCAO');
   });
 
-  it('nenhuma via (cozinha, suqueiros ou motoboy) imprime preço unitário; em entrega o total só aparece no fim da via do motoboy', async () => {
+  it('nenhuma via (cozinha, suqueiros ou motoboy) imprime preço unitário; em entrega o total sai na via principal e na do motoboy', async () => {
     const zone = await prisma.deliveryZone.create({ data: { name: 'Zona Sem Preço Unitário', fee: 5, restaurantId } });
     await autoAcceptService.update(restaurantId, { enabled: true });
     const order = await orderService.openPublic(restaurantId, {
@@ -1244,6 +1245,12 @@ describe('fila de impressão térmica (PrintJob)', () => {
     }
     const motoboy = texts.find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
     expect(motoboy).toContain('TOTAL DO PEDIDO: R$ 23,00');
+    // Via principal (cozinha) também leva o total e a taxa; a dos suqueiros não.
+    const main = texts.find((t) => t.includes('COZINHA'))!;
+    expect(main).toContain('TOTAL DO PEDIDO: R$ 23,00');
+    expect(main).toContain('TAXA DE ENTREGA: R$ 5,00');
+    const juice = texts.find((t) => t.includes('SUQUEIROS'))!;
+    expect(juice).not.toContain('TOTAL DO PEDIDO');
   });
 
   it('retirada com cozinha e suco: o total sai só no fim da via principal (cozinha), não na dos suqueiros', async () => {

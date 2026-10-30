@@ -127,8 +127,8 @@ export interface TicketInput {
   /** "Troco pra quanto" — só relevante (e só chega preenchido) quando paymentMethod é CASH. */
   changeFor?: number | null;
   /** Valor total do pedido inteiro (não só os itens desta via) — impresso só quando
-   * presente, abaixo do último item. Usado na via combinada do motoboy (entrega) e na via
-   * principal da retirada; pedido explícito do cliente pra conferir o valor sem abrir o
+   * presente, abaixo do último item. Usado na via principal (retirada e entrega) e na via
+   * combinada do motoboy (entrega); pedido explícito do cliente pra conferir o valor sem abrir o
    * sistema. */
   orderTotal?: number | null;
   /** Taxa de entrega — impressa logo ABAIXO do total (só quando orderTotal também está
