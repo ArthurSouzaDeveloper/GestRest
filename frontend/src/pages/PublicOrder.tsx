@@ -20,7 +20,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import api, { apiError } from '../lib/api';
-import { brl } from '../lib/format';
+import { brl, dateTime } from '../lib/format';
 import { Spinner } from '../components/ui';
 import { OrderComposer, draftItemUnitPrice, draftItemLabel, type DraftItem } from '../components/OrderComposer';
 import AddressAutocomplete from '../components/AddressAutocomplete';
@@ -1148,14 +1148,21 @@ function CustomerLoginPanel({ slug }: { slug: string }) {
           ) : (
             <div className="flex flex-col gap-2">
               <p className="text-[11.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Seus pedidos</p>
+              <p className="-mt-1 text-[11px] text-[#6B4A78]">Toque num pedido para ver os detalhes.</p>
               {result.orders.map((o) => (
                 <Link
                   key={o.id}
                   to={`/pedido/${slug}/rastreio/${o.id}`}
                   className="flex items-center justify-between rounded-2xl border border-[#1E1024]/10 px-3 py-2 text-[12.5px] hover:bg-brand-100"
                 >
-                  <span className="font-bold text-[#1E1024]">Pedido #{o.number}</span>
-                  <span className="text-brand">{ORDER_STATUS_LABEL[o.status]}</span>
+                  <span className="flex flex-col">
+                    <span className="font-bold text-[#1E1024]">Pedido #{o.number}</span>
+                    <span className="text-[11px] text-[#6B4A78]">{dateTime(o.createdAt)}</span>
+                  </span>
+                  <span className="flex flex-col items-end">
+                    <span className="font-bold text-[#1E1024]">{brl(o.total)}</span>
+                    <span className="text-[11px] text-brand">{ORDER_STATUS_LABEL[o.status]}</span>
+                  </span>
                 </Link>
               ))}
             </div>
