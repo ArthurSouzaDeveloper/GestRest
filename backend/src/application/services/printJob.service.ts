@@ -340,8 +340,11 @@ export const printJobService = {
     );
     const fullBebidaProntaQty = sumQty(fullBebidaProntaItems);
 
+    // Entrega: impresso na via do motoboy. Retirada: impresso no fim da via principal
+    // (pedido explícito do cliente/dono: quem entrega o pedido no balcão confere quanto
+    // cobrar, igual o motoboy faz). Mesa não leva total — paga no caixa.
     let orderTotal: number | null = null;
-    if (order.orderType === 'DELIVERY') {
+    if (order.orderType === 'DELIVERY' || order.orderType === 'PICKUP') {
       // Mesma fórmula de order.helpers.ts#computeTotals (subtotal - desconto + serviço +
       // entrega) — não dá pra chamar a função direto aqui porque ela espera o payload
       // completo do pedido (orderInclude, com produto/pagamentos etc.), e aqui só
@@ -355,6 +358,9 @@ export const printJobService = {
       const serviceFee = round(((subtotal - discount) * Number(full.serviceRate)) / 100);
       orderTotal = round(subtotal - discount + serviceFee + Number(full.deliveryFee));
     }
+    // Total que vai na via principal de produção — só em retirada (em entrega o total já
+    // sai na via do motoboy, logo abaixo).
+    const mainPaperTotal = order.orderType === 'PICKUP' ? orderTotal : null;
 
     const commonTicketFields = {
       tableNumber: order.table?.number ?? null,
@@ -470,6 +476,7 @@ export const printJobService = {
             crossStationNotice: notices,
             crossStationNoticeDetail: isMain ? bebidaProntaDetail : [],
             minimalData: !isMain,
+            orderTotal: isMain ? mainPaperTotal : null,
             items: groupItems.map(toTicketItem),
           }),
         },
@@ -499,6 +506,7 @@ export const printJobService = {
             crossStationNotice: notices,
             crossStationNoticeDetail: isMain ? bebidaProntaDetail : [],
             minimalData: !isMain,
+            orderTotal: isMain ? mainPaperTotal : null,
             items: realSucoItems.map(toTicketItem),
           }),
         },
@@ -526,6 +534,7 @@ export const printJobService = {
             crossStationNotice: notices,
             crossStationNoticeDetail: isMain ? bebidaProntaDetail : [],
             minimalData: !isMain,
+            orderTotal: isMain ? mainPaperTotal : null,
             items: acaiItems.map(toTicketItem),
           }),
         },
