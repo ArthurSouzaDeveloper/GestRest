@@ -444,10 +444,10 @@ describe('renderTicket', () => {
     }).toString('ascii');
     expect(outroTexto).toContain('ITENS INCLUSOS: PASTEL * PORCAO');
 
-    // Mais de uma linha (ex.: aviso de família + menção de bebida pronta na via principal,
-    // ver printJob.service.ts#enqueueForItems) — cada string do array vira uma linha
+    // Mais de uma linha (o aviso da via principal é uma família por linha, ver
+    // printJob.service.ts#includedItemsNotice) — cada string do array vira uma linha
     // própria, nessa ordem.
-    const duasLinhas = renderTicket({
+    const varias = renderTicket({
       station: Station.KITCHEN,
       tableNumber: null,
       orderType: OrderType.PICKUP,
@@ -456,12 +456,40 @@ describe('renderTicket', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-      crossStationNotice: ['ITENS INCLUSOS: SUCO * BEBIDA PRONTA', 'BEBIDA PRONTA: Cerveja Long Neck'],
+      crossStationNotice: ['* ITENS INCLUSOS', '* SUCO', '* BEBIDA PRONTA'],
       items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
     }).toString('ascii');
-    expect(duasLinhas).toContain('ITENS INCLUSOS: SUCO * BEBIDA PRONTA');
-    expect(duasLinhas).toContain('BEBIDA PRONTA: Cerveja Long Neck');
-    expect(duasLinhas.indexOf('ITENS INCLUSOS')).toBeLessThan(duasLinhas.indexOf('BEBIDA PRONTA: Cerveja'));
+    expect(varias).toContain('* ITENS INCLUSOS\n');
+    expect(varias).toContain('* SUCO\n');
+    expect(varias.indexOf('* SUCO')).toBeLessThan(varias.indexOf('* BEBIDA PRONTA'));
+  });
+
+  it('crossStationNoticeDetail sai logo abaixo do aviso, em tamanho de corpo (não o grande do destaque)', () => {
+    const comDetalhe = renderTicket({
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 1,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      crossStationNotice: ['* ITENS INCLUSOS', '* BEBIDA PRONTA'],
+      crossStationNoticeDetail: ['(Coca-Cola 2L)', '(3 Cerveja)'],
+      items: [{ name: 'X', description: null, unitPrice: 10, quantity: 1, additionals: [] }],
+    });
+    const texto = comDetalhe.toString('ascii');
+    expect(texto).toContain('(Coca-Cola 2L)\n');
+    expect(texto).toContain('(3 Cerveja)\n');
+    // Depois da última família do aviso e ainda antes dos dados do pedido.
+    expect(texto.indexOf('(Coca-Cola 2L)')).toBeGreaterThan(texto.indexOf('* BEBIDA PRONTA'));
+    expect(texto.indexOf('(3 Cerveja)')).toBeLessThan(texto.indexOf('PEDIDO #1'));
+    // Sem o ESC ! 0x38 (negrito+altura+largura dupla) na frente: nome de bebida é longo e,
+    // em largura dupla, quebraria a linha na impressora de 32 colunas.
+    const headerMode = Buffer.from([0x1b, 0x21, 0x38]);
+    const detalheIdx = comDetalhe.indexOf(Buffer.from('(Coca-Cola 2L)', 'ascii'));
+    const ultimoHeaderModeAntes = comDetalhe.lastIndexOf(headerMode, detalheIdx);
+    expect(comDetalhe.indexOf(Buffer.from('* BEBIDA PRONTA', 'ascii'))).toBeGreaterThan(ultimoHeaderModeAntes);
   });
 
   it('orderTotal imprime "TOTAL DO PEDIDO" abaixo do último item (não junto dos dados do cliente no topo); ausente, não imprime nada', () => {

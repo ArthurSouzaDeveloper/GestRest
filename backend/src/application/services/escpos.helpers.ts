@@ -101,12 +101,16 @@ export interface TicketInput {
    * presente), pedido explícito do cliente/dono: o motoboy confere quanto da cobrança é
    * frete sem precisar abrir o sistema. null/undefined (ou 0) não imprime nada. */
   deliveryFee?: number | null;
-  /** Linha(s) em destaque logo abaixo do cabeçalho (ex.: "ITENS INCLUSOS: BEBIDA * MINI
+  /** Linha(s) em destaque logo abaixo do cabeçalho (ex.: "* ITENS INCLUSOS", "* MINI
    * PIZZA") — pra quem só vê ESTA via não esquecer que o pedido tem mais coisa em outra
-   * estação/via, ou (na via principal) quais bebidas prontas também saem no pedido. Cada
-   * string do array vira uma linha própria; array vazio/null não imprime nada. Ver
-   * printJob.service.ts. */
+   * estação/via. Cada string do array vira uma linha própria; array vazio/null não imprime
+   * nada. Ver printJob.service.ts. */
   crossStationNotice?: string[] | null;
+  /** Sub-linhas do aviso acima (ex.: "(Coca-Cola 2L)", "(3 Cerveja)"), impressas logo
+   * depois dele em tamanho de corpo em vez do tamanho grande do destaque: detalham a
+   * última família listada (bebida pronta) e precisam caber em nomes longos, que em
+   * largura dupla quebrariam a linha. Ver printJob.service.ts. */
+  crossStationNoticeDetail?: string[] | null;
   /** true imprime uma linha divisória depois de cada item (nome+descrição+preço+
    * adicionais+obs) — pedido explícito do cliente pra valer em toda via (cozinha, suco/
    * bebida em geral e a via combinada do motoboy), não só comida. */
@@ -194,6 +198,7 @@ export function renderTicket(input: TicketInput): Buffer {
   if (input.crossStationNotice && input.crossStationNotice.length > 0) {
     parts.push(line('--------------------------------'));
     for (const notice of input.crossStationNotice) parts.push(HEADER_MODE_ON, line(notice), BODY_MODE_ON);
+    for (const detail of input.crossStationNoticeDetail ?? []) parts.push(line(detail));
   }
 
   // Tamanho normal do corpo (não o grande do cabeçalho) — pedido do cliente pra
