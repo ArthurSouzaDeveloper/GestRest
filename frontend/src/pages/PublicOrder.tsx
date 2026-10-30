@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { deriveBrandVars } from '../lib/publicBrand';
-import { DELIVERY_CLOSED_MESSAGE, useDeliveryClosed } from '../lib/deliveryHours';
+import { DELIVERY_CLOSED_MESSAGE, ORDERS_CLOSED_MESSAGE, useDeliveryClosed, useOrderingClosed } from '../lib/deliveryHours';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -30,6 +30,17 @@ import type { DeliveryZone, EtaEstimate, OrderStatus, OrderType, PaymentMethod, 
 /** "19:45" a partir de um ISO — usado pra mostrar a previsão travada na confirmação. */
 function formatClock(iso: string): string {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Recado de loja fechada (antes das 18h, ver lib/deliveryHours.ts) — dá pra ver o cardápio, mas não pedir. */
+function StoreClosedNote({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <div className="flex items-center gap-2 rounded-2xl bg-[#1E1024] px-4 py-3 text-sm font-bold text-white">
+      <Clock size={14} className="shrink-0" />
+      <span>{ORDERS_CLOSED_MESSAGE}</span>
+    </div>
+  );
 }
 
 /** Nota de previsão reaproveitada nas telas de Dados/Carrinho/Revisão — some se a estimativa ainda não carregou. */
@@ -314,6 +325,7 @@ export default function PublicOrder() {
   const [step, setStep] = useState<Step>('intro');
   const [orderKind, setOrderKind] = useState<OrderKind | null>(null);
   const deliveryClosed = useDeliveryClosed();
+  const orderingClosed = useOrderingClosed();
   // Pré-preenche com a identidade salva neste navegador de um pedido anterior (ver
   // readSavedCustomer) — pedido explícito do cliente/dono: quem já pediu não deveria
   // precisar redigitar nome/telefone a cada visita.
@@ -615,6 +627,7 @@ export default function PublicOrder() {
           logoUrl={restaurant.logoUrl}
           menuPhotoUrls={restaurant.menuPhotoUrls}
           deliveryClosed={deliveryClosed}
+          orderingClosed={orderingClosed}
           onPick={(kind) => {
             if (kind === 'MENU') {
               setOrderKind(null);
@@ -656,6 +669,11 @@ export default function PublicOrder() {
           horizontal próprio) — sem isso a coluna "1fr" ignorava a largura da grade e
           empurrava o resumo lateral (DesktopSummaryCard) pra fora da tela em telas largas. */}
       <div className="lg:min-w-0">
+        {orderingClosed && step !== 'confirmation' && (
+          <div className="mb-4">
+            <StoreClosedNote show />
+          </div>
+        )}
         {step === 'details' && (
           <DetailsStep
             slug={slug}
@@ -867,7 +885,7 @@ export default function PublicOrder() {
         <CartBar
           left={submitOrder.isPending ? 'Enviando...' : 'Confirmar'}
           right={`Fazer Pedido · ${brl(total)}`}
-          disabled={submitOrder.isPending || !orderKind}
+          disabled={submitOrder.isPending || !orderKind || orderingClosed}
           onClick={() => submitOrder.mutate()}
         />
       )}
@@ -911,6 +929,7 @@ function IntroStep({
   logoUrl,
   menuPhotoUrls,
   deliveryClosed,
+  orderingClosed,
   onPick,
 }: {
   slug: string;
@@ -918,6 +937,7 @@ function IntroStep({
   logoUrl: string | null;
   menuPhotoUrls: string[];
   deliveryClosed: boolean;
+  orderingClosed: boolean;
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
   const [kind, setKind] = useState<OrderKind>(deliveryClosed ? 'PICKUP' : 'DELIVERY');
@@ -997,12 +1017,14 @@ function IntroStep({
             </div>
 
             <div className="mt-3 space-y-2">
-              <DeliveryClosedNote show={deliveryClosed} />
-              <EtaNote eta={eta} />
+              <StoreClosedNote show={orderingClosed} />
+              <DeliveryClosedNote show={deliveryClosed && !orderingClosed} />
+              {!orderingClosed && <EtaNote eta={eta} />}
             </div>
 
-            <button className={`${PRIMARY_CTA} mt-4`} onClick={() => onPick(kind)}>
-              Começar pedido
+            {/* Antes das 18h ainda dá pra olhar o cardápio ("Ver cardápio" abaixo), só não começar pedido. */}
+            <button className={`${PRIMARY_CTA} mt-4`} disabled={orderingClosed} onClick={() => onPick(kind)}>
+              {orderingClosed ? 'Abrimos às 18h' : 'Começar pedido'}
             </button>
             <button
               className="mt-4 w-full text-center text-[14px] font-bold text-[#1E1024] underline underline-offset-2"
