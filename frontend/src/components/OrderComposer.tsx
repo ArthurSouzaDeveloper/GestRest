@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda, IceCreamBowl, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { JuiceBuilder } from './JuiceBuilder';
@@ -74,14 +74,34 @@ export function draftItemLabel(item: DraftItem): string {
   return label ? `${label} - ${name}` : name;
 }
 
-// Só 2 abas no topo — Água e Refrigerantes viraram sub-filtro (chip) dentro de "Sucos e
+// 3 abas no topo — Água e Refrigerantes viraram sub-filtro (chip) dentro de "Sucos e
 // Bebidas" em vez de aba própria, pra não competir por espaço com o que o cliente mais pede.
-type TopGroup = 'COMIDAS' | 'BEBIDAS';
+// Açaí e Cupuaçu ganhou aba principal própria (pedido explícito do cliente/dono), saindo
+// de "Sucos e Bebidas".
+type TopGroup = 'COMIDAS' | 'BEBIDAS' | 'ACAI';
 
 const TOP_GROUP_LABELS: Record<TopGroup, string> = {
   COMIDAS: 'Pastéis e Mini Pizzas',
   BEBIDAS: 'Sucos e Bebidas',
+  ACAI: 'Açaí e Cupuaçu',
 };
+
+const TOP_GROUP_ICONS: Record<TopGroup, typeof Utensils> = {
+  COMIDAS: Utensils,
+  BEBIDAS: CupSoda,
+  ACAI: IceCreamBowl,
+};
+
+const TOP_GROUPS: TopGroup[] = ['COMIDAS', 'BEBIDAS', 'ACAI'];
+
+function isAcaiCategory(category: Category | undefined): boolean {
+  if (!category) return false;
+  const name = category.name
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+  return name.includes('acai') || name.includes('cupuacu');
+}
 
 const isRefrigeranteCategory = (c: Category) => c.name.toLowerCase().includes('refrigerante');
 const isAguaCategory = (c: Category) => {
@@ -131,6 +151,7 @@ function isSucosCategoryProduct(p: Product, categoriesById: Map<string, Category
 function productTopGroup(p: Product, categoriesById: Map<string, Category>): TopGroup {
   if (!isSucosCategoryProduct(p, categoriesById) && (isAguaProduct(p) || isRefrigeranteProduct(p))) return 'BEBIDAS';
   const cat = categoriesById.get(p.categoryId);
+  if (isAcaiCategory(cat)) return 'ACAI';
   if (cat && (isAguaCategory(cat) || isRefrigeranteCategory(cat) || cat.station === 'JUICE_BAR')) return 'BEBIDAS';
   return 'COMIDAS';
 }
@@ -165,11 +186,7 @@ function categoryDisplayName(name: string): string {
 function categoryWantsAutoConfig(category: Category | undefined): boolean {
   if (!category) return false;
   if (category.station === 'KITCHEN') return true;
-  const name = category.name
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase();
-  return name.includes('acai') || name.includes('cupuacu');
+  return isAcaiCategory(category);
 }
 
 /** Product grid + item drafting used by the waiter to build an order. */
@@ -229,7 +246,7 @@ export function OrderComposer({
   // em Sucos e Bebidas, Água/Refrigerantes entram como chips virtuais (não são Category de
   // verdade) na frente, com Sucos primeiro por ser o mais pedido.
   const groupChips = useMemo(() => {
-    if (topGroup === 'COMIDAS') {
+    if (topGroup !== 'BEBIDAS') {
       const ids = new Set(groupProducts.map((p) => p.categoryId));
       return categories.filter((c) => ids.has(c.id)).map((c) => ({ key: c.id, label: categoryDisplayName(c.name) }));
     }
@@ -244,7 +261,7 @@ export function OrderComposer({
     }
     return chips;
   }, [topGroup, groupProducts, categories, sucosCategoryId, categoriesById]);
-  const showChipRow = topGroup === 'COMIDAS' ? groupChips.length > 1 : groupChips.length > 0;
+  const showChipRow = topGroup !== 'BEBIDAS' ? groupChips.length > 1 : groupChips.length > 0;
 
   // Não existe mais "Todos": misturar categorias diferentes na mesma lista deixava fácil
   // adicionar o produto errado sem perceber quando duas categorias tinham um sabor de
@@ -269,7 +286,7 @@ export function OrderComposer({
       );
     }
     if (activeCat === 'all') return groupProducts;
-    if (topGroup === 'COMIDAS') return groupProducts.filter((p) => p.categoryId === activeCat);
+    if (topGroup !== 'BEBIDAS') return groupProducts.filter((p) => p.categoryId === activeCat);
     return groupProducts.filter((p) => productChipKey(p, categoriesById) === activeCat);
   }, [products, groupProducts, activeCat, term, searching, topGroup, categoriesById]);
 
@@ -362,30 +379,27 @@ export function OrderComposer({
 
         {!searching && (
           <>
-            {/* Grupo principal: só 2 blocos — Pastéis e Mini Pizzas / Sucos e Bebidas. Água
-                e Refrigerantes viraram chip dentro do segundo bloco (ver abaixo) em vez de
-                aba própria. */}
-            <div className="mb-2 grid grid-cols-2 gap-2">
-              <button
-                className={
-                  isPublic
-                    ? `flex h-12 items-center justify-center gap-1.5 rounded-full text-[13.5px] font-bold transition ${topGroup === 'COMIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-white text-[#6B4A78]'}`
-                    : `flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[14px] font-bold transition ${topGroup === 'COMIDAS' ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
-                }
-                onClick={() => setTopGroup('COMIDAS')}
-              >
-                <Utensils size={15} className="shrink-0" /> Pastéis e Mini Pizzas
-              </button>
-              <button
-                className={
-                  isPublic
-                    ? `flex h-12 items-center justify-center gap-1.5 rounded-full text-[13.5px] font-bold transition ${topGroup === 'BEBIDAS' ? 'bg-brand text-white shadow-sm' : 'bg-white text-[#6B4A78]'}`
-                    : `flex h-11 items-center justify-center gap-1.5 rounded-xl border text-[14px] font-bold transition ${topGroup === 'BEBIDAS' ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
-                }
-                onClick={() => setTopGroup('BEBIDAS')}
-              >
-                <CupSoda size={15} className="shrink-0" /> Sucos e Bebidas
-              </button>
+            {/* Grupo principal: 3 blocos — Pastéis e Mini Pizzas / Sucos e Bebidas / Açaí e
+                Cupuaçu. Água e Refrigerantes viraram chip dentro de Sucos e Bebidas (ver
+                abaixo) em vez de aba própria. */}
+            <div className="mb-2 grid grid-cols-3 gap-2">
+              {TOP_GROUPS.map((group) => {
+                const Icon = TOP_GROUP_ICONS[group];
+                const active = topGroup === group;
+                return (
+                  <button
+                    key={group}
+                    className={
+                      isPublic
+                        ? `flex min-h-12 items-center justify-center gap-1.5 rounded-full px-2 text-center text-[13.5px] font-bold leading-tight transition ${active ? 'bg-brand text-white shadow-sm' : 'bg-white text-[#6B4A78]'}`
+                        : `flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 text-center text-[14px] font-bold leading-tight transition ${active ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
+                    }
+                    onClick={() => setTopGroup(group)}
+                  >
+                    <Icon size={15} className="shrink-0" /> {TOP_GROUP_LABELS[group]}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Sub-filtro dentro do grupo — sempre uma categoria de verdade, nunca "Todos"

@@ -771,9 +771,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
     });
     await autoAcceptService.update(restaurantId, { enabled: false });
 
-    const motoboyJob = (
-      await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } })
-    ).payload.toString('ascii');
+    // As vias de um pedido nascem na mesma transação (mesmo createdAt), então não dá pra
+    // achar a do motoboy por ordem de criação — identifica pelo rótulo.
+    const motoboyJob = (await prisma.printJob.findMany({ where: { orderId: order.id } }))
+      .map((j) => j.payload.toString('ascii'))
+      .find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
     expect(motoboyJob).toContain('3- PASTEL');
     expect(motoboyJob).toContain('1- MINI PIZZA');
     expect(motoboyJob).toContain('1- PORCAO');
@@ -818,9 +820,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
     });
     await autoAcceptService.update(restaurantId, { enabled: false });
 
-    const motoboyJob = (
-      await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } })
-    ).payload.toString('ascii');
+    // As vias de um pedido nascem na mesma transação (mesmo createdAt), então não dá pra
+    // achar a do motoboy por ordem de criação — identifica pelo rótulo.
+    const motoboyJob = (await prisma.printJob.findMany({ where: { orderId: order.id } }))
+      .map((j) => j.payload.toString('ascii'))
+      .find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
     expect(motoboyJob).toContain('1- Coca-Cola 2L');
     expect(motoboyJob).toContain('3- Cerveja Long Neck');
   });
@@ -843,9 +847,11 @@ describe('fila de impressão térmica (PrintJob)', () => {
     });
     await autoAcceptService.update(restaurantId, { enabled: false });
 
-    const motoboyJob = (
-      await prisma.printJob.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } })
-    ).payload.toString('ascii');
+    // As vias de um pedido nascem na mesma transação (mesmo createdAt), então não dá pra
+    // achar a do motoboy por ordem de criação — identifica pelo rótulo.
+    const motoboyJob = (await prisma.printJob.findMany({ where: { orderId: order.id } }))
+      .map((j) => j.payload.toString('ascii'))
+      .find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
     expect(motoboyJob).toContain('SEGUNDA VIA MOTOBOY');
     expect(motoboyJob).toContain('TOTAL DO PEDIDO: R$ 10,00');
     expect(motoboyJob).not.toContain('PEDIDO COM BEBIDAS');
@@ -1095,6 +1101,79 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
     expect(jobs).toHaveLength(1);
     expect(jobs[0].payload.toString('ascii')).toContain('SEGUNDA VIA MOTOBOY');
+  });
+
+  it('Açaí/Cupuaçu sai numa via própria ("ACAI / CUPUACU") com adicionais e obs, fora da via dos suqueiros', async () => {
+    const pasteis = await prisma.category.create({
+      data: { name: 'Pastéis Salgados Via Açaí', station: Station.KITCHEN, restaurantId },
+    });
+    const acaiCat = await prisma.category.create({
+      data: { name: 'Açaí e Cupuaçu Via Própria', station: Station.JUICE_BAR, restaurantId },
+    });
+    const pastel = await prisma.product.create({ data: { name: 'Calabresa', price: 12, categoryId: pasteis.id, restaurantId } });
+    const acai = await prisma.product.create({ data: { name: 'Açaí 500ml', price: 19, categoryId: acaiCat.id, restaurantId } });
+    const granola = await prisma.additional.create({
+      data: { name: 'Granola', kind: AdditionalKind.ADDON, price: 2, restaurantId, categoryId: acaiCat.id },
+    });
+
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente Via Acai',
+      customerPhone: '11999990031',
+      customerCpf: '10000007455',
+      declaredPaymentMethod: PaymentMethod.PIX,
+      items: [
+        { productId: pastel.id, quantity: 1 },
+        { productId: juiceProductId, quantity: 1 },
+        { productId: acai.id, quantity: 1, additionalIds: [granola.id], notes: 'sem banana' },
+      ],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    const texts = jobs.map((j) => j.payload.toString('ascii'));
+    expect(jobs).toHaveLength(3);
+    const acaiPaper = texts.find((t) => t.includes('ACAI / CUPUACU\n') && t.includes('Acai 500ml'))!;
+    expect(acaiPaper).toBeDefined();
+    expect(acaiPaper).toContain('Granola');
+    expect(acaiPaper).toContain('sem banana');
+    // Pastel continua sendo a via principal (dados do cliente + "ITENS INCLUSOS").
+    expect(acaiPaper).not.toContain('Cliente Via Acai');
+    const pastelPaper = texts.find((t) => t.includes('COZINHA - PASTEL'))!;
+    expect(pastelPaper).toContain('Cliente Via Acai');
+    expect(pastelPaper).toContain('* ACAI / CUPUACU\n');
+    expect(pastelPaper).not.toContain('BEBIDA PRONTA');
+    // Via dos suqueiros só com o suco.
+    const juicePaper = texts.find((t) => t.includes('SUQUEIROS'))!;
+    expect(juicePaper).toContain('1- Suco');
+    expect(juicePaper).not.toContain('Acai');
+  });
+
+  it('pedido só de açaí (retirada): a via de Açaí/Cupuaçu vira a principal, sem via dos suqueiros', async () => {
+    const acaiCat = await prisma.category.create({
+      data: { name: 'Açaí e Cupuaçu Só Açaí', station: Station.JUICE_BAR, restaurantId },
+    });
+    const cupuacu = await prisma.product.create({ data: { name: 'Cupuaçu 300ml', price: 15, categoryId: acaiCat.id, restaurantId } });
+
+    await autoAcceptService.update(restaurantId, { enabled: true });
+    const order = await orderService.openPublic(restaurantId, {
+      orderType: 'PICKUP',
+      customerName: 'Cliente So Acai',
+      customerPhone: '11999990032',
+      customerCpf: '10000003700',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId: cupuacu.id, quantity: 2 }],
+    });
+    await autoAcceptService.update(restaurantId, { enabled: false });
+
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order.id } });
+    expect(jobs).toHaveLength(1);
+    const text = jobs[0].payload.toString('ascii');
+    expect(text).toContain('ACAI / CUPUACU');
+    expect(text).toContain('Cliente So Acai');
+    expect(text).toContain('2- Cupuacu 300ml');
+    expect(text).not.toContain('SUQUEIROS');
   });
 
   it('nenhum pastel sai com descrição (salgado, doce nem Sugestão da Casa); mini pizza e porção continuam com a do cardápio', async () => {
