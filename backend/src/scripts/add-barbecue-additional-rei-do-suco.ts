@@ -1,11 +1,11 @@
 /**
  * Adiciona o adicional "Barbecue" (molho) que o cliente pediu e não existia. Vai pra toda
  * categoria que já tem o "Molho de Alho" como adicional (Pastéis Salgados, Mini Pizza
- * Salgada etc., ver ADICIONAIS_SALGADOS em import-menu-rei-do-suco.ts), com o mesmo preço
- * dele: R$2,00.
+ * Salgada etc., ver ADICIONAIS_SALGADOS em import-menu-rei-do-suco.ts), a R$1,50.
  *
  * Idempotente: cada adicional é identificado por (restaurantId, categoryId, name, kind) —
- * mesmo critério de import-menu-rei-do-suco.ts#ensureAdditional. Rodar de novo não duplica.
+ * mesmo critério de import-menu-rei-do-suco.ts#ensureAdditional. Rodar de novo não duplica;
+ * se já existir, só reativa e acerta o preço.
  *
  * Uso:
  *   node dist/scripts/add-barbecue-additional-rei-do-suco.js --slug=rei-do-suco
@@ -15,7 +15,7 @@ import { AdditionalKind, PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 const NAME = 'Barbecue';
-const PRICE = 2.0;
+const PRICE = 1.5;
 const REFERENCE = 'Molho de Alho';
 
 function parseArgs(argv: string[]): Record<string, string> {
@@ -57,14 +57,14 @@ async function main() {
       where: { restaurantId: rid, categoryId: ref.categoryId, name: NAME, kind: AdditionalKind.ADDON },
     });
     if (existing) {
-      await prisma.additional.update({ where: { id: existing.id }, data: { active: true } });
-      console.log(`"${NAME}" já existia em ${categoryName} — mantido (ativo).`);
+      await prisma.additional.update({ where: { id: existing.id }, data: { active: true, price: PRICE } });
+      console.log(`"${NAME}" já existia em ${categoryName} — preço acertado para R$1,50 (ativo).`);
       continue;
     }
     await prisma.additional.create({
       data: { restaurantId: rid, categoryId: ref.categoryId, name: NAME, price: PRICE, kind: AdditionalKind.ADDON },
     });
-    console.log(`"${NAME}" criado em ${categoryName} — R$2,00.`);
+    console.log(`"${NAME}" criado em ${categoryName} — R$1,50.`);
   }
 }
 
