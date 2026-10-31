@@ -528,6 +528,30 @@ describe('renderTicket', () => {
     expect(comTotal.indexOf('TOTAL DO PEDIDO')).toBeGreaterThan(comTotal.indexOf('1- X'));
   });
 
+  it('pedido dividido isento imprime "TAXA DE ENTREGA: ISENTA (JUNTO DO PEDIDO #N)" no lugar do valor da taxa', () => {
+    const base = {
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 2,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      paymentMethod: PaymentMethod.CASH,
+      orderTotal: 20,
+      items: [{ name: 'X', description: null, quantity: 1, additionals: [] }],
+    };
+    const isento = renderTicket({ ...base, deliveryFee: 0, deliveryFeeWaivedByOrderNumber: 41 }).toString('ascii');
+    expect(isento).toContain('TAXA DE ENTREGA: ISENTA');
+    expect(isento).toContain('(JUNTO DO PEDIDO #41)');
+    expect(isento.indexOf('TAXA DE ENTREGA')).toBeGreaterThan(isento.indexOf('TOTAL DO PEDIDO'));
+
+    const normal = renderTicket({ ...base, deliveryFee: 5 }).toString('ascii');
+    expect(normal).toContain('TAXA DE ENTREGA: R$ 5,00');
+    expect(normal).not.toContain('ISENTA');
+  });
+
   it('itemSeparator imprime uma linha divisória depois de cada item (nome+adicionais+obs); sem a opção, não imprime nada extra', () => {
     const semSeparador = renderTicket({
       station: Station.KITCHEN,

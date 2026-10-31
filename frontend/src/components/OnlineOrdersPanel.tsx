@@ -239,6 +239,11 @@ function OnlineOrderCard({
             {order.deliveryCep ? ` · CEP ${order.deliveryCep}` : ''}
           </div>
         )}
+        {order.orderType === 'DELIVERY' && order.deliveryFeeWaivedByOrderNumber != null && (
+          <div className="mt-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+            Taxa de entrega isenta · entregar junto do pedido #{order.deliveryFeeWaivedByOrderNumber}
+          </div>
+        )}
       </div>
 
       <div className="mt-2 space-y-1 border-t border-gray-100 pt-2 dark:border-gray-800">

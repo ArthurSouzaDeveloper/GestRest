@@ -184,6 +184,8 @@ export interface Order {
   deliveryZoneId?: string;
   deliveryZone?: DeliveryZone | null;
   deliveryFee: number;
+  /** Pedido dividido: número do pedido anterior que já pagou a taxa de entrega (este saiu isento). */
+  deliveryFeeWaivedByOrderNumber?: number | null;
   deliveryStreet?: string;
   deliveryNumber?: string;
   deliveryCep?: string;

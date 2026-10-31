@@ -259,6 +259,9 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
         </div>
         <Row label={`Taxa de serviço (${order.serviceRate}%)`} value={brl(order.totals.serviceFee)} />
         {order.totals.deliveryFee > 0 && <Row label="Taxa de entrega" value={brl(order.totals.deliveryFee)} />}
+        {order.deliveryFeeWaivedByOrderNumber != null && (
+          <Row label="Taxa de entrega" value={`Isenta (junto do #${order.deliveryFeeWaivedByOrderNumber})`} />
+        )}
         <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold dark:border-gray-800">
           <span>Valor Final</span>
           <span className="text-brand">{brl(order.totals.total)}</span>

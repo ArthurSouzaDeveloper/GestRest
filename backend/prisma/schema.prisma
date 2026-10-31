@@ -487,6 +487,12 @@ model Order {
   deliveryZone          DeliveryZone?  @relation(fields: [deliveryZoneId], references: [id], onDelete: SetNull)
   deliveryFee           Decimal        @default(0) @db.Decimal(10, 2) // snapshot da taxa no momento do pedido
   deliveryDistanceKm    Decimal?       @db.Decimal(6, 2) // snapshot da distância calculada (modo DISTANCE_BANDS)
+  // Número do pedido anterior do mesmo cliente que já pagou a taxa de entrega — preenchido
+  // quando este pedido foi isento da taxa por ser "pedido dividido" (mesmo CPF+nome+telefone,
+  // mesmo endereço, dentro de DELIVERY_FEE_SPLIT_WINDOW_MINUTES; ver order.service.ts#openPublic).
+  // Caso real do cliente/dono: cliente dividiu a compra em dois pedidos pra pagar parte no
+  // cartão e parte em dinheiro. Painel e impressão mostram "ISENTA (JUNTO DO #N)".
+  deliveryFeeWaivedByOrderNumber Int?
   deliveryStreet        String?
   deliveryNumber        String?
   deliveryCep           String?
