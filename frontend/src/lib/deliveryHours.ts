@@ -45,12 +45,29 @@ export function isOrderingClosed(now: Date = new Date()): boolean {
   return !insideWindow(now, PICKUP_CLOSE_MINUTE);
 }
 
-/** Reavalia a cada 30s — o cliente pode estar com o site aberto quando bate 18h ou 23h. */
+/**
+ * Reavalia a cada 30s — o cliente pode estar com o site aberto quando bate 18h, 23h ou 23:15.
+ * Também reavalia na hora em que o cliente volta pra aba: em segundo plano (principalmente no
+ * celular) o navegador congela o setInterval, e sem isso uma aba aberta desde ontem mostraria
+ * o botão liberado por alguns segundos (o backend recusaria de qualquer jeito).
+ */
 function useClockRule(rule: () => boolean): boolean {
   const [closed, setClosed] = useState(rule);
   useEffect(() => {
-    const id = setInterval(() => setClosed(rule()), 30_000);
-    return () => clearInterval(id);
+    const refresh = () => setClosed(rule());
+    const id = setInterval(refresh, 30_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('pageshow', refresh);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('pageshow', refresh);
+    };
   }, [rule]);
   return closed;
 }
