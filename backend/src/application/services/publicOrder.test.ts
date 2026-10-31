@@ -218,8 +218,8 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
     const result = await publicOrderService.customerLogin(slug, 'Nome Errado', '10000014826');
     expect(result).toEqual({ name: null, orders: [], addresses: [] });
   });
-  it('depois das 23h (horário de SP) o site recusa entrega e aceita retirada', async () => {
-    const meiaNoiteEmSP = new Date('2026-10-30T03:00:00Z');
+  it('entre 23h e 23:15 (horário de SP) o site recusa entrega e aceita retirada', async () => {
+    const onzeEDezEmSP = new Date('2026-10-30T02:10:00Z'); // 23:10 em SP
     await expect(
       publicOrderService.createOrder(
         slug,
@@ -235,9 +235,9 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
           items: [{ productId, quantity: 1 }],
         },
         undefined,
-        meiaNoiteEmSP,
+        onzeEDezEmSP,
       ),
-    ).rejects.toThrow('Após as 23h, somente pedidos por retirada.');
+    ).rejects.toThrow('Após as 23h, somente pedidos por retirada (até 23:15).');
 
     const pickup = await publicOrderService.createOrder(
       slug,
@@ -250,11 +250,11 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
         items: [{ productId, quantity: 1 }],
       },
       undefined,
-      meiaNoiteEmSP,
+      onzeEDezEmSP,
     );
     expect(pickup.orderType).toBe('PICKUP');
   });
-  it('antes das 18h (horário de SP) o site recusa qualquer pedido, e às 18h em ponto aceita', async () => {
+  it('antes das 18h e a partir das 23:15 (horário de SP) o site recusa qualquer pedido; às 18h em ponto aceita', async () => {
     const input = {
       orderType: 'PICKUP' as const,
       customerName: 'Cliente Adiantado',
@@ -265,7 +265,10 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
     };
     await expect(
       publicOrderService.createOrder(slug, input, undefined, new Date('2026-10-30T20:59:00Z')),
-    ).rejects.toThrow('A loja ainda não abriu. Os pedidos começam às 18h.');
+    ).rejects.toThrow('Fora do horário de pedidos.');
+    await expect(
+      publicOrderService.createOrder(slug, input, undefined, new Date('2026-10-31T02:15:00Z')),
+    ).rejects.toThrow('Fora do horário de pedidos.');
 
     const order = await publicOrderService.createOrder(slug, input, undefined, new Date('2026-10-30T21:00:00Z'));
     expect(order.orderType).toBe('PICKUP');

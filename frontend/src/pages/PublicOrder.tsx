@@ -324,8 +324,10 @@ export default function PublicOrder() {
   const { slug = '' } = useParams();
   const [step, setStep] = useState<Step>('intro');
   const [orderKind, setOrderKind] = useState<OrderKind | null>(null);
-  const deliveryClosed = useDeliveryClosed();
   const orderingClosed = useOrderingClosed();
+  // "Entrega fechada" aqui é só o intervalo 23h–23:15 (retirada ainda aberta). Com a loja
+  // fechada (antes das 18h / depois das 23:15) quem aparece é o recado de loja fechada.
+  const deliveryClosed = useDeliveryClosed() && !orderingClosed;
   // Pré-preenche com a identidade salva neste navegador de um pedido anterior (ver
   // readSavedCustomer) — pedido explícito do cliente/dono: quem já pediu não deveria
   // precisar redigitar nome/telefone a cada visita.
@@ -1072,7 +1074,7 @@ function IntroStep({
       <div className="mx-auto mt-auto flex w-full max-w-md flex-col items-center gap-2.5 pb-6 pt-8 lg:max-w-5xl">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
           <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#8BC53F] shadow-[0_0_0_3px_rgba(139,197,63,0.22)]" />
-          Aberto de quarta a domingo até 23h
+          Funcionamento: quarta a domingo, das 18h às 23:30
         </div>
 
         <CustomerLoginPanel slug={slug} />

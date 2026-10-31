@@ -1,36 +1,48 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Cópia do corte noturno da entrega (ver backend/src/application/services/deliveryHours.ts,
- * que é quem vale de verdade e recusa o pedido) — aqui só serve pra desabilitar o botão
- * Entrega e mostrar o recado antes do cliente montar o pedido. Mudou o horário lá, muda aqui.
+ * Horário de pedidos do site público — pedido explícito do dono (31/10/2026), no fuso do
+ * restaurante (não no do servidor, que roda em UTC):
+ *   - pedidos começam às 18h em ponto (entrega e retirada);
+ *   - entrega até 23h (depois não tem motoboy rodando);
+ *   - retirada até 23:15;
+ *   - das 23:15 às 18h do dia seguinte o site não aceita pedido nenhum.
+ * Os horários são em minutos desde a meia-noite. Pra mudar é só trocar as constantes aqui E
+ * em backend/src/application/services/deliveryHours.ts (esta é a cópia que o site usa pra
+ * travar os botões; a do backend é quem vale de verdade e recusa o pedido na API).
  */
-export const DELIVERY_CUTOFF_HOUR = 23;
-export const DELIVERY_RESUME_HOUR = 6;
 export const DELIVERY_TIMEZONE = 'America/Sao_Paulo';
-export const DELIVERY_CLOSED_MESSAGE = 'Após as 23h, somente pedidos por retirada.';
+export const ORDERS_OPEN_MINUTE = 18 * 60; // 18:00
+export const DELIVERY_CLOSE_MINUTE = 23 * 60; // 23:00
+export const PICKUP_CLOSE_MINUTE = 23 * 60 + 15; // 23:15
+export const DELIVERY_CLOSED_MESSAGE = 'Após as 23h, somente pedidos por retirada (até 23:15).';
+export const ORDERS_CLOSED_MESSAGE = 'Fora do horário de pedidos. Aceitamos pedidos das 18h às 23:15 (entrega até 23h).';
 
-/** Abertura da loja (18h) — fechada das 6h às 18h. Cópia de backend/.../deliveryHours.ts. */
-export const ORDERS_OPEN_HOUR = 18;
-export const ORDERS_CLOSED_MESSAGE = 'A loja ainda não abriu. Os pedidos começam às 18h.';
-
-function localHour(now: Date): number {
-  const hour = new Intl.DateTimeFormat('en-US', { timeZone: DELIVERY_TIMEZONE, hour: '2-digit', hourCycle: 'h23' })
-    .formatToParts(now)
-    .find((p) => p.type === 'hour')?.value;
-  return Number(hour);
+/** Minutos desde a meia-noite (0-1439) no fuso do restaurante. */
+function localMinute(now: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: DELIVERY_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return get('hour') * 60 + get('minute');
 }
 
+function insideWindow(now: Date, closeMinute: number): boolean {
+  const minute = localMinute(now);
+  return minute >= ORDERS_OPEN_MINUTE && minute < closeMinute;
+}
+
+/** Entrega fechada: fora das 18h às 23h. */
 export function isDeliveryClosed(now: Date = new Date()): boolean {
-  const hour = localHour(now);
-  return DELIVERY_CUTOFF_HOUR > DELIVERY_RESUME_HOUR
-    ? hour >= DELIVERY_CUTOFF_HOUR || hour < DELIVERY_RESUME_HOUR
-    : hour >= DELIVERY_CUTOFF_HOUR && hour < DELIVERY_RESUME_HOUR;
+  return !insideWindow(now, DELIVERY_CLOSE_MINUTE);
 }
 
+/** Loja fechada pro site (nem retirada): fora das 18h às 23:15. */
 export function isOrderingClosed(now: Date = new Date()): boolean {
-  const hour = localHour(now);
-  return hour >= DELIVERY_RESUME_HOUR && hour < ORDERS_OPEN_HOUR;
+  return !insideWindow(now, PICKUP_CLOSE_MINUTE);
 }
 
 /** Reavalia a cada 30s — o cliente pode estar com o site aberto quando bate 18h ou 23h. */
