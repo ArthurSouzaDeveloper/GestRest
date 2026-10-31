@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { deriveBrandVars } from '../lib/publicBrand';
-import { DELIVERY_CLOSED_MESSAGE, ORDERS_CLOSED_MESSAGE, useDeliveryClosed, useOrderingClosed } from '../lib/deliveryHours';
+import {
+  DELIVERY_CLOSED_MESSAGE,
+  ORDERS_CLOSED_MESSAGE,
+  isOrderingClosed,
+  useDeliveryClosed,
+  useOrderingClosed,
+} from '../lib/deliveryHours';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -888,7 +894,15 @@ export default function PublicOrder() {
           left={submitOrder.isPending ? 'Enviando...' : 'Confirmar'}
           right={`Fazer Pedido · ${brl(total)}`}
           disabled={submitOrder.isPending || !orderKind || orderingClosed}
-          onClick={() => submitOrder.mutate()}
+          onClick={() => {
+            // Confere o relógio de novo no clique (a aba pode ter ficado parada desde ontem);
+            // o backend recusa do mesmo jeito, isso só evita mandar o pedido à toa.
+            if (isOrderingClosed()) {
+              setSubmitError(ORDERS_CLOSED_MESSAGE);
+              return;
+            }
+            submitOrder.mutate();
+          }}
         />
       )}
     </div>
