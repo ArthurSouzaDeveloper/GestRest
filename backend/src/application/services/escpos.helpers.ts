@@ -135,6 +135,10 @@ export interface TicketInput {
    * presente), pedido explícito do cliente/dono: o motoboy confere quanto da cobrança é
    * frete sem precisar abrir o sistema. null/undefined (ou 0) não imprime nada. */
   deliveryFee?: number | null;
+  /** Número do pedido anterior que já pagou a taxa, quando ESTE pedido foi isento por ser
+   * "pedido dividido" (ver order.service.ts#openPublic). Impresso no lugar da linha da taxa
+   * (só quando orderTotal está presente), pro motoboy saber que leva os dois juntos. */
+  deliveryFeeWaivedByOrderNumber?: number | null;
   /** Linha(s) em destaque logo abaixo do cabeçalho (ex.: "* ITENS INCLUSOS", "* MINI
    * PIZZA") — pra quem só vê ESTA via não esquecer que o pedido tem mais coisa em outra
    * estação/via. Cada string do array vira uma linha própria; array vazio/null não imprime
@@ -286,7 +290,11 @@ export function renderTicket(input: TicketInput): Buffer {
   // que está sendo cobrado.
   if (input.orderTotal != null) {
     parts.push(line('--------------------------------'), line(`TOTAL DO PEDIDO: ${formatCurrency(input.orderTotal)}`));
-    if (input.deliveryFee) parts.push(line(`TAXA DE ENTREGA: ${formatCurrency(input.deliveryFee)}`));
+    if (input.deliveryFeeWaivedByOrderNumber != null) {
+      parts.push(line('TAXA DE ENTREGA: ISENTA'), line(`(JUNTO DO PEDIDO #${input.deliveryFeeWaivedByOrderNumber})`));
+    } else if (input.deliveryFee) {
+      parts.push(line(`TAXA DE ENTREGA: ${formatCurrency(input.deliveryFee)}`));
+    }
   }
 
   parts.push(line('--------------------------------'), feedLines(4), PARTIAL_CUT);

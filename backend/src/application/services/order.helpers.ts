@@ -219,6 +219,9 @@ export function serializePublicStatus(order: OrderWithRelations) {
     subtotal: totals.subtotal,
     discount: totals.discount,
     deliveryFee: totals.deliveryFee,
+    // Pedido dividido isento da taxa (ver order.service.ts#openPublic) — o acompanhamento
+    // mostra "Isenta (junto do pedido #N)" em vez de "Grátis".
+    deliveryFeeWaivedByOrderNumber: order.deliveryFeeWaivedByOrderNumber,
     total: totals.total,
     paymentMethod: order.declaredPaymentMethod,
     changeFor: order.changeFor !== null ? Number(order.changeFor) : null,

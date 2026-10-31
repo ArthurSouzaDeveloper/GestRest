@@ -50,6 +50,11 @@ interface NewItemInput {
   comboProductIds?: string[];
 }
 
+/** Janela (min) em que um segundo pedido de entrega do mesmo cliente pro mesmo endereço sai
+ * sem taxa de entrega — ver openPublic ("pedido dividido"). Fixa por enquanto (pedido do
+ * cliente/dono: 10 minutos). */
+export const DELIVERY_FEE_SPLIT_WINDOW_MINUTES = 10;
+
 // Regra do dono do restaurante: ao combinar mais de 1 fruta num suco/frapê, o preço é
 // sempre o da combinação fruta+base mais cara entre as escolhidas, mais esse valor fixo
 // por fruta adicional (a partir da 2ª). Nunca confiado do cliente — sempre recalculado
@@ -436,6 +441,42 @@ export const orderService = {
               restaurantId: tenantId,
             },
           });
+      // Pedido dividido paga uma taxa só — caso real do cliente/dono: o cliente fez dois
+      // pedidos seguidos (parte no cartão, parte em dinheiro) pro mesmo endereço e pagou o
+      // frete duas vezes. Só isenta quando é claramente a mesma entrega: mesmo cadastro
+      // (CPF+nome, como acima) com o mesmo telefone de antes, mesmo endereço (rua
+      // normalizada + número — endereço diferente é outra viagem do motoboy) e um pedido
+      // anterior com taxa cobrada, não cancelado, feito há no máximo
+      // DELIVERY_FEE_SPLIT_WINDOW_MINUTES. Compara com o pedido que PAGOU a taxa (deliveryFee
+      // > 0), então um terceiro pedido dentro da janela também sai isento, sem a janela ir
+      // "andando" indefinidamente a cada pedido novo.
+      let deliveryFeeWaivedByOrderNumber: number | null = null;
+      if (
+        input.orderType === 'DELIVERY' &&
+        deliveryFee > 0 &&
+        existing &&
+        existing.phoneNormalized === phoneNormalized
+      ) {
+        const recent = await tx.order.findMany({
+          where: {
+            restaurantId: tenantId,
+            customerId: existing.id,
+            orderType: OrderType.DELIVERY,
+            status: { not: OrderStatus.CANCELLED },
+            deliveryFee: { gt: 0 },
+            deliveryNumber: input.deliveryNumber?.trim(),
+            createdAt: { gte: new Date(Date.now() - DELIVERY_FEE_SPLIT_WINDOW_MINUTES * 60_000) },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { number: true, deliveryStreet: true },
+        });
+        const streetNormalized = normalizeForMatch(input.deliveryStreet ?? '');
+        const source = recent.find((o) => normalizeForMatch(o.deliveryStreet ?? '') === streetNormalized);
+        if (source) {
+          deliveryFee = 0;
+          deliveryFeeWaivedByOrderNumber = source.number;
+        }
+      }
       const order = await tx.order.create({
         data: {
           restaurantId: tenantId,
@@ -450,6 +491,7 @@ export const orderService = {
           serviceRate: 0,
           deliveryZoneId: input.orderType === 'DELIVERY' ? input.deliveryZoneId : undefined,
           deliveryFee,
+          deliveryFeeWaivedByOrderNumber,
           deliveryDistanceKm,
           deliveryStreet: input.deliveryStreet,
           deliveryNumber: input.deliveryNumber,

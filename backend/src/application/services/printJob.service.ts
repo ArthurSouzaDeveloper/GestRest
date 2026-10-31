@@ -305,6 +305,7 @@ export const printJobService = {
       select: {
         discount: true,
         deliveryFee: true,
+        deliveryFeeWaivedByOrderNumber: true,
         serviceRate: true,
         items: {
           where: { status: { not: 'CANCELLED' } },
@@ -361,6 +362,9 @@ export const printJobService = {
     // Via principal de produção leva o mesmo total da via do motoboy, inclusive a linha da
     // taxa de entrega logo abaixo (null/0 em retirada, que não imprime a linha).
     const mainPaperDeliveryFee = order.orderType === 'DELIVERY' ? Number(full.deliveryFee) : null;
+    // Pedido dividido isento da taxa (ver order.service.ts#openPublic): imprime "ISENTA (JUNTO
+    // DO PEDIDO #N)" no lugar da taxa, na via principal e na do motoboy.
+    const waivedBy = order.orderType === 'DELIVERY' ? full.deliveryFeeWaivedByOrderNumber : null;
 
     const commonTicketFields = {
       tableNumber: order.table?.number ?? null,
@@ -478,6 +482,7 @@ export const printJobService = {
             minimalData: !isMain,
             orderTotal: isMain ? orderTotal : null,
             deliveryFee: isMain ? mainPaperDeliveryFee : null,
+            deliveryFeeWaivedByOrderNumber: isMain ? waivedBy : null,
             items: groupItems.map(toTicketItem),
           }),
         },
@@ -509,6 +514,7 @@ export const printJobService = {
             minimalData: !isMain,
             orderTotal: isMain ? orderTotal : null,
             deliveryFee: isMain ? mainPaperDeliveryFee : null,
+            deliveryFeeWaivedByOrderNumber: isMain ? waivedBy : null,
             items: realSucoItems.map(toTicketItem),
           }),
         },
@@ -538,6 +544,7 @@ export const printJobService = {
             minimalData: !isMain,
             orderTotal: isMain ? orderTotal : null,
             deliveryFee: isMain ? mainPaperDeliveryFee : null,
+            deliveryFeeWaivedByOrderNumber: isMain ? waivedBy : null,
             items: acaiItems.map(toTicketItem),
           }),
         },
@@ -574,6 +581,7 @@ export const printJobService = {
             crossStationNotice: null,
             orderTotal,
             deliveryFee: Number(full.deliveryFee),
+            deliveryFeeWaivedByOrderNumber: waivedBy,
             itemsSummaryOnly: true,
             items: motoboySummaryItems(kitchenItems, juiceItems),
           }),

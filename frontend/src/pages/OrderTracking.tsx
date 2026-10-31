@@ -27,6 +27,7 @@ interface PublicOrderStatus {
   subtotal: number;
   discount: number;
   deliveryFee: number;
+  deliveryFeeWaivedByOrderNumber?: number | null;
   total: number;
   paymentMethod: PaymentMethod | null;
   changeFor: number | null;
@@ -215,7 +216,13 @@ export default function OrderTracking() {
             {!isPickup && (
               <div className="flex justify-between">
                 <span>Taxa de entrega</span>
-                <span>{order.deliveryFee > 0 ? brl(order.deliveryFee) : 'Grátis'}</span>
+                <span>
+                  {order.deliveryFee > 0
+                    ? brl(order.deliveryFee)
+                    : order.deliveryFeeWaivedByOrderNumber != null
+                      ? `Isenta (junto do pedido #${order.deliveryFeeWaivedByOrderNumber})`
+                      : 'Grátis'}
+                </span>
               </div>
             )}
             <div className="flex justify-between pt-1 font-semibold text-[#14161C]">
