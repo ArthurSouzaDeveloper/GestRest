@@ -254,4 +254,20 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
     );
     expect(pickup.orderType).toBe('PICKUP');
   });
+  it('antes das 18h (horário de SP) o site recusa qualquer pedido, e às 18h em ponto aceita', async () => {
+    const input = {
+      orderType: 'PICKUP' as const,
+      customerName: 'Cliente Adiantado',
+      customerPhone: '19990002222',
+      customerCpf: '10000014826',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId, quantity: 1 }],
+    };
+    await expect(
+      publicOrderService.createOrder(slug, input, undefined, new Date('2026-10-30T20:59:00Z')),
+    ).rejects.toThrow('A loja ainda não abriu. Os pedidos começam às 18h.');
+
+    const order = await publicOrderService.createOrder(slug, input, undefined, new Date('2026-10-30T21:00:00Z'));
+    expect(order.orderType).toBe('PICKUP');
+  });
 });

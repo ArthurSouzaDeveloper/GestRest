@@ -2,7 +2,7 @@ import { prisma } from '../../config/prisma';
 import { AppError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { additionalService, categoryService, deliveryZoneService, productService } from './catalog.service';
 import { deliveryPricingService } from './deliveryPricing.service';
-import { DELIVERY_CLOSED_MESSAGE, isDeliveryClosed } from './deliveryHours';
+import { DELIVERY_CLOSED_MESSAGE, ORDERS_CLOSED_MESSAGE, isDeliveryClosed, isOrderingClosed } from './deliveryHours';
 import { etaService } from './eta.service';
 import { googleMapsClient } from './googleMaps.client';
 import { computeTotals, normalizeCpf, orderInclude, serializePublicStatus } from './order.helpers';
@@ -51,6 +51,7 @@ export const publicOrderService = {
     const tenantId = await resolveActiveTenant(slug);
     // O site já desabilita Entrega depois do corte (ver deliveryHours.ts), mas a regra vale
     // aqui pra não dar pra burlar mandando o pedido direto pra API ou com a aba aberta de antes.
+    if (isOrderingClosed(now)) throw new AppError(ORDERS_CLOSED_MESSAGE);
     if (input.orderType === 'DELIVERY' && isDeliveryClosed(now)) throw new AppError(DELIVERY_CLOSED_MESSAGE);
     return orderService.openPublic(tenantId, input, ip);
   },
