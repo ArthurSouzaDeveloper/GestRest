@@ -17,10 +17,6 @@ const BODY_MODE_ON = Buffer.from([ESC, 0x21, 0x18]);
 // um item do próximo. O texto de verdade (nome, descrição, preço) continua do mesmo
 // tamanho de sempre — só o espaço ocupado pelo traço fica menor.
 const NORMAL_MODE_ON = Buffer.from([ESC, 0x21, 0x00]);
-// Impressão invertida (fundo preto, letra branca) — só pro aviso de potinho à parte (ver
-// TicketItem.sideAdditionals): precisa saltar aos olhos de quem monta o pedido.
-const REVERSE_ON = Buffer.from([GS, 0x42, 0x01]);
-const REVERSE_OFF = Buffer.from([GS, 0x42, 0x00]);
 const feedLines = (n: number) => Buffer.from([ESC, 0x64, n]);
 const PARTIAL_CUT = Buffer.from([GS, 0x56, 0x01]);
 
@@ -59,8 +55,9 @@ export interface TicketItem {
   notes?: string | null;
   additionals: string[];
   /** Adicionais que NÃO vão dentro do prato, e sim num potinho separado (ex.: Vinagrete)
-   * — pedido do cliente/dono: saem no fim do item, em impressão invertida, pra cozinha
-   * não confundir com recheio. */
+   * — pedido do cliente/dono: não aparecem embaixo do pastel; saem somados como uma
+   * linha própria no fim da via ("2- Vinagrete 200ml"), antes do total, como se fossem
+   * mais um item do pedido. */
   sideAdditionals?: string[];
 }
 
@@ -88,7 +85,6 @@ export function mergeIdenticalItems(items: TicketItem[]): TicketItem[] {
       item.description ?? null,
       item.notes?.trim() || null,
       item.additionals.map((a) => a.trim().toLowerCase()).sort(),
-      (item.sideAdditionals ?? []).map((a) => a.trim().toLowerCase()).sort(),
     ]);
   const merged = new Map<string, TicketItem>();
   for (const item of items) {
@@ -290,12 +286,27 @@ export function renderTicket(input: TicketInput): Buffer {
     if (input.itemsSummaryOnly) continue;
     if (item.description) parts.push(line(`  ${item.description}`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
-    for (const side of item.sideAdditionals ?? []) {
-      const label = item.quantity > 1 ? `${item.quantity} POTINHOS A PARTE` : 'POTINHO A PARTE';
-      parts.push(REVERSE_ON, line(` ${label}: ${side.toUpperCase()} `), REVERSE_OFF);
-    }
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
     if (input.itemSeparator) parts.push(NORMAL_MODE_ON, line('----------------------------'), BODY_MODE_ON);
+  }
+
+  // Potinhos à parte (vinagrete) somados de todos os itens da via, como linhas próprias
+  // no mesmo tamanho grande dos pastéis — pedido do cliente/dono: pastel de carne com
+  // vinagrete + 2 queijos com vinagrete = "2- Vinagrete" no fim, antes do total.
+  const sideTotals = new Map<string, { name: string; quantity: number }>();
+  for (const item of input.items) {
+    for (const side of item.sideAdditionals ?? []) {
+      const key = side.trim().toLowerCase();
+      const entry = sideTotals.get(key) ?? { name: side.trim(), quantity: 0 };
+      entry.quantity += item.quantity;
+      sideTotals.set(key, entry);
+    }
+  }
+  if (sideTotals.size > 0) {
+    parts.push(line('--------------------------------'));
+    for (const side of sideTotals.values()) {
+      parts.push(HEADER_MODE_ON, line(`${side.quantity}- ${side.name}`), BODY_MODE_ON);
+    }
   }
 
   // Abaixo do ÚLTIMO item, não mais junto dos dados do cliente no topo — pedido explícito
