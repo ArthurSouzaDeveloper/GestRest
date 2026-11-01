@@ -404,7 +404,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).not.toContain('Atum em pedacos');
   });
 
-  it('"Monte o Seu Pastel" (produto isCustom) imprime o sabor-base em destaque, os extras com "+" e o vinagrete como potinho à parte', async () => {
+  it('"Monte o Seu Pastel" (produto isCustom) imprime o sabor-base em destaque, os extras com "+" e o vinagrete numa linha própria no fim', async () => {
     const category = await prisma.category.create({
       data: { name: 'Pastéis Salgados', station: Station.KITCHEN, restaurantId },
     });
@@ -439,12 +439,12 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const job = await prisma.printJob.findFirstOrThrow({ where: { orderId: order!.id } });
     const text = job.payload.toString('ascii');
     // Sabor-base no título (mesmo com o extra escolhido antes), extras embaixo com "+" e o
-    // vinagrete fora da lista, como potinho à parte (ver toTicketItem).
+    // vinagrete fora da lista, numa linha própria no fim da via (ver renderTicket).
     expect(text).toContain('1- Frango\n');
     expect(text).toContain('  + Catupiry');
     expect(text).not.toContain('+ Frango');
     expect(text).not.toContain('+ Vinagrete');
-    expect(text).toContain('POTINHO A PARTE: VINAGRETE 200ML');
+    expect(text).toContain('1- Vinagrete 200ml\n');
     expect(text).not.toContain('Monte o Seu Pastel');
     expect(text).not.toContain('escolha os ingredientes');
     // Papel de cozinha não mostra mais preço nenhum (achado do cliente/dono, Passo 8 —

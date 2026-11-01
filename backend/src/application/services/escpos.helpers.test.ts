@@ -682,8 +682,8 @@ describe('mergeIdenticalItems', () => {
     expect(text).not.toContain('1- CHEDDAR, FRANGO');
   });
 
-  it('adicional de potinho à parte sai no fim do item, em impressão invertida, com a quantidade de potinhos', () => {
-    const base = {
+  it('potinhos à parte (vinagrete) saem somados numa linha própria depois dos itens e antes do total', () => {
+    const text = renderTicket({
       station: Station.KITCHEN,
       tableNumber: null,
       orderType: OrderType.PICKUP,
@@ -692,29 +692,19 @@ describe('mergeIdenticalItems', () => {
       customerPhone: null,
       deliveryAddress: null,
       placedAt: PLACED_AT,
-    };
-    const text = renderTicket({
-      ...base,
+      orderTotal: 50,
       items: [
-        { name: '2 Queijos', description: null, quantity: 1, additionals: ['Mussarela'], sideAdditionals: ['Vinagrete 200ml'] },
+        { name: 'Carne', description: null, quantity: 1, additionals: [], sideAdditionals: ['Vinagrete'] },
+        { name: '2 Queijos', description: null, quantity: 1, additionals: ['Mussarela'], sideAdditionals: ['Vinagrete'] },
+        { name: '3 Queijos', description: null, quantity: 1, additionals: [] },
+        { name: 'Carne', description: null, quantity: 1, additionals: [] },
       ],
     }).toString('latin1');
-    const reverseOn = '\x1dB\x01';
-    const reverseOff = '\x1dB\x00';
-    expect(text).toContain(`${reverseOn} POTINHO A PARTE: VINAGRETE 200ML \n${reverseOff}`);
-    expect(text.indexOf('+ Mussarela')).toBeLessThan(text.indexOf('POTINHO A PARTE'));
+    expect(text).toContain('2- Vinagrete\n');
     expect(text).not.toContain('+ Vinagrete');
-
-    const two = renderTicket({
-      ...base,
-      items: [
-        { name: '2 Queijos', description: null, quantity: 1, additionals: [], sideAdditionals: ['Vinagrete'] },
-        { name: '2 Queijos', description: null, quantity: 1, additionals: [], sideAdditionals: ['Vinagrete'] },
-        { name: '2 Queijos', description: null, quantity: 1, additionals: [] },
-      ],
-    }).toString('latin1');
-    expect(two).toContain('2 POTINHOS A PARTE: VINAGRETE');
-    // Com e sem vinagrete não se juntam.
-    expect(two).toContain('1- 2 Queijos');
+    // Carne com e sem vinagrete viram uma linha só (o vinagrete não fica mais no item).
+    expect(text).toContain('2- Carne');
+    expect(text.indexOf('1- 3 Queijos')).toBeLessThan(text.indexOf('2- Vinagrete'));
+    expect(text.indexOf('2- Vinagrete')).toBeLessThan(text.indexOf('TOTAL DO PEDIDO'));
   });
 });
