@@ -1,4 +1,4 @@
-import { Prisma, Station } from '@prisma/client';
+import { AdditionalKind, Prisma, Station } from '@prisma/client';
 import { renderTicket, type TicketItem } from './escpos.helpers';
 import { itemDisplayName } from './order.helpers';
 
@@ -209,19 +209,30 @@ function motoboySummaryItems(kitchenItems: CreatedOrderItem[], juiceItems: Creat
  * ticket que o item apareça (via normal por estação, ou a via combinada do motoboy
  * abaixo) — extraído pra não duplicar (e arriscar desalinhar) essa lógica nos dois
  * lugares. */
-function toTicketItem(item: CreatedOrderItem): TicketItem {
+/** Adicional servido num potinho separado, fora do prato (pedido do cliente/dono: o
+ * vinagrete não vai dentro do pastel). Pelo nome, pra valer pra qualquer variação
+ * cadastrada ("Vinagrete", "Vinagrete 200ml"...). */
+function isSideAdditional(name: string): boolean {
+  return /vinagrete/i.test(name);
+}
+
+function toTicketItem(item: CreatedOrderItem, baseAdditionalIds: Set<string>): TicketItem {
+  const sideAdditionals = item.additionals.filter((a) => isSideAdditional(a.name)).map((a) => a.name);
+  const fillings = item.additionals.filter((a) => !isSideAdditional(a.name));
   // "Monte o Seu Pastel"/"Monte o Seu Pastel Doce": o nome do produto não diz nada pra
-  // quem prepara — o que importa é o que o cliente escolheu por dentro. Pedido explícito
-  // do cliente: no lugar do nome genérico, o título vira a lista de ingredientes
-  // escolhidos em CAIXA ALTA, sem tipo/descrição (ambos genéricos aqui).
+  // quem prepara. Pedido explícito do cliente/dono: o sabor principal escolhido (o
+  // adicional BASE) vira o título em destaque, igual ao nome de um pastel do cardápio
+  // ("1- Frango"), e os extras saem embaixo com "+" como em qualquer outro item.
   if (item.product.isCustom) {
+    const base = fillings.find((a) => baseAdditionalIds.has(a.additionalId)) ?? fillings[0];
     return {
-      name: item.additionals.map((a) => a.name.toUpperCase()).join(', '),
+      name: base ? base.name : item.product.name,
       typeLabel: null,
       description: null,
       quantity: item.quantity,
       notes: item.notes,
-      additionals: [],
+      additionals: fillings.filter((a) => a !== base).map((a) => a.name),
+      sideAdditionals,
     };
   }
   return {
@@ -238,7 +249,8 @@ function toTicketItem(item: CreatedOrderItem): TicketItem {
     description: kitchenTypeSummary(item.product.category.name) === 'PASTEL' ? null : item.product.description,
     quantity: item.quantity,
     notes: item.notes,
-    additionals: item.additionals.map((a) => a.name),
+    additionals: fillings.map((a) => a.name),
+    sideAdditionals,
   };
 }
 
@@ -265,6 +277,21 @@ export const printJobService = {
       byStation.set(item.station, list);
     }
     if (byStation.size === 0) return;
+
+    // Quais adicionais são sabor-base (kind BASE) — o título do "Monte o Seu" (ver
+    // toTicketItem). O item recebido só traz o snapshot (nome/preço), sem o kind.
+    const additionalIds = [...new Set(items.flatMap((i) => i.additionals.map((a) => a.additionalId)))];
+    const baseAdditionalIds = new Set(
+      additionalIds.length === 0
+        ? []
+        : (
+            await tx.additional.findMany({
+              where: { id: { in: additionalIds }, kind: AdditionalKind.BASE },
+              select: { id: true },
+            })
+          ).map((a) => a.id),
+    );
+    const toTicket = (item: CreatedOrderItem) => toTicketItem(item, baseAdditionalIds);
 
     const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
@@ -483,7 +510,7 @@ export const printJobService = {
             orderTotal: isMain ? orderTotal : null,
             deliveryFee: isMain ? mainPaperDeliveryFee : null,
             deliveryFeeWaivedByOrderNumber: isMain ? waivedBy : null,
-            items: groupItems.map(toTicketItem),
+            items: groupItems.map(toTicket),
           }),
         },
       });
@@ -515,7 +542,7 @@ export const printJobService = {
             orderTotal: isMain ? orderTotal : null,
             deliveryFee: isMain ? mainPaperDeliveryFee : null,
             deliveryFeeWaivedByOrderNumber: isMain ? waivedBy : null,
-            items: realSucoItems.map(toTicketItem),
+            items: realSucoItems.map(toTicket),
           }),
         },
       });
@@ -545,7 +572,7 @@ export const printJobService = {
             orderTotal: isMain ? orderTotal : null,
             deliveryFee: isMain ? mainPaperDeliveryFee : null,
             deliveryFeeWaivedByOrderNumber: isMain ? waivedBy : null,
-            items: acaiItems.map(toTicketItem),
+            items: acaiItems.map(toTicket),
           }),
         },
       });

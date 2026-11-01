@@ -17,6 +17,10 @@ const BODY_MODE_ON = Buffer.from([ESC, 0x21, 0x18]);
 // um item do próximo. O texto de verdade (nome, descrição, preço) continua do mesmo
 // tamanho de sempre — só o espaço ocupado pelo traço fica menor.
 const NORMAL_MODE_ON = Buffer.from([ESC, 0x21, 0x00]);
+// Impressão invertida (fundo preto, letra branca) — só pro aviso de potinho à parte (ver
+// TicketItem.sideAdditionals): precisa saltar aos olhos de quem monta o pedido.
+const REVERSE_ON = Buffer.from([GS, 0x42, 0x01]);
+const REVERSE_OFF = Buffer.from([GS, 0x42, 0x00]);
 const feedLines = (n: number) => Buffer.from([ESC, 0x64, n]);
 const PARTIAL_CUT = Buffer.from([GS, 0x56, 0x01]);
 
@@ -54,6 +58,10 @@ export interface TicketItem {
   description: string | null;
   notes?: string | null;
   additionals: string[];
+  /** Adicionais que NÃO vão dentro do prato, e sim num potinho separado (ex.: Vinagrete)
+   * — pedido do cliente/dono: saem no fim do item, em impressão invertida, pra cozinha
+   * não confundir com recheio. */
+  sideAdditionals?: string[];
 }
 
 /**
@@ -80,6 +88,7 @@ export function mergeIdenticalItems(items: TicketItem[]): TicketItem[] {
       item.description ?? null,
       item.notes?.trim() || null,
       item.additionals.map((a) => a.trim().toLowerCase()).sort(),
+      (item.sideAdditionals ?? []).map((a) => a.trim().toLowerCase()).sort(),
     ]);
   const merged = new Map<string, TicketItem>();
   for (const item of items) {
@@ -281,6 +290,10 @@ export function renderTicket(input: TicketInput): Buffer {
     if (input.itemsSummaryOnly) continue;
     if (item.description) parts.push(line(`  ${item.description}`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
+    for (const side of item.sideAdditionals ?? []) {
+      const label = item.quantity > 1 ? `${item.quantity} POTINHOS A PARTE` : 'POTINHO A PARTE';
+      parts.push(REVERSE_ON, line(` ${label}: ${side.toUpperCase()} `), REVERSE_OFF);
+    }
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
     if (input.itemSeparator) parts.push(NORMAL_MODE_ON, line('----------------------------'), BODY_MODE_ON);
   }

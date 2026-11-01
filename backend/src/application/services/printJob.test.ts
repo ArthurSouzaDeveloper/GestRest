@@ -404,7 +404,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
     expect(text).not.toContain('Atum em pedacos');
   });
 
-  it('"Monte o Seu Pastel" (produto isCustom) imprime só os ingredientes em CAIXA ALTA', async () => {
+  it('"Monte o Seu Pastel" (produto isCustom) imprime o sabor-base em destaque, os extras com "+" e o vinagrete como potinho à parte', async () => {
     const category = await prisma.category.create({
       data: { name: 'Pastéis Salgados', station: Station.KITCHEN, restaurantId },
     });
@@ -424,24 +424,29 @@ describe('fila de impressão térmica (PrintJob)', () => {
     const extra = await prisma.additional.create({
       data: { name: 'Catupiry', kind: AdditionalKind.ADDON, price: 2, restaurantId, categoryId: category.id },
     });
+    const vinagrete = await prisma.additional.create({
+      data: { name: 'Vinagrete 200ml', kind: AdditionalKind.ADDON, price: 0, restaurantId, categoryId: category.id },
+    });
 
     const table = await prisma.restaurantTable.create({ data: { number: 522, restaurantId } });
     const order = await orderService.open({ tableId: table.id }, { userId: waiterId, tenantId: restaurantId, role: Role.WAITER });
     await orderService.addItems(
       order!.id,
-      [{ productId: customProduct.id, quantity: 1, additionalIds: [base.id, extra.id] }],
+      [{ productId: customProduct.id, quantity: 1, additionalIds: [extra.id, base.id, vinagrete.id] }],
       { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
     );
 
     const job = await prisma.printJob.findFirstOrThrow({ where: { orderId: order!.id } });
     const text = job.payload.toString('ascii');
-    expect(text).toContain('FRANGO');
-    expect(text).toContain('CATUPIRY');
-    // Nem o nome genérico do produto, nem a descrição fixa, nem a linha "+ " separada de
-    // adicional — os ingredientes viraram o próprio título do item (ver printJob.service.ts).
+    // Sabor-base no título (mesmo com o extra escolhido antes), extras embaixo com "+" e o
+    // vinagrete fora da lista, como potinho à parte (ver toTicketItem).
+    expect(text).toContain('1- Frango\n');
+    expect(text).toContain('  + Catupiry');
+    expect(text).not.toContain('+ Frango');
+    expect(text).not.toContain('+ Vinagrete');
+    expect(text).toContain('POTINHO A PARTE: VINAGRETE 200ML');
     expect(text).not.toContain('Monte o Seu Pastel');
     expect(text).not.toContain('escolha os ingredientes');
-    expect(text).not.toContain('+ Catupiry');
     // Papel de cozinha não mostra mais preço nenhum (achado do cliente/dono, Passo 8 —
     // ver hideItemPrice), então a checagem do valor certo (R$14 = base Frango R$12 +
     // adicional Catupiry R$2, não R$0 — achado de produção original) sai do ticket e vai

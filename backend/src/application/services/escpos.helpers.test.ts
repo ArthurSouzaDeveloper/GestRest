@@ -681,4 +681,40 @@ describe('mergeIdenticalItems', () => {
     expect(text).toContain('2- CHEDDAR, FRANGO');
     expect(text).not.toContain('1- CHEDDAR, FRANGO');
   });
+
+  it('adicional de potinho à parte sai no fim do item, em impressão invertida, com a quantidade de potinhos', () => {
+    const base = {
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.PICKUP,
+      orderNumber: 5,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+    };
+    const text = renderTicket({
+      ...base,
+      items: [
+        { name: '2 Queijos', description: null, quantity: 1, additionals: ['Mussarela'], sideAdditionals: ['Vinagrete 200ml'] },
+      ],
+    }).toString('latin1');
+    const reverseOn = '\x1dB\x01';
+    const reverseOff = '\x1dB\x00';
+    expect(text).toContain(`${reverseOn} POTINHO A PARTE: VINAGRETE 200ML \n${reverseOff}`);
+    expect(text.indexOf('+ Mussarela')).toBeLessThan(text.indexOf('POTINHO A PARTE'));
+    expect(text).not.toContain('+ Vinagrete');
+
+    const two = renderTicket({
+      ...base,
+      items: [
+        { name: '2 Queijos', description: null, quantity: 1, additionals: [], sideAdditionals: ['Vinagrete'] },
+        { name: '2 Queijos', description: null, quantity: 1, additionals: [], sideAdditionals: ['Vinagrete'] },
+        { name: '2 Queijos', description: null, quantity: 1, additionals: [] },
+      ],
+    }).toString('latin1');
+    expect(two).toContain('2 POTINHOS A PARTE: VINAGRETE');
+    // Com e sem vinagrete não se juntam.
+    expect(two).toContain('1- 2 Queijos');
+  });
 });
