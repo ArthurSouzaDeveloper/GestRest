@@ -227,6 +227,21 @@ async function createOrderItems(
         })
       : [];
 
+    // Sabor/adicional marcado como esgotado (active=false) depois que o cliente montou o
+    // carrinho: sem isso ele sumia calado do item (ou, se fosse a base, dava o confuso
+    // "Escolha o sabor-base"). Avisa pelo nome pra quem estiver pedindo trocar.
+    if (item.additionalIds?.length && additionals.length < new Set(item.additionalIds).size) {
+      const soldOut = await tx.additional.findFirst({
+        where: {
+          id: { in: item.additionalIds },
+          restaurantId: tenantId,
+          active: false,
+          OR: [{ categoryId: product.categoryId }, { categoryId: null }],
+        },
+      });
+      if (soldOut) throw new AppError(`Esgotado no momento: ${soldOut.name}`);
+    }
+
     assertCustomProductBase(product, additionals);
 
     const created = await tx.orderItem.create({

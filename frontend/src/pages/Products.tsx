@@ -4,7 +4,7 @@ import { Plus, Pencil } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
-import type { Category, Product } from '../types';
+import type { Additional, Category, Product } from '../types';
 
 export default function Products() {
   const qc = useQueryClient();
@@ -21,6 +21,19 @@ export default function Products() {
     queryFn: async () => (await api.get<Category[]>('/catalog/categories')).data,
   });
 
+  // Sabores ("base" do Monte o Seu, ex.: Pernil) e adicionais ficam numa tabela separada
+  // dos produtos — sem esta lista eles nunca apareciam aqui e não dava pra marcar esgotado.
+  const { data: additionals = [] } = useQuery({
+    queryKey: ['additionals', 'admin'],
+    queryFn: async () => (await api.get<Additional[]>('/catalog/additionals')).data,
+  });
+
+  const toggleAdditional = useMutation({
+    mutationFn: async (a: Additional) => api.patch(`/catalog/additionals/${a.id}`, { active: !a.active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['additionals'] }),
+    onError: (e) => alert(apiError(e)),
+  });
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['products'] });
     qc.invalidateQueries({ queryKey: ['products', 'admin'] });
@@ -34,7 +47,17 @@ export default function Products() {
 
   if (isLoading) return <Spinner />;
 
-  const filtered = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+  const term = search.toLowerCase();
+  const filtered = products.filter((p) => p.name.toLowerCase().includes(term));
+  const categoryName = (id?: string) => categories.find((c) => c.id === id)?.name ?? 'Todas as categorias';
+  const filteredAdditionals = additionals
+    .filter((a) => a.name.toLowerCase().includes(term) || categoryName(a.categoryId).toLowerCase().includes(term))
+    .sort(
+      (a, b) =>
+        categoryName(a.categoryId).localeCompare(categoryName(b.categoryId), 'pt-BR') ||
+        (a.kind === b.kind ? 0 : a.kind === 'BASE' ? -1 : 1) ||
+        a.name.localeCompare(b.name, 'pt-BR'),
+    );
 
   return (
     <div>
@@ -82,6 +105,50 @@ export default function Products() {
                 </td>
                 <td className="p-3 text-right">
                   <button className="btn-secondary !px-2 !py-1" onClick={() => setEditing(p)}><Pencil size={14} /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        </div>
+      </Card>
+
+      <h2 className="mb-1 mt-8 text-lg font-semibold">Sabores e adicionais</h2>
+      <p className="mb-3 text-sm text-gray-500">
+        Sabores do "Monte o Seu" e adicionais. Marcado como esgotado, some do site e do pedido até ser reativado.
+      </p>
+      <Card className="!p-0">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
+            <tr>
+              <th className="p-3">Nome</th>
+              <th className="p-3">Categoria</th>
+              <th className="p-3">Tipo</th>
+              <th className="p-3 text-right">Preço</th>
+              <th className="p-3 text-center">Disponível</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAdditionals.map((a) => (
+              <tr key={a.id} className="border-b border-gray-50 dark:border-gray-800">
+                <td className="p-3 font-medium">{a.name}</td>
+                <td className="p-3 text-gray-500">{categoryName(a.categoryId)}</td>
+                <td className="p-3 text-gray-500">{a.kind === 'BASE' ? 'Sabor' : 'Adicional'}</td>
+                <td className="p-3 text-right">{brl(a.price)}</td>
+                <td className="p-3 text-center">
+                  <button
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium transition ${
+                      a.active
+                        ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
+                        : 'bg-gray-200 text-gray-600 hover:bg-green-100 hover:text-green-700'
+                    }`}
+                    disabled={toggleAdditional.isPending}
+                    title={a.active ? 'Marcar como esgotado' : 'Marcar como disponível'}
+                    onClick={() => toggleAdditional.mutate(a)}
+                  >
+                    {a.active ? 'Disponível' : 'Esgotado'}
+                  </button>
                 </td>
               </tr>
             ))}

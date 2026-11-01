@@ -504,7 +504,7 @@ describe('fila de impressão térmica (PrintJob)', () => {
         [{ productId: customProduct.id, quantity: 1, additionalIds: [baseDesativada.id] }],
         { userId: waiterId, tenantId: restaurantId, role: Role.WAITER },
       ),
-    ).rejects.toThrow(/sabor-base/);
+    ).rejects.toThrow(/Esgotado no momento: Base Descontinuada/);
   });
 
   it('aceite manual de pedido online gera o PrintJob no momento do aceite, não antes', async () => {
