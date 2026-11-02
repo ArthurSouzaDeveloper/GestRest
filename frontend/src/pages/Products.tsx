@@ -4,6 +4,7 @@ import { Plus, Pencil } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
+import { IngredientsPanel } from '../components/IngredientsPanel';
 import type { Additional, Category, Product } from '../types';
 
 export default function Products() {
@@ -67,6 +68,8 @@ export default function Products() {
         action={<button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Novo Produto</button>}
       />
 
+      <IngredientsPanel products={products} additionals={additionals} categories={categories} />
+
       <input className="input mb-4 max-w-xs" placeholder="Pesquisar..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
       <Card className="!p-0">
@@ -102,6 +105,7 @@ export default function Products() {
                   >
                     {p.available ? 'Disponível' : 'Esgotado'}
                   </button>
+                  <SoldOutBadge names={p.soldOutIngredients} />
                 </td>
                 <td className="p-3 text-right">
                   <button className="btn-secondary !px-2 !py-1" onClick={() => setEditing(p)}><Pencil size={14} /></button>
@@ -149,6 +153,7 @@ export default function Products() {
                   >
                     {a.active ? 'Disponível' : 'Esgotado'}
                   </button>
+                  <SoldOutBadge names={a.soldOutIngredients} />
                 </td>
               </tr>
             ))}
@@ -166,6 +171,16 @@ export default function Products() {
         />
       )}
     </div>
+  );
+}
+
+/** Fora do cardápio porque um insumo acabou, mesmo marcado como disponível. */
+function SoldOutBadge({ names }: { names?: string[] }) {
+  if (!names?.length) return null;
+  return (
+    <span className="mt-1 block text-xs font-medium text-red-600" title="Volta sozinho quando o insumo for marcado em estoque">
+      Sem {names.join(', ')}
+    </span>
   );
 }
 

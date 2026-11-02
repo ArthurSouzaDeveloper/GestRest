@@ -13,6 +13,7 @@ import { prisma } from '../../config/prisma';
 import { AppError, ConflictError, NotFoundError } from '../../utils/errors';
 import { emitTenant, ROOMS } from '../../socket';
 import { auditService } from './audit.service';
+import { ALL_INGREDIENTS_IN_STOCK, SOLD_OUT_INGREDIENTS } from './catalog.service';
 import { deliveryPricingService } from './deliveryPricing.service';
 import { etaService } from './eta.service';
 import { printJobService } from './printJob.service';
@@ -162,6 +163,11 @@ interface CreatedOrderItems {
  * quem precisa acordar a tela de produção certa) e os itens criados (pra quem precisa montar
  * o ticket de impressão — ver printJob.service.ts).
  */
+/** Produto barrado porque um insumo dele acabou (ex.: "Morango (Laranja)" sem laranja). */
+function soldOutByIngredientMessage(p: { name: string; ingredients: { name: string }[] }) {
+  return `Esgotado no momento: ${p.name} (sem ${p.ingredients.map((i) => i.name).join(', ')})`;
+}
+
 async function createOrderItems(
   tx: Prisma.TransactionClient,
   tenantId: string,
@@ -178,11 +184,13 @@ async function createOrderItems(
     if (item.comboProductIds && item.comboProductIds.length >= 2) {
       const comboProducts = await tx.product.findMany({
         where: { id: { in: item.comboProductIds }, restaurantId: tenantId },
-        include: { category: true },
+        include: { category: true, ingredients: SOLD_OUT_INGREDIENTS },
       });
       if (comboProducts.length !== item.comboProductIds.length) throw new NotFoundError('Produto');
       const unavailable = comboProducts.find((p) => !p.available);
       if (unavailable) throw new AppError(`Produto indisponível: ${unavailable.name}`);
+      const missing = comboProducts.find((p) => p.ingredients.length > 0);
+      if (missing) throw new AppError(soldOutByIngredientMessage(missing));
       if (new Set(comboProducts.map((p) => p.categoryId)).size > 1) {
         throw new AppError('As frutas do combo precisam ser da mesma categoria');
       }
@@ -200,10 +208,11 @@ async function createOrderItems(
     } else {
       product = await tx.product.findFirst({
         where: { id: item.productId, restaurantId: tenantId },
-        include: { category: true },
+        include: { category: true, ingredients: SOLD_OUT_INGREDIENTS },
       });
       if (!product) throw new NotFoundError('Produto');
       if (!product.available) throw new AppError(`Produto indisponível: ${product.name}`);
+      if (product.ingredients.length > 0) throw new AppError(soldOutByIngredientMessage(product));
       unitPrice = product.price;
     }
 
@@ -222,6 +231,7 @@ async function createOrderItems(
             id: { in: item.additionalIds },
             restaurantId: tenantId,
             active: true,
+            ingredients: ALL_INGREDIENTS_IN_STOCK,
             OR: [{ categoryId: product.categoryId }, { categoryId: null }],
           },
         })
@@ -235,8 +245,8 @@ async function createOrderItems(
         where: {
           id: { in: item.additionalIds },
           restaurantId: tenantId,
-          active: false,
           OR: [{ categoryId: product.categoryId }, { categoryId: null }],
+          AND: [{ OR: [{ active: false }, { ingredients: { some: { inStock: false } } }] }],
         },
       });
       if (soldOut) throw new AppError(`Esgotado no momento: ${soldOut.name}`);
