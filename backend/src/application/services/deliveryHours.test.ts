@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDeliveryClosed, isOrderingClosed } from './deliveryHours';
+import { isDeliveryClosed, isOrderingClosed, reopenLabel } from './deliveryHours';
 
 // Horários em UTC; São Paulo é UTC-3 (sem horário de verão desde 2019).
 // 18:00 SP = 21:00Z · 23:00 SP = 02:00Z · 23:15 SP = 02:15Z
@@ -42,5 +42,39 @@ describe('retirada das 18h às 23:15 (fuso de São Paulo)', () => {
   });
   it('não depende do relógio do servidor: 21:00Z é 18h em SP', () => {
     expect(isOrderingClosed(new Date('2026-11-01T21:30:00Z'))).toBe(false);
+  });
+});
+
+// 02/11/2026 é segunda; 03/11 terça; 04/11 quarta; 08/11 domingo.
+describe('só de quarta a domingo', () => {
+  it('segunda e terça às 19h em SP ficam fechadas (entrega e retirada)', () => {
+    expect(isOrderingClosed(new Date('2026-11-02T22:00:00Z'))).toBe(true);
+    expect(isDeliveryClosed(new Date('2026-11-02T22:00:00Z'))).toBe(true);
+    expect(isOrderingClosed(new Date('2026-11-03T22:00:00Z'))).toBe(true);
+  });
+  it('quarta e domingo às 19h em SP ficam abertos', () => {
+    expect(isOrderingClosed(new Date('2026-11-04T22:00:00Z'))).toBe(false);
+    expect(isOrderingClosed(new Date('2026-11-08T22:00:00Z'))).toBe(false);
+  });
+  it('domingo 23:10 em SP ainda aceita retirada (mesmo sendo segunda em UTC)', () => {
+    expect(isOrderingClosed(new Date('2026-11-09T02:10:00Z'))).toBe(false);
+  });
+});
+
+describe('texto do botão de loja fechada', () => {
+  it('quarta antes das 18h: abre hoje', () => {
+    expect(reopenLabel(new Date('2026-11-04T15:00:00Z'))).toBe('Abrimos às 18h');
+  });
+  it('segunda: abre quarta', () => {
+    expect(reopenLabel(new Date('2026-11-02T22:00:00Z'))).toBe('Abrimos quarta às 18h');
+  });
+  it('terça: abre amanhã', () => {
+    expect(reopenLabel(new Date('2026-11-03T15:00:00Z'))).toBe('Abrimos amanhã às 18h');
+  });
+  it('sexta depois das 23:15: abre amanhã', () => {
+    expect(reopenLabel(new Date('2026-11-07T02:30:00Z'))).toBe('Abrimos amanhã às 18h');
+  });
+  it('domingo depois das 23:15: abre quarta', () => {
+    expect(reopenLabel(new Date('2026-11-09T02:30:00Z'))).toBe('Abrimos quarta às 18h');
   });
 });
