@@ -146,6 +146,7 @@ model Restaurant {
   categories    Category[]
   products      Product[]
   additionals   Additional[]
+  ingredients   Ingredient[]
   tables        RestaurantTable[]
   customers     Customer[]
   customerAddresses CustomerAddress[]
@@ -426,6 +427,9 @@ model Product {
   updatedAt    DateTime   @updatedAt
 
   orderItems OrderItem[]
+  // Insumos que este produto leva (ex.: Laranja). Insumo esgotado deixa o produto
+  // indisponível sem mexer no `available` dele — ver Ingredient abaixo.
+  ingredients Ingredient[] @relation("ProductIngredients")
 
   @@index([restaurantId, available])
   @@index([categoryId])
@@ -446,9 +450,30 @@ model Additional {
   createdAt    DateTime       @default(now())
 
   orderItemAdditionals OrderItemAdditional[]
+  ingredients          Ingredient[]          @relation("AdditionalIngredients")
 
   @@index([restaurantId])
   @@map("additionals")
+}
+
+// Insumo (ex.: Laranja) que vários produtos/sabores levam. Marcado como em falta
+// (inStock=false), todo produto e adicional ligado a ele sai do cardápio e é recusado no
+// pedido, sem alterar o `available`/`active` próprio de cada um: quando o insumo volta,
+// só volta o que não estava esgotado por conta própria.
+model Ingredient {
+  id           String       @id @default(uuid())
+  name         String
+  inStock      Boolean      @default(true)
+  restaurantId String
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  products    Product[]    @relation("ProductIngredients")
+  additionals Additional[] @relation("AdditionalIngredients")
+
+  @@unique([restaurantId, name])
+  @@map("ingredients")
 }
 
 // ─────────────────────────────────────────────────────────────

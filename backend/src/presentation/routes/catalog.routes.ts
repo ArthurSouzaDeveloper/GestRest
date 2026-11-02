@@ -7,6 +7,7 @@ import {
   additionalService,
   categoryService,
   deliveryZoneService,
+  ingredientService,
   productService,
 } from '../../application/services/catalog.service';
 import {
@@ -32,6 +33,8 @@ import {
   deliveryZoneSchema,
   deliveryZoneUpdateSchema,
   etaSettingsSchema,
+  ingredientSchema,
+  ingredientUpdateSchema,
   printerSettingsSchema,
   productSchema,
   productUpdateSchema,
@@ -144,6 +147,34 @@ router.delete(
   manager,
   asyncHandler(async (req, res) => {
     await additionalService.remove(tid(req), req.params.id);
+    res.status(204).end();
+  }),
+);
+
+// ── Insumos (ex.: Laranja): em falta, tudo que leva o insumo sai do cardápio ──
+router.get(
+  '/ingredients',
+  asyncHandler(async (req, res) => res.json(await ingredientService.list(tid(req)))),
+);
+router.post(
+  '/ingredients',
+  manager,
+  validateBody(ingredientSchema),
+  asyncHandler(async (req, res) => res.status(201).json(await ingredientService.create(tid(req), req.body))),
+);
+router.patch(
+  '/ingredients/:id',
+  manager,
+  validateBody(ingredientUpdateSchema),
+  asyncHandler(async (req, res) =>
+    res.json(await ingredientService.update(tid(req), req.params.id, req.body)),
+  ),
+);
+router.delete(
+  '/ingredients/:id',
+  manager,
+  asyncHandler(async (req, res) => {
+    await ingredientService.remove(tid(req), req.params.id);
     res.status(204).end();
   }),
 );

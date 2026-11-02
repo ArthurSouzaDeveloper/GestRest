@@ -6,10 +6,27 @@ import { ConflictError, NotFoundError } from '../../utils/errors';
 // `product.price + additionalsTotal` on the client silently does string concatenation
 // instead of addition (e.g. "16" + 0 => "160").
 function serializeProduct<T extends { price: Prisma.Decimal | number }>(p: T) {
-  return { ...p, price: Number(p.price) };
+  return withSoldOutIngredients({ ...p, price: Number(p.price) });
 }
 function serializeAdditional<T extends { price: Prisma.Decimal | number }>(a: T) {
-  return { ...a, price: Number(a.price) };
+  return withSoldOutIngredients({ ...a, price: Number(a.price) });
+}
+
+// Insumos em falta (ex.: Laranja acabou) tornam o produto/adicional indisponível sem
+// mexer no `available`/`active` próprio dele — assim, quando o insumo volta, só volta o
+// que não estava esgotado por conta própria. A lista só traz os insumos EM FALTA (ver
+// SOLD_OUT_INGREDIENTS) e vira `soldOutIngredients: string[]` pra tela mostrar o motivo.
+export const SOLD_OUT_INGREDIENTS = {
+  where: { inStock: false },
+  select: { name: true },
+  orderBy: { name: 'asc' },
+} satisfies Prisma.Product$ingredientsArgs;
+/** Filtro Prisma: nenhum insumo ligado está em falta. */
+export const ALL_INGREDIENTS_IN_STOCK = { none: { inStock: false } } satisfies Prisma.IngredientListRelationFilter;
+
+function withSoldOutIngredients<T extends object>(item: T) {
+  const { ingredients, ...rest } = item as T & { ingredients?: { name: string }[] };
+  return { ...rest, soldOutIngredients: (ingredients ?? []).map((i) => i.name) };
 }
 function serializeDeliveryZone<T extends { fee: Prisma.Decimal | number }>(z: T) {
   return { ...z, fee: Number(z.fee) };
@@ -64,10 +81,13 @@ export const productService = {
     const where: Prisma.ProductWhereInput = { restaurantId: tenantId };
     if (params.search) where.name = { contains: params.search, mode: 'insensitive' };
     if (params.categoryId) where.categoryId = params.categoryId;
-    if (params.onlyAvailable) where.available = true;
+    if (params.onlyAvailable) {
+      where.available = true;
+      where.ingredients = ALL_INGREDIENTS_IN_STOCK;
+    }
     const products = await prisma.product.findMany({
       where,
-      include: { category: true },
+      include: { category: true, ingredients: SOLD_OUT_INGREDIENTS },
       // Montáveis ("Monte o Seu") primeiro na categoria, resto alfabético.
       orderBy: [{ isCustom: 'desc' }, { name: 'asc' }],
     });
@@ -76,7 +96,7 @@ export const productService = {
   async get(tenantId: string, id: string) {
     const p = await prisma.product.findFirst({
       where: { id, restaurantId: tenantId },
-      include: { category: true },
+      include: { category: true, ingredients: SOLD_OUT_INGREDIENTS },
     });
     if (!p) throw new NotFoundError('Produto');
     return serializeProduct(p);
@@ -138,8 +158,15 @@ export const additionalService = {
   async list(tenantId: string, params: { categoryId?: string; onlyActive?: boolean } = {}) {
     const where: Prisma.AdditionalWhereInput = { restaurantId: tenantId };
     if (params.categoryId) where.categoryId = params.categoryId;
-    if (params.onlyActive) where.active = true;
-    const additionals = await prisma.additional.findMany({ where, orderBy: { name: 'asc' } });
+    if (params.onlyActive) {
+      where.active = true;
+      where.ingredients = ALL_INGREDIENTS_IN_STOCK;
+    }
+    const additionals = await prisma.additional.findMany({
+      where,
+      include: { ingredients: SOLD_OUT_INGREDIENTS },
+      orderBy: { name: 'asc' },
+    });
     return additionals.map(serializeAdditional);
   },
   async create(
@@ -177,6 +204,100 @@ export const additionalService = {
       );
     }
     return prisma.additional.delete({ where: { id } });
+  },
+};
+
+// Insumos (ex.: Laranja) ligados a vários produtos/adicionais. Um toque em "Em falta"
+// tira do cardápio tudo que leva o insumo; outro toque devolve. Ver model Ingredient.
+type IngredientInput = { name: string; inStock?: boolean; productIds?: string[]; additionalIds?: string[] };
+
+async function assertOwnedLinks(tenantId: string, productIds?: string[], additionalIds?: string[]) {
+  if (productIds?.length) {
+    const ids = [...new Set(productIds)];
+    const n = await prisma.product.count({ where: { id: { in: ids }, restaurantId: tenantId } });
+    if (n !== ids.length) throw new NotFoundError('Produto');
+  }
+  if (additionalIds?.length) {
+    const ids = [...new Set(additionalIds)];
+    const n = await prisma.additional.count({ where: { id: { in: ids }, restaurantId: tenantId } });
+    if (n !== ids.length) throw new NotFoundError('Adicional');
+  }
+}
+
+function serializeIngredient(i: {
+  id: string;
+  name: string;
+  inStock: boolean;
+  products: { id: string }[];
+  additionals: { id: string }[];
+}) {
+  return {
+    id: i.id,
+    name: i.name,
+    inStock: i.inStock,
+    productIds: i.products.map((p) => p.id),
+    additionalIds: i.additionals.map((a) => a.id),
+  };
+}
+const INGREDIENT_LINKS = { products: { select: { id: true } }, additionals: { select: { id: true } } } as const;
+
+export const ingredientService = {
+  async list(tenantId: string) {
+    const rows = await prisma.ingredient.findMany({
+      where: { restaurantId: tenantId },
+      include: INGREDIENT_LINKS,
+      orderBy: { name: 'asc' },
+    });
+    return rows.map(serializeIngredient);
+  },
+  async create(tenantId: string, data: IngredientInput) {
+    await assertOwnedLinks(tenantId, data.productIds, data.additionalIds);
+    const exists = await prisma.ingredient.findFirst({
+      where: { restaurantId: tenantId, name: { equals: data.name, mode: 'insensitive' } },
+    });
+    if (exists) throw new ConflictError(`Já existe um insumo chamado "${exists.name}".`);
+    const row = await prisma.ingredient.create({
+      data: {
+        name: data.name,
+        inStock: data.inStock ?? true,
+        restaurantId: tenantId,
+        products: { connect: (data.productIds ?? []).map((id) => ({ id })) },
+        additionals: { connect: (data.additionalIds ?? []).map((id) => ({ id })) },
+      },
+      include: INGREDIENT_LINKS,
+    });
+    return serializeIngredient(row);
+  },
+  async update(tenantId: string, id: string, data: Partial<IngredientInput>) {
+    await ingredientService.ensure(tenantId, id);
+    await assertOwnedLinks(tenantId, data.productIds, data.additionalIds);
+    if (data.name) {
+      const clash = await prisma.ingredient.findFirst({
+        where: { restaurantId: tenantId, name: { equals: data.name, mode: 'insensitive' }, NOT: { id } },
+      });
+      if (clash) throw new ConflictError(`Já existe um insumo chamado "${clash.name}".`);
+    }
+    const row = await prisma.ingredient.update({
+      where: { id },
+      data: {
+        name: data.name,
+        inStock: data.inStock,
+        products: data.productIds ? { set: data.productIds.map((pid) => ({ id: pid })) } : undefined,
+        additionals: data.additionalIds ? { set: data.additionalIds.map((aid) => ({ id: aid })) } : undefined,
+      },
+      include: INGREDIENT_LINKS,
+    });
+    return serializeIngredient(row);
+  },
+  async remove(tenantId: string, id: string) {
+    await ingredientService.ensure(tenantId, id);
+    // Só desliga os vínculos (tabelas de junção em cascata); produtos/adicionais ficam.
+    return prisma.ingredient.delete({ where: { id } });
+  },
+  async ensure(tenantId: string, id: string) {
+    const i = await prisma.ingredient.findFirst({ where: { id, restaurantId: tenantId } });
+    if (!i) throw new NotFoundError('Insumo');
+    return i;
   },
 };
 

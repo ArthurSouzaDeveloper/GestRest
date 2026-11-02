@@ -60,6 +60,8 @@ export interface Product {
   category?: Category;
   /** Montável (Monte o Seu): exige escolher 1 adicional BASE, que carrega o preço. */
   isCustom?: boolean;
+  /** Insumos em falta que deixam o produto fora do cardápio (ex.: ["Laranja"]). */
+  soldOutIngredients?: string[];
 }
 
 export interface Additional {
@@ -69,6 +71,16 @@ export interface Additional {
   active: boolean;
   categoryId?: string;
   kind?: 'ADDON' | 'BASE';
+  soldOutIngredients?: string[];
+}
+
+/** Insumo (ex.: Laranja) que vários produtos/sabores levam. Em falta, todos saem do cardápio. */
+export interface Ingredient {
+  id: string;
+  name: string;
+  inStock: boolean;
+  productIds: string[];
+  additionalIds: string[];
 }
 
 export interface TableComandaSummary {

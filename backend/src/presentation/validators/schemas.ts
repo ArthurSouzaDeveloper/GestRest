@@ -121,6 +121,18 @@ export const additionalUpdateSchema = z
   })
   .strict();
 
+// Insumo (ex.: Laranja) ligado a produtos/adicionais — ver ingredientService.
+const idList = z.array(z.string().uuid()).max(1000);
+export const ingredientSchema = z
+  .object({
+    name: text(z.string().min(2).max(60)),
+    inStock: z.boolean().optional(),
+    productIds: idList.optional(),
+    additionalIds: idList.optional(),
+  })
+  .strict();
+export const ingredientUpdateSchema = ingredientSchema.partial().strict();
+
 export const deliveryZoneSchema = z.object({
   name: text(z.string().min(2)),
   fee: z.number().nonnegative(),
