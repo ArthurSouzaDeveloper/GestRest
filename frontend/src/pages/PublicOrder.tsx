@@ -5,6 +5,7 @@ import {
   DELIVERY_CLOSED_MESSAGE,
   ORDERS_CLOSED_MESSAGE,
   isOrderingClosed,
+  reopenLabel,
   useDeliveryClosed,
   useOrderingClosed,
 } from '../lib/deliveryHours';
@@ -1040,7 +1041,7 @@ function IntroStep({
 
             {/* Antes das 18h ainda dá pra olhar o cardápio ("Ver cardápio" abaixo), só não começar pedido. */}
             <button className={`${PRIMARY_CTA} mt-4`} disabled={orderingClosed} onClick={() => onPick(kind)}>
-              {orderingClosed ? 'Abrimos às 18h' : 'Começar pedido'}
+              {orderingClosed ? reopenLabel() : 'Começar pedido'}
             </button>
             <button
               className="mt-4 w-full text-center text-[14px] font-bold text-[#1E1024] underline underline-offset-2"
