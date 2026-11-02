@@ -59,7 +59,7 @@ export function IngredientsPanel({
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {ingredients.map((i) => {
-            const count = i.productIds.length + i.additionalIds.length;
+            const count = i.productIds.length + i.optionalProductIds.length + i.additionalIds.length;
             return (
               <Card key={i.id} className="flex items-center justify-between gap-3 !p-3">
                 <div className="min-w-0">
@@ -78,7 +78,7 @@ export function IngredientsPanel({
                     disabled={toggle.isPending}
                     title={i.inStock ? 'Marcar como em falta' : 'Marcar como em estoque'}
                     onClick={() => {
-                      if (i.inStock && !confirm(`Marcar ${i.name} em falta? ${count} itens saem do cardápio.`)) return;
+                      if (i.inStock && !confirm(`Marcar ${i.name} em falta? Os itens ligados saem do cardápio ou ficam "sem ${i.name.toLowerCase()}".`)) return;
                       toggle.mutate(i);
                     }}
                   >
@@ -127,7 +127,12 @@ function IngredientForm({
   onSaved: () => void;
 }) {
   const [name, setName] = useState(ingredient?.name ?? '');
-  const [productIds, setProductIds] = useState<Set<string>>(new Set(ingredient?.productIds ?? []));
+  // Todos os produtos ligados (essenciais + "dá pra tirar"); `optionalIds` diz quais
+  // continuam à venda sem o insumo quando ele acaba (ex.: Milho no Especial da Casa).
+  const [productIds, setProductIds] = useState<Set<string>>(
+    new Set([...(ingredient?.productIds ?? []), ...(ingredient?.optionalProductIds ?? [])]),
+  );
+  const [optionalIds, setOptionalIds] = useState<Set<string>>(new Set(ingredient?.optionalProductIds ?? []));
   const [additionalIds, setAdditionalIds] = useState<Set<string>>(new Set(ingredient?.additionalIds ?? []));
   const [filter, setFilter] = useState('');
   const [onlyLinked, setOnlyLinked] = useState(false);
@@ -163,7 +168,13 @@ function IngredientForm({
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload = { name: name.trim(), productIds: [...productIds], additionalIds: [...additionalIds] };
+      const linked = [...productIds];
+      const payload = {
+        name: name.trim(),
+        productIds: linked.filter((id) => !optionalIds.has(id)),
+        optionalProductIds: linked.filter((id) => optionalIds.has(id)),
+        additionalIds: [...additionalIds],
+      };
       if (ingredient) return api.patch(`/catalog/ingredients/${ingredient.id}`, payload);
       return api.post('/catalog/ingredients', payload);
     },
@@ -192,7 +203,9 @@ function IngredientForm({
           </div>
           <p className="mt-1 text-xs text-gray-500">
             "Marcar pelo nome" marca tudo que tem o nome do insumo. Confira a lista e desmarque o que não leva de verdade, e
-            marque o que leva sem ter no nome (ex.: Salada de Frutas).
+            marque o que leva sem ter no nome (ex.: Salada de Frutas). Em cada produto marcado, escolha se ele{' '}
+            <b>some do cardápio</b> quando o insumo acabar ou se <b>dá pra tirar</b> (continua à venda e sai "SEM{' '}
+            {name.trim().toUpperCase() || 'INSUMO'}" na cozinha).
           </p>
         </div>
 
@@ -209,11 +222,30 @@ function IngredientForm({
             <p className="mb-1 text-xs font-semibold uppercase text-gray-400">Produtos ({productIds.size})</p>
             {visibleProducts.length === 0 && <p className="text-sm text-gray-400">Nada aqui.</p>}
             {visibleProducts.map((p) => (
-              <label key={p.id} className="flex items-center gap-2 py-0.5 text-sm">
-                <input type="checkbox" checked={productIds.has(p.id)} onChange={() => flip(productIds, setProductIds, p.id)} />
-                <span>{p.name}</span>
-                <span className="text-xs text-gray-400">{p.category?.name}</span>
-              </label>
+              <div key={p.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={productIds.has(p.id)} onChange={() => flip(productIds, setProductIds, p.id)} />
+                  <span>{p.name}</span>
+                  <span className="text-xs text-gray-400">{p.category?.name}</span>
+                </label>
+                {productIds.has(p.id) && (
+                  <select
+                    className={`rounded border px-1.5 py-0.5 text-xs dark:bg-gray-900 ${
+                      optionalIds.has(p.id) ? 'border-amber-300 text-amber-700' : 'border-red-200 text-red-700'
+                    }`}
+                    value={optionalIds.has(p.id) ? 'optional' : 'essential'}
+                    onChange={(e) => {
+                      const next = new Set(optionalIds);
+                      if (e.target.value === 'optional') next.add(p.id);
+                      else next.delete(p.id);
+                      setOptionalIds(next);
+                    }}
+                  >
+                    <option value="essential">Some do cardápio</option>
+                    <option value="optional">Dá pra tirar</option>
+                  </select>
+                )}
+              </div>
             ))}
           </div>
           <div>

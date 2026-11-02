@@ -313,6 +313,9 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
                       {it.additionals.length > 0 && (
                         <span className="text-xs text-gray-500"> ({it.additionals.map((a) => a.name).join(', ')})</span>
                       )}
+                      {!!it.removedIngredients?.length && (
+                        <span className="ml-1 text-xs font-semibold text-red-600">sem {it.removedIngredients.join(', ').toLowerCase()}</span>
+                      )}
                       {it.notes && <span className="ml-1 text-xs italic text-gray-500">— {it.notes}</span>}
                     </div>
                     <div className="flex items-center gap-2">

@@ -430,6 +430,9 @@ model Product {
   // Insumos que este produto leva (ex.: Laranja). Insumo esgotado deixa o produto
   // indisponível sem mexer no `available` dele — ver Ingredient abaixo.
   ingredients Ingredient[] @relation("ProductIngredients")
+  // Insumos que dá pra tirar (ex.: Milho no Especial da Casa): em falta, o produto continua
+  // à venda, só que sem eles — o pedido guarda isso em OrderItem.removedIngredients.
+  optionalIngredients Ingredient[] @relation("ProductOptionalIngredients")
 
   @@index([restaurantId, available])
   @@index([categoryId])
@@ -469,8 +472,9 @@ model Ingredient {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  products    Product[]    @relation("ProductIngredients")
-  additionals Additional[] @relation("AdditionalIngredients")
+  products         Product[]    @relation("ProductIngredients")
+  optionalProducts Product[]    @relation("ProductOptionalIngredients")
+  additionals      Additional[] @relation("AdditionalIngredients")
 
   @@unique([restaurantId, name])
   @@map("ingredients")
@@ -595,6 +599,9 @@ model OrderItem {
   // pra combinação fruta+base de maior preço entre as escolhidas (regra do dono: preço
   // é sempre o da fruta mais cara + R$1,00 por fruta extra, calculado no backend).
   comboLabel String?
+  // Insumos "dá pra tirar" que estavam em falta quando o item foi pedido (ex.: ["Milho"]):
+  // o item sai sem eles e a impressão da cozinha mostra "SEM MILHO".
+  removedIngredients String[] @default([])
   station    Station          @default(KITCHEN)
   status     ProductionStatus @default(WAITING)
   startedAt  DateTime?

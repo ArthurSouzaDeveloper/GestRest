@@ -180,17 +180,20 @@ async function createOrderItems(
     let product;
     let unitPrice: number | Prisma.Decimal;
     let comboLabel: string | undefined;
+    // Insumos "dá pra tirar" em falta agora (ex.: Milho): o item sai sem eles.
+    let removedIngredients: string[] = [];
 
     if (item.comboProductIds && item.comboProductIds.length >= 2) {
       const comboProducts = await tx.product.findMany({
         where: { id: { in: item.comboProductIds }, restaurantId: tenantId },
-        include: { category: true, ingredients: SOLD_OUT_INGREDIENTS },
+        include: { category: true, ingredients: SOLD_OUT_INGREDIENTS, optionalIngredients: SOLD_OUT_INGREDIENTS },
       });
       if (comboProducts.length !== item.comboProductIds.length) throw new NotFoundError('Produto');
       const unavailable = comboProducts.find((p) => !p.available);
       if (unavailable) throw new AppError(`Produto indisponível: ${unavailable.name}`);
       const missing = comboProducts.find((p) => p.ingredients.length > 0);
       if (missing) throw new AppError(soldOutByIngredientMessage(missing));
+      removedIngredients = [...new Set(comboProducts.flatMap((p) => p.optionalIngredients.map((i) => i.name)))];
       if (new Set(comboProducts.map((p) => p.categoryId)).size > 1) {
         throw new AppError('As frutas do combo precisam ser da mesma categoria');
       }
@@ -208,11 +211,12 @@ async function createOrderItems(
     } else {
       product = await tx.product.findFirst({
         where: { id: item.productId, restaurantId: tenantId },
-        include: { category: true, ingredients: SOLD_OUT_INGREDIENTS },
+        include: { category: true, ingredients: SOLD_OUT_INGREDIENTS, optionalIngredients: SOLD_OUT_INGREDIENTS },
       });
       if (!product) throw new NotFoundError('Produto');
       if (!product.available) throw new AppError(`Produto indisponível: ${product.name}`);
       if (product.ingredients.length > 0) throw new AppError(soldOutByIngredientMessage(product));
+      removedIngredients = product.optionalIngredients.map((i) => i.name);
       unitPrice = product.price;
     }
 
@@ -262,6 +266,7 @@ async function createOrderItems(
         unitPrice,
         notes: item.notes,
         comboLabel,
+        removedIngredients,
         station,
         status: station === Station.NONE ? ProductionStatus.DONE : ProductionStatus.WAITING,
         additionals: {

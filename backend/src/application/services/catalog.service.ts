@@ -24,9 +24,19 @@ export const SOLD_OUT_INGREDIENTS = {
 /** Filtro Prisma: nenhum insumo ligado está em falta. */
 export const ALL_INGREDIENTS_IN_STOCK = { none: { inStock: false } } satisfies Prisma.IngredientListRelationFilter;
 
+// Insumos "dá pra tirar" em falta (ex.: Milho no Especial da Casa) não tiram o produto do
+// cardápio: viram `missingIngredients` pra tela avisar "Sem milho hoje".
 function withSoldOutIngredients<T extends object>(item: T) {
-  const { ingredients, ...rest } = item as T & { ingredients?: { name: string }[] };
-  return { ...rest, soldOutIngredients: (ingredients ?? []).map((i) => i.name) };
+  const { ingredients, optionalIngredients, ...rest } = item as T & {
+    ingredients?: { name: string }[];
+    optionalIngredients?: { name: string }[];
+  };
+  const out: typeof rest & { soldOutIngredients: string[]; missingIngredients?: string[] } = {
+    ...rest,
+    soldOutIngredients: (ingredients ?? []).map((i) => i.name),
+  };
+  if (optionalIngredients) out.missingIngredients = optionalIngredients.map((i) => i.name);
+  return out;
 }
 function serializeDeliveryZone<T extends { fee: Prisma.Decimal | number }>(z: T) {
   return { ...z, fee: Number(z.fee) };
@@ -87,7 +97,7 @@ export const productService = {
     }
     const products = await prisma.product.findMany({
       where,
-      include: { category: true, ingredients: SOLD_OUT_INGREDIENTS },
+      include: { category: true, ingredients: SOLD_OUT_INGREDIENTS, optionalIngredients: SOLD_OUT_INGREDIENTS },
       // Montáveis ("Monte o Seu") primeiro na categoria, resto alfabético.
       orderBy: [{ isCustom: 'desc' }, { name: 'asc' }],
     });
@@ -96,7 +106,7 @@ export const productService = {
   async get(tenantId: string, id: string) {
     const p = await prisma.product.findFirst({
       where: { id, restaurantId: tenantId },
-      include: { category: true, ingredients: SOLD_OUT_INGREDIENTS },
+      include: { category: true, ingredients: SOLD_OUT_INGREDIENTS, optionalIngredients: SOLD_OUT_INGREDIENTS },
     });
     if (!p) throw new NotFoundError('Produto');
     return serializeProduct(p);
@@ -209,7 +219,24 @@ export const additionalService = {
 
 // Insumos (ex.: Laranja) ligados a vários produtos/adicionais. Um toque em "Em falta"
 // tira do cardápio tudo que leva o insumo; outro toque devolve. Ver model Ingredient.
-type IngredientInput = { name: string; inStock?: boolean; productIds?: string[]; additionalIds?: string[] };
+type IngredientInput = {
+  name: string;
+  inStock?: boolean;
+  /** Essenciais: em falta, o produto sai do cardápio. */
+  productIds?: string[];
+  /** "Dá pra tirar": em falta, o produto continua, só que sem o insumo. */
+  optionalProductIds?: string[];
+  additionalIds?: string[];
+};
+
+/** Produto marcado nas duas listas fica só como essencial (o mais seguro). */
+function splitProductLinks(data: Partial<IngredientInput>) {
+  const essential = data.productIds ? [...new Set(data.productIds)] : undefined;
+  const optional = data.optionalProductIds
+    ? [...new Set(data.optionalProductIds)].filter((id) => !(essential ?? []).includes(id))
+    : undefined;
+  return { essential, optional };
+}
 
 async function assertOwnedLinks(tenantId: string, productIds?: string[], additionalIds?: string[]) {
   if (productIds?.length) {
@@ -229,6 +256,7 @@ function serializeIngredient(i: {
   name: string;
   inStock: boolean;
   products: { id: string }[];
+  optionalProducts: { id: string }[];
   additionals: { id: string }[];
 }) {
   return {
@@ -236,10 +264,15 @@ function serializeIngredient(i: {
     name: i.name,
     inStock: i.inStock,
     productIds: i.products.map((p) => p.id),
+    optionalProductIds: i.optionalProducts.map((p) => p.id),
     additionalIds: i.additionals.map((a) => a.id),
   };
 }
-const INGREDIENT_LINKS = { products: { select: { id: true } }, additionals: { select: { id: true } } } as const;
+const INGREDIENT_LINKS = {
+  products: { select: { id: true } },
+  optionalProducts: { select: { id: true } },
+  additionals: { select: { id: true } },
+} as const;
 
 export const ingredientService = {
   async list(tenantId: string) {
@@ -251,7 +284,8 @@ export const ingredientService = {
     return rows.map(serializeIngredient);
   },
   async create(tenantId: string, data: IngredientInput) {
-    await assertOwnedLinks(tenantId, data.productIds, data.additionalIds);
+    const { essential, optional } = splitProductLinks(data);
+    await assertOwnedLinks(tenantId, [...(essential ?? []), ...(optional ?? [])], data.additionalIds);
     const exists = await prisma.ingredient.findFirst({
       where: { restaurantId: tenantId, name: { equals: data.name, mode: 'insensitive' } },
     });
@@ -261,7 +295,8 @@ export const ingredientService = {
         name: data.name,
         inStock: data.inStock ?? true,
         restaurantId: tenantId,
-        products: { connect: (data.productIds ?? []).map((id) => ({ id })) },
+        products: { connect: (essential ?? []).map((id) => ({ id })) },
+        optionalProducts: { connect: (optional ?? []).map((id) => ({ id })) },
         additionals: { connect: (data.additionalIds ?? []).map((id) => ({ id })) },
       },
       include: INGREDIENT_LINKS,
@@ -270,7 +305,8 @@ export const ingredientService = {
   },
   async update(tenantId: string, id: string, data: Partial<IngredientInput>) {
     await ingredientService.ensure(tenantId, id);
-    await assertOwnedLinks(tenantId, data.productIds, data.additionalIds);
+    const { essential, optional } = splitProductLinks(data);
+    await assertOwnedLinks(tenantId, [...(essential ?? []), ...(optional ?? [])], data.additionalIds);
     if (data.name) {
       const clash = await prisma.ingredient.findFirst({
         where: { restaurantId: tenantId, name: { equals: data.name, mode: 'insensitive' }, NOT: { id } },
@@ -282,7 +318,8 @@ export const ingredientService = {
       data: {
         name: data.name,
         inStock: data.inStock,
-        products: data.productIds ? { set: data.productIds.map((pid) => ({ id: pid })) } : undefined,
+        products: essential ? { set: essential.map((pid) => ({ id: pid })) } : undefined,
+        optionalProducts: optional ? { set: optional.map((pid) => ({ id: pid })) } : undefined,
         additionals: data.additionalIds ? { set: data.additionalIds.map((aid) => ({ id: aid })) } : undefined,
       },
       include: INGREDIENT_LINKS,

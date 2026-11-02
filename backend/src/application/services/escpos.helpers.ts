@@ -54,6 +54,9 @@ export interface TicketItem {
   description: string | null;
   notes?: string | null;
   additionals: string[];
+  /** Insumos "dá pra tirar" que estavam em falta (ex.: ["Milho"]) — sai "SEM MILHO" pra
+   * quem prepara não colocar por engano. */
+  removedIngredients?: string[];
   /** Adicionais que NÃO vão dentro do prato, e sim num potinho separado (ex.: Vinagrete)
    * — pedido do cliente/dono: não aparecem embaixo do pastel; saem somados como uma
    * linha própria no fim da via ("2- Vinagrete 200ml"), antes do total, como se fossem
@@ -85,6 +88,7 @@ export function mergeIdenticalItems(items: TicketItem[]): TicketItem[] {
       item.description ?? null,
       item.notes?.trim() || null,
       item.additionals.map((a) => a.trim().toLowerCase()).sort(),
+      (item.removedIngredients ?? []).map((r) => r.trim().toLowerCase()).sort(),
     ]);
   const merged = new Map<string, TicketItem>();
   for (const item of items) {
@@ -286,6 +290,9 @@ export function renderTicket(input: TicketInput): Buffer {
     if (input.itemsSummaryOnly) continue;
     if (item.description) parts.push(line(`  ${item.description}`));
     for (const additional of item.additionals) parts.push(line(`  + ${additional}`));
+    for (const removed of item.removedIngredients ?? []) {
+      parts.push(line(`  SEM ${removed.toUpperCase()}`));
+    }
     if (item.notes) parts.push(line(`  obs: ${item.notes}`));
     if (input.itemSeparator) parts.push(NORMAL_MODE_ON, line('----------------------------'), BODY_MODE_ON);
   }

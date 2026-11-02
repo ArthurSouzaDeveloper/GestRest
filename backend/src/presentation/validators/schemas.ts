@@ -128,6 +128,7 @@ export const ingredientSchema = z
     name: text(z.string().min(2).max(60)),
     inStock: z.boolean().optional(),
     productIds: idList.optional(),
+    optionalProductIds: idList.optional(),
     additionalIds: idList.optional(),
   })
   .strict();

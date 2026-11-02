@@ -106,6 +106,11 @@ export default function Products() {
                     {p.available ? 'Disponível' : 'Esgotado'}
                   </button>
                   <SoldOutBadge names={p.soldOutIngredients} />
+                  {!!p.missingIngredients?.length && (
+                    <span className="mt-1 block text-xs font-medium text-amber-600" title="Continua à venda, a cozinha recebe SEM ...">
+                      Vende sem {p.missingIngredients.join(', ').toLowerCase()}
+                    </span>
+                  )}
                 </td>
                 <td className="p-3 text-right">
                   <button className="btn-secondary !px-2 !py-1" onClick={() => setEditing(p)}><Pencil size={14} /></button>

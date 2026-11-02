@@ -62,6 +62,8 @@ export interface Product {
   isCustom?: boolean;
   /** Insumos em falta que deixam o produto fora do cardápio (ex.: ["Laranja"]). */
   soldOutIngredients?: string[];
+  /** Insumos "dá pra tirar" em falta: o produto sai sem eles (ex.: ["Milho"]). */
+  missingIngredients?: string[];
 }
 
 export interface Additional {
@@ -79,7 +81,10 @@ export interface Ingredient {
   id: string;
   name: string;
   inStock: boolean;
+  /** Essenciais: em falta, o produto sai do cardápio. */
   productIds: string[];
+  /** "Dá pra tirar": em falta, o produto continua, só que sem o insumo. */
+  optionalProductIds: string[];
   additionalIds: string[];
 }
 
@@ -158,6 +163,8 @@ export interface OrderItem {
   notes?: string;
   /** Combo de frutas do "Monte o Seu" (ex.: "Abacaxi + Morango") — presente só quando o item combina mais de 1 fruta. */
   comboLabel?: string | null;
+  /** Insumos que estavam em falta quando foi pedido (o item sai sem eles). */
+  removedIngredients?: string[];
   station: Station;
   status: ProductionStatus;
   product: Product;
@@ -248,6 +255,7 @@ export interface ProductionTicket {
   quantity: number;
   notes?: string;
   additionals: string[];
+  removedIngredients?: string[];
   status: ProductionStatus;
   createdAt: string;
   waitingMin: number;
