@@ -47,6 +47,7 @@ export const productionService = {
         quantity: item.quantity,
         notes: item.notes,
         additionals: item.additionals.map((a) => a.name),
+        removedIngredients: item.removedIngredients,
         status: item.status,
         createdAt: item.createdAt,
         startedAt: item.startedAt,

@@ -232,6 +232,7 @@ function toTicketItem(item: CreatedOrderItem, baseAdditionalIds: Set<string>): T
       quantity: item.quantity,
       notes: item.notes,
       additionals: fillings.filter((a) => a !== base).map((a) => a.name),
+      removedIngredients: item.removedIngredients,
       sideAdditionals,
     };
   }
@@ -250,6 +251,7 @@ function toTicketItem(item: CreatedOrderItem, baseAdditionalIds: Set<string>): T
     quantity: item.quantity,
     notes: item.notes,
     additionals: fillings.map((a) => a.name),
+    removedIngredients: item.removedIngredients,
     sideAdditionals,
   };
 }

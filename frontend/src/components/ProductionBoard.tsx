@@ -136,6 +136,11 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
                         <span className="font-medium">Adicionais:</span> {item.additionals.join(', ')}
                       </div>
                     )}
+                    {item.removedIngredients && item.removedIngredients.length > 0 && (
+                      <div className="mt-1 text-base font-bold uppercase text-red-600">
+                        Sem {item.removedIngredients.join(', ')}
+                      </div>
+                    )}
                     {item.notes && (
                       <div className="mt-1 rounded bg-yellow-50 px-2.5 py-1.5 text-base italic text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
                         {item.notes}

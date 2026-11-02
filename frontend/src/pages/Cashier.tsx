@@ -225,6 +225,9 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
                     {it.additionals.length > 0 && (
                       <div className="text-xs text-gray-400">+ {it.additionals.map((a) => a.name).join(', ')}</div>
                     )}
+                    {!!it.removedIngredients?.length && (
+                      <div className="text-xs font-semibold text-red-600">sem {it.removedIngredients.join(', ').toLowerCase()}</div>
+                    )}
                   </td>
                   <td className="text-center">{it.quantity}</td>
                   <td className="text-right">{brl(it.unitPrice + addl)}</td>

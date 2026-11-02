@@ -464,6 +464,9 @@ export function OrderComposer({
                       {p.description && (
                         <div className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-[#6B4A78]">{p.description}</div>
                       )}
+                      {p.missingIngredients && p.missingIngredients.length > 0 && (
+                        <div className="mt-0.5 text-xs font-semibold text-red-600">Sem {p.missingIngredients.join(', ').toLowerCase()} hoje</div>
+                      )}
                       <div className="mt-1.5 text-[15px] font-extrabold text-[#1E1024]">
                         {p.isCustom ? 'Preço pela montagem' : brl(p.price)}
                       </div>
@@ -528,6 +531,9 @@ export function OrderComposer({
                     {p.description && (
                       <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-gray-500">{p.description}</div>
                     )}
+                    {p.missingIngredients && p.missingIngredients.length > 0 && (
+                        <div className="mt-0.5 text-xs font-semibold text-red-600">Sem {p.missingIngredients.join(', ').toLowerCase()} hoje</div>
+                      )}
                     <div className="mt-0.5 text-sm font-bold text-brand">
                       {p.isCustom ? 'Preço pela montagem' : brl(p.price)}
                     </div>
