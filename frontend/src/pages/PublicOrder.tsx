@@ -2082,8 +2082,22 @@ function ConfirmationStep({
 }) {
   const paymentLabel = PAYMENT_OPTIONS.find((p) => p.key === paymentMethod)?.label;
   return (
+    <>
+    {/* Seta no canto superior esquerdo, no mesmo estilo do header das outras etapas:
+        volta pra capa (Entrega / Retirada / Ver cardápio). Faz o mesmo reset do
+        "Fazer novo pedido": o pedido já foi confirmado, então o carrinho zera. */}
+    <div className="pt-4">
+      <button
+        onClick={onNewOrder}
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1E1024]"
+        title="Voltar ao início"
+        aria-label="Voltar ao início"
+      >
+        <ChevronLeft size={22} strokeWidth={2.3} />
+      </button>
+    </div>
     <div className="lg:mx-auto lg:flex lg:max-w-4xl lg:items-center lg:justify-center lg:gap-16 lg:pt-10">
-      <div className="flex flex-col items-center gap-3 pt-[54px] text-center lg:w-[360px] lg:shrink-0 lg:pt-0">
+      <div className="flex flex-col items-center gap-3 pt-[10px] text-center lg:w-[360px] lg:shrink-0 lg:pt-0">
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand text-white">
           <Check size={44} strokeWidth={3} />
         </div>
@@ -2104,11 +2118,6 @@ function ConfirmationStep({
             Acompanhar pedido
           </Link>
         )}
-        {/* Volta pra capa (Entrega / Retirada / Ver cardápio). Faz o mesmo reset do
-            "Fazer novo pedido": o pedido já foi confirmado, então o carrinho zera. */}
-        <button className={`${PRIMARY_CTA} mt-3`} onClick={onNewOrder}>
-          Voltar ao início
-        </button>
         <button className="mt-[18px] text-[12.5px] font-bold text-brand underline decoration-brand/35 underline-offset-2" onClick={onNewOrder}>
           Fazer novo pedido
         </button>
@@ -2157,5 +2166,6 @@ function ConfirmationStep({
         </div>
       )}
     </div>
+    </>
   );
 }
