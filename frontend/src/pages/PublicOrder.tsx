@@ -86,6 +86,10 @@ const FIELD_INPUT =
   'w-full rounded-2xl border-2 border-brand-100 bg-white px-4 py-3 text-[16px] text-[#1E1024] outline-none transition focus:border-brand';
 const PRIMARY_CTA =
   'block w-full rounded-full bg-brand px-6 py-4 text-center text-[17px] font-extrabold text-white shadow-[0_6px_0_var(--brand-700,#5e0f78)] transition active:translate-y-[3px] active:shadow-[0_3px_0_var(--brand-700,#5e0f78)] disabled:cursor-not-allowed disabled:opacity-50';
+// Provisório (pedido do cliente, 07/11/2026): esconde o botão "Acompanhar pedido" da tela
+// de pedido feito até acharem uma forma melhor. A página de acompanhamento continua no ar
+// (e acessível por "Ver meus pedidos" na capa). Pra voltar o botão, é só trocar pra true.
+const SHOW_TRACKING_BUTTON_ON_CONFIRMATION = false;
 const STEP_TITLE = 'mb-[18px] font-display text-[26px] font-extrabold tracking-tight text-[#1E1024]';
 const CARD = 'rounded-3xl bg-white';
 
@@ -2078,8 +2082,22 @@ function ConfirmationStep({
 }) {
   const paymentLabel = PAYMENT_OPTIONS.find((p) => p.key === paymentMethod)?.label;
   return (
+    <>
+    {/* Seta no canto superior esquerdo, no mesmo estilo do header das outras etapas:
+        volta pra capa (Entrega / Retirada / Ver cardápio). Faz o mesmo reset do
+        "Fazer novo pedido": o pedido já foi confirmado, então o carrinho zera. */}
+    <div className="pt-4">
+      <button
+        onClick={onNewOrder}
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1E1024]"
+        title="Voltar ao início"
+        aria-label="Voltar ao início"
+      >
+        <ChevronLeft size={22} strokeWidth={2.3} />
+      </button>
+    </div>
     <div className="lg:mx-auto lg:flex lg:max-w-4xl lg:items-center lg:justify-center lg:gap-16 lg:pt-10">
-      <div className="flex flex-col items-center gap-3 pt-[54px] text-center lg:w-[360px] lg:shrink-0 lg:pt-0">
+      <div className="flex flex-col items-center gap-3 pt-[10px] text-center lg:w-[360px] lg:shrink-0 lg:pt-0">
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand text-white">
           <Check size={44} strokeWidth={3} />
         </div>
@@ -2089,18 +2107,13 @@ function ConfirmationStep({
             Número do pedido <b className="text-[14.5px] text-[#1E1024]">#{orderNumber}</b>
           </div>
         )}
-        <p className="max-w-[26ch] text-[12.5px] leading-[1.5] text-[#6B4A78]">
-          {orderKind === 'DELIVERY'
-            ? 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo.'
-            : 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo — vá até o balcão no horário combinado.'}
-        </p>
         {estimatedReadyAt && (
           <div className="mx-auto flex w-fit items-center gap-2 rounded-2xl bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
             <Clock size={16} />
             {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
           </div>
         )}
-        {orderId && (
+        {SHOW_TRACKING_BUTTON_ON_CONFIRMATION && orderId && (
           <Link to={`/pedido/${slug}/rastreio/${orderId}`} className={`${PRIMARY_CTA} mt-3`}>
             Acompanhar pedido
           </Link>
@@ -2153,5 +2166,6 @@ function ConfirmationStep({
         </div>
       )}
     </div>
+    </>
   );
 }
