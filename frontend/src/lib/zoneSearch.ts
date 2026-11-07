@@ -26,6 +26,7 @@ const ABBREVIATIONS: Record<string, string> = {
   jrd: 'jardim',
   jard: 'jardim',
   pq: 'parque',
+  pl: 'parque', // o cliente do Rei do Suco escreve "PL" pra Parque
   pqe: 'parque',
   prq: 'parque',
   vl: 'vila',
