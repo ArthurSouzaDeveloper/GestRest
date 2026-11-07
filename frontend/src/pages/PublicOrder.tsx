@@ -86,6 +86,10 @@ const FIELD_INPUT =
   'w-full rounded-2xl border-2 border-brand-100 bg-white px-4 py-3 text-[16px] text-[#1E1024] outline-none transition focus:border-brand';
 const PRIMARY_CTA =
   'block w-full rounded-full bg-brand px-6 py-4 text-center text-[17px] font-extrabold text-white shadow-[0_6px_0_var(--brand-700,#5e0f78)] transition active:translate-y-[3px] active:shadow-[0_3px_0_var(--brand-700,#5e0f78)] disabled:cursor-not-allowed disabled:opacity-50';
+// Provisório (pedido do cliente, 07/11/2026): esconde o botão "Acompanhar pedido" da tela
+// de pedido feito até acharem uma forma melhor. A página de acompanhamento continua no ar
+// (e acessível por "Ver meus pedidos" na capa). Pra voltar o botão, é só trocar pra true.
+const SHOW_TRACKING_BUTTON_ON_CONFIRMATION = false;
 const STEP_TITLE = 'mb-[18px] font-display text-[26px] font-extrabold tracking-tight text-[#1E1024]';
 const CARD = 'rounded-3xl bg-white';
 
@@ -2100,7 +2104,7 @@ function ConfirmationStep({
             {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
           </div>
         )}
-        {orderId && (
+        {SHOW_TRACKING_BUTTON_ON_CONFIRMATION && orderId && (
           <Link to={`/pedido/${slug}/rastreio/${orderId}`} className={`${PRIMARY_CTA} mt-3`}>
             Acompanhar pedido
           </Link>
