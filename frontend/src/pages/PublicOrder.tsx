@@ -33,6 +33,7 @@ import { Spinner } from '../components/ui';
 import { OrderComposer, draftItemUnitPrice, draftItemLabel, type DraftItem } from '../components/OrderComposer';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import type { DeliveryZone, EtaEstimate, OrderStatus, OrderType, PaymentMethod, PlaceDetails } from '../types';
+import { searchZones } from '../lib/zoneSearch';
 
 /** "19:45" a partir de um ISO — usado pra mostrar a previsão travada na confirmação. */
 function formatClock(iso: string): string {
@@ -1282,8 +1283,9 @@ function ZoneAutocomplete({
   });
   const [open, setOpen] = useState(false);
 
-  const term = query.trim().toLowerCase();
-  const filtered = term ? zones.filter((z) => z.name.toLowerCase().includes(term)) : zones;
+  const term = query.trim();
+  // Busca tolerante: ignora acento/ordem e entende "JD", "PQ", "VL"... (ver lib/zoneSearch).
+  const filtered = term ? searchZones(zones, term, (z) => splitZoneName(z.name).bairro) : zones;
   // Só avisa "indisponível" depois que o cliente de fato procurou um bairro e não achou —
   // antes disso (campo vazio, lista ainda carregando) não é o caso de fora da área, é só
   // ainda não ter pesquisado nada.
