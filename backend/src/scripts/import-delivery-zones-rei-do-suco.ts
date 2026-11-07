@@ -207,7 +207,6 @@ const SANTA_BARBARA: [string, number][] = [
   ['Eldorado, Parque', 10.0],
   ['Esmeralda, Jardim', 6.0],
   ['Europa I, Jardim', 7.0],
-  ['Fernando Mollon, Jardim', 6.0],
   ['Frerrarezi, Vila', 6.0],
   ['Firenze, Jardim', 15.0],
   ['Flamboyant, Jardim', 14.0],
@@ -233,6 +232,8 @@ const SANTA_BARBARA: [string, number][] = [
   ['Mac Knight, Vila', 12.0],
   ['Maria, Vila', 12.0],
   ['Mariana, Jardim', 8.0],
+  // "Jardim Fernando Mollon" é o mesmo bairro que "Mollon" (confirmado pelo cliente em
+  // 07/11/2026): entrava duplicado com taxa errada de R$6, então saiu da lista.
   ['Mollon', 5.0],
   ['Monte Líbano, Jardim', 6.0],
   ['Nova Conquista, Jardim', 8.0],
