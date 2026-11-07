@@ -2093,11 +2093,6 @@ function ConfirmationStep({
             Número do pedido <b className="text-[14.5px] text-[#1E1024]">#{orderNumber}</b>
           </div>
         )}
-        <p className="max-w-[26ch] text-[12.5px] leading-[1.5] text-[#6B4A78]">
-          {orderKind === 'DELIVERY'
-            ? 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo.'
-            : 'O restaurante já foi avisado. Assim que aceitar, seu pedido entra em preparo — vá até o balcão no horário combinado.'}
-        </p>
         {estimatedReadyAt && (
           <div className="mx-auto flex w-fit items-center gap-2 rounded-2xl bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
             <Clock size={16} />
@@ -2109,6 +2104,11 @@ function ConfirmationStep({
             Acompanhar pedido
           </Link>
         )}
+        {/* Volta pra capa (Entrega / Retirada / Ver cardápio). Faz o mesmo reset do
+            "Fazer novo pedido": o pedido já foi confirmado, então o carrinho zera. */}
+        <button className={`${PRIMARY_CTA} mt-3`} onClick={onNewOrder}>
+          Voltar ao início
+        </button>
         <button className="mt-[18px] text-[12.5px] font-bold text-brand underline decoration-brand/35 underline-offset-2" onClick={onNewOrder}>
           Fazer novo pedido
         </button>
