@@ -635,6 +635,43 @@ export const orderService = {
     return loadAndBroadcast(ctx.tenantId, id, 'order:updated');
   },
 
+  /**
+   * Reimprime o pedido inteiro (todos os itens não cancelados), do jeito que saiu na
+   * primeira vez — mesmas vias por estação, com "*** REIMPRESSAO ***" no topo. Vale pra
+   * pedido em qualquer status, inclusive já entregue/pago ou arquivado: é só papel, não
+   * mexe em status, produção nem caixa.
+   */
+  async reprint(id: string, ctx: Ctx) {
+    const order = await requireOrder(ctx.tenantId, id);
+    if (order.status === OrderStatus.PENDING) {
+      throw new ConflictError('Pedido ainda não foi aceito — aceite primeiro pra imprimir');
+    }
+
+    const jobCount = await prisma.$transaction(async (tx) => {
+      const items = await tx.orderItem.findMany({
+        where: { orderId: id, status: { not: ProductionStatus.CANCELLED } },
+        include: { product: { include: { category: true } }, additionals: true },
+      });
+      if (items.length === 0) throw new ConflictError('Pedido sem itens pra imprimir');
+      const before = await tx.printJob.count({ where: { orderId: id } });
+      await printJobService.enqueueForItems(tx, ctx.tenantId, id, items, { reprint: true });
+      return (await tx.printJob.count({ where: { orderId: id } })) - before;
+    });
+    if (jobCount === 0) throw new ConflictError('Nenhum item deste pedido sai na impressora');
+
+    await auditService.record({
+      action: AuditAction.ORDER_UPDATED,
+      userId: ctx.userId,
+      restaurantId: ctx.tenantId,
+      entity: 'Order',
+      entityId: id,
+      ip: ctx.ip,
+      metadata: { reprint: true, printJobs: jobCount },
+    });
+
+    return { printJobs: jobCount };
+  },
+
   async addItems(orderId: string, items: NewItemInput[], ctx: Ctx) {
     if (items.length === 0) throw new AppError('Nenhum item informado');
     const order = await requireOrder(ctx.tenantId, orderId);

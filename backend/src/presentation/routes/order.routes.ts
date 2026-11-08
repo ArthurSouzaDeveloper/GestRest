@@ -35,6 +35,9 @@ const canDeliver = authorize(Role.COOK, Role.MANAGER, Role.ADMIN, Role.MOTOBOY);
 // própria fila enxuta (production.routes.ts, só nome do cliente) e nunca chama estas
 // rotas; COOK entra porque o painel de pedidos online mora na tela de Cozinha; MOTOBOY
 // entra porque a fila de entregas (Motoboy.tsx) é a mesma lista de pedidos filtrada.
+// Reimprimir pedido já feito (inclusive entregue/arquivado) — pedido explícito do dono:
+// opção de administrador do restaurante.
+const canReprint = authorize(Role.MANAGER, Role.ADMIN);
 const orderRead = authorize(Role.WAITER, Role.CASHIER, Role.COOK, Role.MANAGER, Role.ADMIN, Role.MOTOBOY);
 
 router.get(
@@ -130,6 +133,12 @@ router.post(
   '/:id/accept',
   onlineOps,
   asyncHandler(async (req, res) => res.json(await orderService.accept(req.params.id, ctx(req)))),
+);
+
+router.post(
+  '/:id/reprint',
+  canReprint,
+  asyncHandler(async (req, res) => res.json(await orderService.reprint(req.params.id, ctx(req)))),
 );
 
 router.post(

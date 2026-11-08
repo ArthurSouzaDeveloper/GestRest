@@ -123,6 +123,9 @@ export interface TicketInput {
    * tamanho normal (não o grande do cabeçalho), com um tracejado antes — pedido do cliente
    * pra economizar papel. */
   copyLabel?: string | null;
+  /** Reimpressão pedida pelo painel (ver orderService.reprint): marca a via logo abaixo
+   * do cabeçalho, pra ninguém confundir com um pedido novo e preparar de novo. */
+  reprint?: boolean;
   /** Sobrescreve o texto do cabeçalho grande (normalmente "COZINHA"/"SUQUEIROS", ver
    * STATION_LABEL); string vazia ('') omite a linha inteira. Usado só na via combinada de
    * entrega pro motoboy — pedido do cliente pra tirar de vez o "PEDIDO COMPLETO" gigante
@@ -230,6 +233,8 @@ export function renderTicket(input: TicketInput): Buffer {
   } else {
     parts.push(BODY_MODE_ON);
   }
+
+  if (input.reprint) parts.push(line('*** REIMPRESSAO ***'));
 
   // Logo no topo (antes de qualquer outra informação) — pedido explícito do cliente pra
   // ser a primeira coisa que quem pega a via vê, e não esquecer de buscar o resto do

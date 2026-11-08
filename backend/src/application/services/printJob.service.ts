@@ -270,6 +270,7 @@ export const printJobService = {
     tenantId: string,
     orderId: string,
     items: CreatedOrderItem[],
+    options: { reprint?: boolean } = {},
   ): Promise<void> {
     const byStation = new Map<Station, CreatedOrderItem[]>();
     for (const item of items) {
@@ -405,6 +406,7 @@ export const printJobService = {
       placedAt: order.openedAt,
       paymentMethod: order.declaredPaymentMethod,
       changeFor: order.changeFor !== null ? Number(order.changeFor) : null,
+      reprint: options.reprint ?? false,
     };
 
     // Cozinha imprime na ordem fixa (Pastel — incluindo Sugestões da Casa —, Mini Pizza,
