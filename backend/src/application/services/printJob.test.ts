@@ -1313,4 +1313,23 @@ describe('fila de impressão térmica (PrintJob)', () => {
     await printerSettingsService.generateAgentKey(restaurantId, { userId: waiterId });
     await expect(verifyAgentKey(key)).resolves.toBeNull();
   });
+  it('reimprimir gera de novo as vias do pedido inteiro, marcadas como REIMPRESSAO, mesmo já pago', async () => {
+    const table = await prisma.restaurantTable.create({ data: { number: 509, restaurantId } });
+    const ctxWaiter = { userId: waiterId, tenantId: restaurantId, role: Role.WAITER };
+    const order = await orderService.open({ tableId: table.id }, ctxWaiter);
+    await orderService.addItems(order!.id, [{ productId: kitchenProductId, quantity: 1 }], ctxWaiter);
+    await orderService.addItems(order!.id, [{ productId: juiceProductId, quantity: 1 }], ctxWaiter);
+    await prisma.order.update({ where: { id: order!.id }, data: { status: OrderStatus.PAID } });
+    const before = await prisma.printJob.count({ where: { orderId: order!.id } });
+
+    const result = await orderService.reprint(order!.id, { ...ctxWaiter, role: Role.ADMIN });
+
+    expect(result.printJobs).toBe(2);
+    const jobs = await prisma.printJob.findMany({ where: { orderId: order!.id }, orderBy: { createdAt: 'asc' } });
+    expect(jobs).toHaveLength(before + 2);
+    const reprinted = jobs.slice(before);
+    expect(reprinted.map((j) => j.station).sort()).toEqual([Station.JUICE_BAR, Station.KITCHEN].sort());
+    for (const job of reprinted) expect(job.payload.toString('latin1')).toContain('REIMPRESSAO');
+    for (const job of jobs.slice(0, before)) expect(job.payload.toString('latin1')).not.toContain('REIMPRESSAO');
+  });
 });

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bike, ShoppingBag, Phone, Archive } from 'lucide-react';
+import { Bike, ShoppingBag, Phone, Archive, Printer } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl, time, dateTime } from '../lib/format';
 import { Card, ProductionBadge, orderTypeLabels, paymentMethodLabels } from './ui';
 import { useRealtime } from '../hooks/useRealtime';
+import { useAuth } from '../contexts/AuthContext';
 import type { Order, OrderType } from '../types';
 
 const QUERY_KEYS: ['online-orders-delivery', 'online-orders-pickup'] = ['online-orders-delivery', 'online-orders-pickup'];
@@ -48,7 +49,12 @@ export function OnlineOrdersPanel({
   useRealtime(['cashier', 'floor'], [[QUERY_KEYS[0]], [QUERY_KEYS[1]]]);
   const qc = useQueryClient();
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'preparing' | 'ready' | 'history'>(defaultTab);
+  const [notice, setNotice] = useState('');
+  const [tab, setTab] = useState<'preparing' | 'ready' | 'done' | 'history'>(defaultTab);
+  // Reimprimir pedido já feito: opção de administrador (ADMIN/MANAGER), pedido explícito do
+  // dono — o backend também só aceita esses perfis (ver order.routes.ts).
+  const { hasRole } = useAuth();
+  const canReprint = hasRole('ADMIN', 'MANAGER');
 
   const { data: deliveryOrders = [] } = useQuery({
     queryKey: [QUERY_KEYS[0]],
@@ -92,6 +98,13 @@ export function OnlineOrdersPanel({
   const preparing = orders.filter((o) => o.status === 'OPEN' || o.status === 'IN_PRODUCTION');
   const ready = orders.filter((o) => o.status === 'READY_FOR_PAYMENT');
   const history = [...deliveryHistory, ...pickupHistory];
+  // Concluídos = já entregues/retirados (pagos). Só pra quem pode reimprimir: a aba existe
+  // pra achar um pedido antigo e mandar pra impressora de novo.
+  const done = canReprint
+    ? [...deliveryOrders, ...pickupOrders]
+        .filter((o) => o.status === 'PAID')
+        .sort((a, b) => b.openedAt.localeCompare(a.openedAt))
+    : [];
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: [QUERY_KEYS[0]] });
@@ -110,11 +123,34 @@ export function OnlineOrdersPanel({
     onSuccess: refresh,
     onError: (e) => setError(apiError(e)),
   });
+  const reprint = useMutation({
+    mutationFn: async (o: Order) => {
+      await api.post(`/orders/${o.id}/reprint`);
+      return o;
+    },
+    onMutate: () => {
+      setError('');
+      setNotice('');
+    },
+    onSuccess: (o) => setNotice(`Pedido #${o.number} enviado pra impressora de novo.`),
+    onError: (e) => setError(apiError(e)),
+  });
+  const reprintFor = (o: Order) =>
+    canReprint && o.status !== 'PENDING' && o.status !== 'CANCELLED'
+      ? {
+          pending: reprint.isPending && reprint.variables?.id === o.id,
+          onClick: () => {
+            if (window.confirm(`Reimprimir o pedido #${o.number}? Todas as vias saem de novo, marcadas como REIMPRESSÃO.`)) {
+              reprint.mutate(o);
+            }
+          },
+        }
+      : undefined;
 
   // "Histórico" é sempre alcançável mesmo sem nenhum pedido ao vivo no momento (ex.: painel
   // vazio de madrugada, mas com pedidos esquecidos arquivados ontem) — só esconde tudo (ou
   // mostra emptyMessage) quando não há absolutamente nada, nem ao vivo nem arquivado.
-  if (orders.length === 0 && history.length === 0) {
+  if (orders.length === 0 && history.length === 0 && done.length === 0) {
     if (!emptyMessage) return null;
     return <p className="py-10 text-center text-sm text-gray-400">{emptyMessage}</p>;
   }
@@ -138,6 +174,14 @@ export function OnlineOrdersPanel({
         >
           Prontos{ready.length > 0 ? ` (${ready.length})` : ''}
         </button>
+        {canReprint && (
+          <button
+            className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'done' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+            onClick={() => setTab('done')}
+          >
+            Concluídos
+          </button>
+        )}
         <button
           className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'history' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
           onClick={() => setTab('history')}
@@ -147,12 +191,16 @@ export function OnlineOrdersPanel({
       </div>
 
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+      {notice && <p className="mb-2 text-sm text-green-600">{notice}</p>}
 
       {tab === 'preparing' && preparingCount === 0 && (
         <p className="py-6 text-center text-sm text-gray-400">Nenhum pedido em preparo no momento.</p>
       )}
       {tab === 'ready' && ready.length === 0 && (
         <p className="py-6 text-center text-sm text-gray-400">Nenhum pedido pronto no momento.</p>
+      )}
+      {tab === 'done' && done.length === 0 && (
+        <p className="py-6 text-center text-sm text-gray-400">Nenhum pedido concluído ainda.</p>
       )}
       {tab === 'history' && history.length === 0 && (
         <p className="py-6 text-center text-sm text-gray-400">
@@ -164,11 +212,12 @@ export function OnlineOrdersPanel({
         {tab === 'preparing' && canAccept && pending.map((o) => (
           <OnlineOrderCard key={o.id} order={o} action={{ label: 'Aceitar Pedido', pending: accept.isPending, onClick: () => accept.mutate(o.id) }} />
         ))}
-        {tab === 'preparing' && preparing.map((o) => <OnlineOrderCard key={o.id} order={o} />)}
+        {tab === 'preparing' && preparing.map((o) => <OnlineOrderCard key={o.id} order={o} reprint={reprintFor(o)} />)}
         {tab === 'ready' && ready.map((o) => (
           <OnlineOrderCard
             key={o.id}
             order={o}
+            reprint={reprintFor(o)}
             action={{
               label: 'Marcar Entregue',
               pending: deliver.isPending,
@@ -180,10 +229,12 @@ export function OnlineOrdersPanel({
             }}
           />
         ))}
+        {tab === 'done' && done.map((o) => <OnlineOrderCard key={o.id} order={o} reprint={reprintFor(o)} />)}
         {tab === 'history' && history.map((o) => (
           <OnlineOrderCard
             key={o.id}
             order={o}
+            reprint={reprintFor(o)}
             action={o.status === 'READY_FOR_PAYMENT' ? {
               label: 'Marcar Entregue',
               pending: deliver.isPending,
@@ -203,9 +254,11 @@ export function OnlineOrdersPanel({
 function OnlineOrderCard({
   order,
   action,
+  reprint,
 }: {
   order: Order;
   action?: { label: string; pending: boolean; onClick: () => void };
+  reprint?: { pending: boolean; onClick: () => void };
 }) {
   const Icon = order.orderType === 'DELIVERY' ? Bike : ShoppingBag;
   // Pedido arquivado pode ser de qualquer dia anterior — só a hora (como nas abas ao vivo,
@@ -280,6 +333,15 @@ function OnlineOrderCard({
           onClick={action.onClick}
         >
           {action.label}
+        </button>
+      )}
+      {reprint && (
+        <button
+          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+          disabled={reprint.pending}
+          onClick={reprint.onClick}
+        >
+          <Printer size={14} /> {reprint.pending ? 'Enviando…' : 'Reimprimir'}
         </button>
       )}
     </Card>
