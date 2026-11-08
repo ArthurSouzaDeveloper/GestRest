@@ -87,10 +87,6 @@ const FIELD_INPUT =
   'w-full rounded-2xl border-2 border-brand-100 bg-white px-4 py-3 text-[16px] text-[#1E1024] outline-none transition focus:border-brand';
 const PRIMARY_CTA =
   'block w-full rounded-full bg-brand px-6 py-4 text-center text-[17px] font-extrabold text-white shadow-[0_6px_0_var(--brand-700,#5e0f78)] transition active:translate-y-[3px] active:shadow-[0_3px_0_var(--brand-700,#5e0f78)] disabled:cursor-not-allowed disabled:opacity-50';
-// Provisório (pedido do cliente, 07/11/2026): esconde o botão "Acompanhar pedido" da tela
-// de pedido feito até acharem uma forma melhor. A página de acompanhamento continua no ar
-// (e acessível por "Ver meus pedidos" na capa). Pra voltar o botão, é só trocar pra true.
-const SHOW_TRACKING_BUTTON_ON_CONFIRMATION = false;
 const STEP_TITLE = 'mb-[18px] font-display text-[26px] font-extrabold tracking-tight text-[#1E1024]';
 const CARD = 'rounded-3xl bg-white';
 
@@ -372,8 +368,6 @@ export default function PublicOrder() {
   // (campos chamados "website"/"empresa" são alvo comum de autofill, o que barraria
   // um cliente de verdade sem ele nunca ter digitado nada aqui).
   const [grHp, setGrHp] = useState('');
-  const [confirmedOrderNumber, setConfirmedOrderNumber] = useState<number | null>(null);
-  const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
   const [confirmedEta, setConfirmedEta] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState('');
 
@@ -567,8 +561,6 @@ export default function PublicOrder() {
     },
     onSuccess: (order) => {
       setSubmitError('');
-      setConfirmedOrderNumber(order.number);
-      setConfirmedOrderId(order.id);
       setConfirmedEta(order.estimatedReadyAt);
       setStep('confirmation');
       // Lembra nome+telefone+CPF nesse navegador — é o que deixa o cliente "entrar" de novo
@@ -797,16 +789,8 @@ export default function PublicOrder() {
 
         {step === 'confirmation' && (
           <ConfirmationStep
-            slug={slug}
-            orderNumber={confirmedOrderNumber}
-            orderId={confirmedOrderId}
             orderKind={orderKind}
             estimatedReadyAt={confirmedEta}
-            draft={draft}
-            subtotal={subtotal}
-            deliveryFee={deliveryFee}
-            total={total}
-            paymentMethod={paymentMethod}
             onNewOrder={() => {
               // Mantém nome/telefone/endereço de propósito (não limpa) — mesmo cliente
               // pedindo de novo na mesma visita não deveria ter que redigitar tudo outra
@@ -817,8 +801,6 @@ export default function PublicOrder() {
               setDraft([]);
               setPaymentMethod('');
               setChangeFor('');
-              setConfirmedOrderNumber(null);
-              setConfirmedOrderId(null);
               setConfirmedEta(null);
             }}
           />
@@ -2058,116 +2040,42 @@ function ReviewStep({
 }
 
 function ConfirmationStep({
-  slug,
-  orderNumber,
-  orderId,
   orderKind,
   estimatedReadyAt,
-  draft,
-  subtotal,
-  deliveryFee,
-  total,
-  paymentMethod,
   onNewOrder,
 }: {
-  slug: string;
-  orderNumber: number | null;
-  orderId: string | null;
   orderKind: OrderKind | null;
   estimatedReadyAt: string | null;
-  draft: DraftItem[];
-  subtotal: number;
-  deliveryFee: number;
-  total: number;
-  paymentMethod: PublicPaymentMethod | '';
   onNewOrder: () => void;
 }) {
-  const paymentLabel = PAYMENT_OPTIONS.find((p) => p.key === paymentMethod)?.label;
+  // A pedido do cliente (08/11/2026), a tela de pedido feito mostra só o agradecimento e
+  // a previsão. Saíram número do pedido, "Acompanhar pedido", "Fazer novo pedido" e o
+  // resumo lateral do computador. A seta no topo é a única saída: volta pra capa
+  // (Entrega / Retirada / Ver cardápio) zerando o carrinho do pedido já confirmado.
   return (
     <>
-    {/* Seta no canto superior esquerdo, no mesmo estilo do header das outras etapas:
-        volta pra capa (Entrega / Retirada / Ver cardápio). Faz o mesmo reset do
-        "Fazer novo pedido": o pedido já foi confirmado, então o carrinho zera. */}
-    <div className="pt-4">
-      <button
-        onClick={onNewOrder}
-        className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1E1024]"
-        title="Voltar ao início"
-        aria-label="Voltar ao início"
-      >
-        <ChevronLeft size={22} strokeWidth={2.3} />
-      </button>
-    </div>
-    <div className="lg:mx-auto lg:flex lg:max-w-4xl lg:items-center lg:justify-center lg:gap-16 lg:pt-10">
-      <div className="flex flex-col items-center gap-3 pt-[10px] text-center lg:w-[360px] lg:shrink-0 lg:pt-0">
+      <div className="pt-4">
+        <button
+          onClick={onNewOrder}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1E1024]"
+          title="Voltar ao início"
+          aria-label="Voltar ao início"
+        >
+          <ChevronLeft size={22} strokeWidth={2.3} />
+        </button>
+      </div>
+      <div className="flex flex-col items-center gap-3 pt-[10px] text-center lg:pt-10">
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand text-white">
           <Check size={44} strokeWidth={3} />
         </div>
-        <h1 className="mt-1 font-display text-[34px] font-extrabold tracking-tight text-[#1E1024]">Pedido recebido!</h1>
-        {orderNumber && (
-          <div className="text-[12.5px] text-[#6B4A78]">
-            Número do pedido <b className="text-[14.5px] text-[#1E1024]">#{orderNumber}</b>
-          </div>
-        )}
+        <h1 className="mt-1 font-display text-[34px] font-extrabold tracking-tight text-[#1E1024]">Obrigado pelo pedido!</h1>
         {estimatedReadyAt && (
           <div className="mx-auto flex w-fit items-center gap-2 rounded-2xl bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
             <Clock size={16} />
             {orderKind === 'DELIVERY' ? `Previsão de chegada: até ${formatClock(estimatedReadyAt)}` : `Previsão pra retirar: até ${formatClock(estimatedReadyAt)}`}
           </div>
         )}
-        {SHOW_TRACKING_BUTTON_ON_CONFIRMATION && orderId && (
-          <Link to={`/pedido/${slug}/rastreio/${orderId}`} className={`${PRIMARY_CTA} mt-3`}>
-            Acompanhar pedido
-          </Link>
-        )}
-        <button className="mt-[18px] text-[12.5px] font-bold text-brand underline decoration-brand/35 underline-offset-2" onClick={onNewOrder}>
-          Fazer novo pedido
-        </button>
       </div>
-
-      {/* Resumo do pedido — só aparece em telas largas (lg:), ao lado da confirmação; no
-          celular a confirmação já tem tudo que precisa (número, previsão, acompanhar). */}
-      {draft.length > 0 && (
-        <div className="hidden lg:block lg:w-[380px] lg:shrink-0">
-          <div className={`${CARD} p-6`}>
-            <h2 className="font-display text-[20px] font-extrabold text-[#1E1024]">Resumo</h2>
-            <div className="mt-4 flex max-h-[280px] flex-col gap-2.5 overflow-y-auto pr-1">
-              {draft.map((item, i) => (
-                <div key={i} className="flex items-center justify-between gap-2 text-[13.5px] text-[#1E1024]">
-                  <span className="min-w-0 truncate">
-                    <b>{item.quantity}×</b> {draftItemLabel(item)}
-                  </span>
-                  <span className="shrink-0 font-bold">{brl(draftItemUnitPrice(item) * item.quantity)}</span>
-                </div>
-              ))}
-            </div>
-            <div className="my-4 h-[2px] bg-brand-50" />
-            <div className="flex flex-col gap-2 text-[13.5px] text-[#6B4A78]">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>{brl(subtotal)}</span>
-              </div>
-              {orderKind === 'DELIVERY' && (
-                <div className="flex justify-between">
-                  <span>Taxa de entrega</span>
-                  <span>{brl(deliveryFee)}</span>
-                </div>
-              )}
-              {paymentLabel && (
-                <div className="flex justify-between">
-                  <span>Pago com</span>
-                  <span>{paymentLabel}</span>
-                </div>
-              )}
-            </div>
-            <div className="mt-2 flex justify-between border-t-2 border-[#1E1024]/10 pt-3 text-[18px] font-extrabold text-[#1E1024]">
-              <span>Total</span>
-              <span>{brl(total)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
     </>
   );
 }
