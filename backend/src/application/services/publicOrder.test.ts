@@ -217,7 +217,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
 
   it('nome que não bate com o CPF não reconhece (e não vaza o endereço de outra pessoa)', async () => {
     const result = await publicOrderService.customerLogin(slug, 'Nome Errado', '10000014826');
-    expect(result).toEqual({ name: null, orders: [], addresses: [] });
+    expect(result).toEqual({ name: null, addresses: [] });
   });
   it('entre 23h e 23:15 (horário de SP) o site recusa entrega e aceita retirada', async () => {
     const onzeEDezEmSP = new Date('2026-10-30T02:10:00Z'); // 23:10 em SP
