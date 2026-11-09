@@ -5,13 +5,18 @@ import api, { apiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Modal } from './ui';
 
-interface PauseState {
+export interface PauseState {
   paused: boolean;
   reason: string | null;
   pausedAt: string | null;
+  /** A pausa atual foi a automática das 23:20. */
+  pausedAutomatically: boolean;
+  /** Pausa automática todo dia às 23:20 ligada. */
+  autoPauseAfterClose: boolean;
 }
 
-const QUERY_KEY = ['online-orders-pause'];
+export const PAUSE_QUERY_KEY = ['online-orders-pause'];
+const QUERY_KEY = PAUSE_QUERY_KEY;
 
 /**
  * Botão do cabeçalho pra o dono/gerente pausar só os pedidos online do site (imprevisto,
@@ -59,10 +64,17 @@ export function OnlineOrdersPauseControl({ placement }: { placement: 'button' | 
       <div className="flex flex-wrap items-center justify-between gap-2 bg-red-600 px-4 py-2 text-sm font-medium text-white">
         <div className="flex items-center gap-2">
           <PauseCircle size={18} className="shrink-0" />
-          <span>
-            Pedidos online PAUSADOS{since ? ` desde ${since}` : ''}. O site não está aceitando pedidos.
-            {data.reason ? ` Recado pro cliente: "${data.reason}"` : ''}
-          </span>
+          {data.pausedAutomatically ? (
+            <span>
+              Pedidos online pausados automaticamente no fechamento{since ? ` (${since})` : ''}. Clique em Retomar
+              quando o restaurante estiver pronto: o site volta a aceitar pedidos no horário normal, a partir das 18h.
+            </span>
+          ) : (
+            <span>
+              Pedidos online PAUSADOS{since ? ` desde ${since}` : ''}. O site não está aceitando pedidos.
+              {data.reason ? ` Recado pro cliente: "${data.reason}"` : ''}
+            </span>
+          )}
         </div>
         <button
           className="flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"

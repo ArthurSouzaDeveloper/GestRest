@@ -5,6 +5,7 @@ import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
+import { PAUSE_QUERY_KEY, type PauseState } from '../components/OnlineOrdersPauseControl';
 import type {
   AutoCompleteSettings,
   AutoDeliverPickupSettings,
@@ -38,6 +39,7 @@ export default function DeliveryZones() {
         subtitle="Como o sistema calcula a taxa de entrega no site de pedidos online"
       />
 
+      <AutoPauseCard />
       <EtaSettingsCard />
       <AutoCompleteCard />
       <AutoDeliverPickupCard />
@@ -202,6 +204,57 @@ function EtaSettingsCard() {
  * entregue sozinho (ver autoComplete.service.ts). Ligada por padrão com 10 min. Escrita
  * restrita a ADMIN, mesmo critério do tempo estimado.
  */
+/**
+ * Pausa automática ao fechar — pedido do dono (09/11/2026): ligada, o sistema pausa os
+ * pedidos online sozinho todo dia às 23:20 e só volta quando alguém clica em Retomar (faixa
+ * vermelha no topo do painel). Assim, se o restaurante ficar sem energia/acesso, o site não
+ * abre sozinho às 18h do dia seguinte. Ver onlineOrdersPause.service.ts#sweep.
+ */
+function AutoPauseCard() {
+  const qc = useQueryClient();
+  const [error, setError] = useState('');
+  const { data } = useQuery({
+    queryKey: PAUSE_QUERY_KEY,
+    queryFn: async () => (await api.get<PauseState>('/catalog/online-orders-pause')).data,
+  });
+  const save = useMutation({
+    mutationFn: async (on: boolean) =>
+      (await api.patch<PauseState>('/catalog/online-orders-pause', { autoPauseAfterClose: on })).data,
+    onSuccess: (state) => {
+      setError('');
+      qc.setQueryData(PAUSE_QUERY_KEY, state);
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+  if (!data) return null;
+  const on = data.autoPauseAfterClose;
+  return (
+    <Card className="mb-6">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Pausar pedidos online sozinho ao fechar</h3>
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+            on ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+          }`}
+        >
+          {on ? 'Ligado — todo dia às 23:20' : 'Desligado'}
+        </span>
+      </div>
+      <p className="mb-3 text-sm text-gray-500">
+        Todo dia às 23:20 o sistema pausa os pedidos online sozinho. No dia seguinte, o site só volta a aceitar
+        pedidos (a partir das 18h) depois que alguém clicar em <strong>Retomar pedidos online</strong> no topo do
+        painel. Serve pra quando o restaurante pode ficar sem energia ou sem acesso: o site não abre sem ninguém
+        confirmar. Atenção: se ninguém retomar, o site fica fechado o dia todo.
+      </p>
+      <label className="flex items-center gap-2 text-sm font-semibold">
+        <input type="checkbox" checked={on} disabled={save.isPending} onChange={(e) => save.mutate(e.target.checked)} />
+        Pausar sozinho às 23:20 e só voltar quando alguém retomar
+      </label>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </Card>
+  );
+}
+
 function AutoCompleteCard() {
   const { hasRole } = useAuth();
   const isAdmin = hasRole('ADMIN');
