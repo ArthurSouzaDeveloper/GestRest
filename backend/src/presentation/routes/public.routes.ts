@@ -94,11 +94,6 @@ router.post(
   ),
 );
 
-router.get(
-  '/:slug/orders/:id',
-  asyncHandler(async (req, res) => res.json(await publicOrderService.orderStatus(req.params.slug, req.params.id))),
-);
-
 router.post(
   '/:slug/customers/login',
   customerLookupLimiter,
