@@ -3,6 +3,7 @@ import api from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, PageHeader, Spinner } from '../components/ui';
 import { useRealtime } from '../hooks/useRealtime';
+import { OnlineOrdersCard } from '../components/OnlineOrdersPauseControl';
 import type { DashboardSummary } from '../types';
 
 function Stat({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
@@ -43,6 +44,8 @@ export default function Dashboard() {
   return (
     <div>
       <PageHeader title="Dashboard" subtitle="Visão geral da operação em tempo real" />
+
+      <OnlineOrdersCard />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Mesas Livres" value={data.tables.free} accent="text-gray-600" />

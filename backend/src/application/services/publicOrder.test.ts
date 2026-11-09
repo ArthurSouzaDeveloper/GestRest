@@ -296,7 +296,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
     await expect(publicOrderService.products(slug)).resolves.toBeDefined();
 
     const resumed = await onlineOrdersPauseService.update(restaurantId, { paused: false, reason: 'ignorado' }, actor);
-    expect(resumed).toEqual({ paused: false, reason: null, pausedAt: null });
+    expect(resumed).toMatchObject({ paused: false, reason: null, pausedAt: null });
     const order = await publicOrderService.createOrder(slug, input, undefined, quartaAsOitoEmSP);
     expect(order.orderType).toBe('PICKUP');
   });

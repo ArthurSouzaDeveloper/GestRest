@@ -199,6 +199,14 @@ model Restaurant {
   onlineOrdersPaused       Boolean   @default(false)
   onlineOrdersPausedReason String?
   onlineOrdersPausedAt     DateTime?
+  // Pausa automática ao fechar (pedido do dono, 09/11/2026): ligada, o sistema pausa sozinho
+  // todo dia às 23:20 e só volta quando alguém clicar em Retomar no painel — se o restaurante
+  // ficar sem energia/acesso, o site não abre sozinho às 18h do dia seguinte.
+  // pausedAuto marca que a pausa atual veio daí (pro painel avisar); autoPausedOn guarda o
+  // dia (AAAA-MM-DD, fuso SP) do último fechamento já aplicado, pra não pausar duas vezes.
+  autoPauseAfterClose       Boolean @default(false)
+  onlineOrdersPausedAuto    Boolean @default(false)
+  onlineOrdersAutoPausedOn  String?
 
   // Entrega automática de RETIRADA: quando preenchido (minutos > 0), um pedido de retirada
   // que fica "Pronto" (READY_FOR_PAYMENT) e passa esse tempo sem a equipe clicar em "Marcar

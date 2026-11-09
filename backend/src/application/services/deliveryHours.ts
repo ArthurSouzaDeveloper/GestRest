@@ -64,3 +64,17 @@ export function isDeliveryClosed(now: Date = new Date()): boolean {
 export function isOrderingClosed(now: Date = new Date()): boolean {
   return !insideWindow(now, PICKUP_CLOSE_MINUTE);
 }
+
+/** Pausa automática ao fechar (ver onlineOrdersPause.service.ts#sweep): 23:20, já depois do último pedido (23:15). */
+export const AUTO_PAUSE_MINUTE = 23 * 60 + 20; // 23:20
+
+/**
+ * Dia (AAAA-MM-DD, fuso SP) do fechamento das 23:20 mais recente: hoje se já passou das
+ * 23:20, senão ontem. Usado pra pausar uma vez só por noite, e pra pegar a pausa mesmo se o
+ * servidor estava fora do ar às 23:20 (pausa quando voltar, antes das 18h).
+ */
+export function lastClosingKey(now: Date): string {
+  const { minute } = localTime(now);
+  const ref = minute >= AUTO_PAUSE_MINUTE ? now : new Date(now.getTime() - 24 * 60 * 60_000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: DELIVERY_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ref);
+}
