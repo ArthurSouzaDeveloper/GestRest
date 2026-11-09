@@ -16,6 +16,7 @@ import {
 } from '../../application/services/deliveryPricing.service';
 import { etaSettingsService } from '../../application/services/eta.service';
 import { autoAcceptService } from '../../application/services/autoAccept.service';
+import { onlineOrdersPauseService } from '../../application/services/onlineOrdersPause.service';
 import { autoDeliverPickupService } from '../../application/services/autoDeliverPickup.service';
 import { autoCompleteService } from '../../application/services/autoComplete.service';
 import { printerSettingsService } from '../../application/services/printerSettings.service';
@@ -23,6 +24,7 @@ import {
   additionalSchema,
   additionalUpdateSchema,
   autoAcceptSchema,
+  onlineOrdersPauseSchema,
   autoDeliverPickupSchema,
   autoCompleteSchema,
   categorySchema,
@@ -277,6 +279,22 @@ router.patch(
   admin,
   validateBody(autoAcceptSchema),
   asyncHandler(async (req, res) => res.json(await autoAcceptService.update(tid(req), req.body))),
+);
+
+// ── Pausar pedidos online (imprevisto, ex.: falta de energia) — o próprio dono/gerente
+// fecha só o site, sem precisar do superadmin desativar o restaurante inteiro. ──
+router.get(
+  '/online-orders-pause',
+  asyncHandler(async (req, res) => res.json(await onlineOrdersPauseService.get(tid(req)))),
+);
+router.patch(
+  '/online-orders-pause',
+  manager,
+  validateBody(onlineOrdersPauseSchema),
+  asyncHandler(async (req, res) => {
+    const c = ctx(req);
+    res.json(await onlineOrdersPauseService.update(c.tenantId, req.body, { userId: c.userId, ip: c.ip }));
+  }),
 );
 
 // ── Entrega automática de RETIRADA — fecha sozinho (mesmo efeito de "Marcar Entregue") um

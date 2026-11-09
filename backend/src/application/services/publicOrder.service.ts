@@ -4,6 +4,7 @@ import { additionalService, categoryService, deliveryZoneService, productService
 import { deliveryPricingService } from './deliveryPricing.service';
 import { DELIVERY_CLOSED_MESSAGE, ORDERS_CLOSED_MESSAGE, isDeliveryClosed, isOrderingClosed } from './deliveryHours';
 import { etaService } from './eta.service';
+import { pausedMessage } from './onlineOrdersPause.service';
 import { googleMapsClient } from './googleMaps.client';
 import { computeTotals, normalizeCpf, orderInclude, serializePublicStatus } from './order.helpers';
 import { orderService, type PublicOrderInput } from './order.service';
@@ -49,6 +50,13 @@ export const publicOrderService = {
   },
   async createOrder(slug: string, input: PublicOrderInput, ip?: string, now: Date = new Date()) {
     const tenantId = await resolveActiveTenant(slug);
+    // Pausa feita pelo próprio restaurante no painel (imprevisto) — o site já esconde o botão,
+    // isso barra aba aberta de antes da pausa ou chamada direta na API.
+    const pause = await prisma.restaurant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { onlineOrdersPaused: true, onlineOrdersPausedReason: true },
+    });
+    if (pause.onlineOrdersPaused) throw new AppError(pausedMessage(pause.onlineOrdersPausedReason));
     // O site já desabilita Entrega depois do corte (ver deliveryHours.ts), mas a regra vale
     // aqui pra não dar pra burlar mandando o pedido direto pra API ou com a aba aberta de antes.
     if (isOrderingClosed(now)) throw new AppError(ORDERS_CLOSED_MESSAGE);

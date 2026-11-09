@@ -123,6 +123,7 @@ enum AuditAction {
   ORDER_ACCEPTED // Equipe aceitou um pedido online, tirando-o de PENDING
   REFRESH_TOKEN_REUSE_DETECTED // Reuso de refresh token já revogado — sinal de possível roubo de token (achado de auditoria QA), derruba todas as sessões do usuário
   PRINTER_AGENT_KEY_GENERATED // ADMIN gerou/regenerou a chave de acesso da ponte de impressão local
+  ONLINE_ORDERS_PAUSE_CHANGED // ADMIN/MANAGER pausou ou retomou os pedidos online pelo painel
 }
 
 enum PrintJobStatus {
@@ -189,6 +190,15 @@ model Restaurant {
   // de quem já usa o sistema; configurável só por ADMIN (mesmo critério do tempo
   // estimado, EtaMode acima).
   autoAcceptOnlineOrders Boolean @default(false)
+
+  // Pausa dos pedidos online pelo próprio restaurante (ADMIN/MANAGER), pra imprevisto tipo
+  // falta de energia: o site para de aceitar pedidos, mas o restaurante continua ativo, a
+  // equipe continua logando e mesa/caixa/cozinha seguem normais. Diferente de `active`, que
+  // só o superadmin mexe e derruba o login de todo mundo. Ver onlineOrdersPause.service.ts.
+  // O motivo (opcional) aparece pro cliente no site; pausedAt é só pra mostrar desde quando.
+  onlineOrdersPaused       Boolean   @default(false)
+  onlineOrdersPausedReason String?
+  onlineOrdersPausedAt     DateTime?
 
   // Entrega automática de RETIRADA: quando preenchido (minutos > 0), um pedido de retirada
   // que fica "Pronto" (READY_FOR_PAYMENT) e passa esse tempo sem a equipe clicar em "Marcar

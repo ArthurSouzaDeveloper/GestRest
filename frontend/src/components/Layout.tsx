@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
+import { OnlineOrdersPauseControl } from './OnlineOrdersPauseControl';
 import type { Role } from '../types';
 
 interface NavItem {
@@ -108,6 +109,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <OnlineOrdersPauseControl placement="button" />
             <div className="text-right">
               <div className="text-sm font-medium">{user?.name}</div>
               <div className="text-xs text-gray-500">{user?.role}</div>
@@ -117,6 +119,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
           </div>
         </header>
+        <OnlineOrdersPauseControl placement="banner" />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
     </div>
