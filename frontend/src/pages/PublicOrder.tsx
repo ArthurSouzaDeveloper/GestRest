@@ -41,12 +41,12 @@ function formatClock(iso: string): string {
 }
 
 /** Recado de loja fechada (antes das 18h, ver lib/deliveryHours.ts) — dá pra ver o cardápio, mas não pedir. */
-function StoreClosedNote({ show }: { show: boolean }) {
+function StoreClosedNote({ show, message }: { show: boolean; message?: string }) {
   if (!show) return null;
   return (
     <div className="flex items-center gap-2 rounded-2xl bg-[#1E1024] px-4 py-3 text-sm font-bold text-white">
       <Clock size={14} className="shrink-0" />
-      <span>{ORDERS_CLOSED_MESSAGE}</span>
+      <span>{message ?? ORDERS_CLOSED_MESSAGE}</span>
     </div>
   );
 }
@@ -228,6 +228,16 @@ interface PublicRestaurant {
   /** Foto(s) do cardápio físico (ver branding.service.ts/set-menu-photos-*.ts) — array
    * vazio quando o restaurante ainda não tem nenhuma configurada. */
   menuPhotoUrls: string[];
+  /** Pausa feita pelo próprio restaurante no painel (imprevisto, ex.: falta de energia). */
+  onlineOrdersPaused: boolean;
+  onlineOrdersPausedReason: string | null;
+}
+
+/** Mesmo texto da tela de restaurante inativo, + o motivo que o restaurante escreveu (se escreveu). */
+const PAUSED_MESSAGE = 'Este restaurante não está aceitando pedidos online no momento.';
+function pausedMessage(reason: string | null | undefined): string {
+  const r = reason?.trim();
+  return r ? `${PAUSED_MESSAGE} ${r}` : PAUSED_MESSAGE;
 }
 
 interface CustomerOrderSummary {
@@ -332,10 +342,10 @@ export default function PublicOrder() {
   const { slug = '' } = useParams();
   const [step, setStep] = useState<Step>('intro');
   const [orderKind, setOrderKind] = useState<OrderKind | null>(null);
-  const orderingClosed = useOrderingClosed();
+  const scheduleClosed = useOrderingClosed();
   // "Entrega fechada" aqui é só o intervalo 23h–23:15 (retirada ainda aberta). Com a loja
   // fechada (antes das 18h / depois das 23:15) quem aparece é o recado de loja fechada.
-  const deliveryClosed = useDeliveryClosed() && !orderingClosed;
+  const scheduleDeliveryClosed = useDeliveryClosed();
   // Pré-preenche com a identidade salva neste navegador de um pedido anterior (ver
   // readSavedCustomer) — pedido explícito do cliente/dono: quem já pediu não deveria
   // precisar redigitar nome/telefone a cada visita.
@@ -385,7 +395,18 @@ export default function PublicOrder() {
     queryFn: async () => (await api.get<PublicRestaurant>(`/public/restaurants/${slug}`)).data,
     enabled: !!slug,
     retry: false,
+    // Reconsulta de tempos em tempos (e ao voltar pra aba) pra pausa/retomada feita no painel
+    // chegar em quem já está com o site aberto.
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
+
+  // Pausa pelo painel conta como loja fechada (some o "Começar pedido", trava o Confirmar),
+  // só que com o recado próprio em vez do de horário.
+  const paused = !!restaurant?.onlineOrdersPaused;
+  const orderingClosed = scheduleClosed || paused;
+  const closedMessage = paused ? pausedMessage(restaurant?.onlineOrdersPausedReason) : undefined;
+  const deliveryClosed = scheduleDeliveryClosed && !orderingClosed;
 
   const distanceMode = restaurant?.deliveryPricingMode === 'DISTANCE_BANDS';
 
@@ -634,6 +655,7 @@ export default function PublicOrder() {
           menuPhotoUrls={restaurant.menuPhotoUrls}
           deliveryClosed={deliveryClosed}
           orderingClosed={orderingClosed}
+          closedMessage={closedMessage}
           onPick={(kind) => {
             if (kind === 'MENU') {
               setOrderKind(null);
@@ -677,7 +699,7 @@ export default function PublicOrder() {
       <div className="lg:min-w-0">
         {orderingClosed && step !== 'confirmation' && (
           <div className="mb-4">
-            <StoreClosedNote show />
+            <StoreClosedNote show message={closedMessage} />
           </div>
         )}
         {step === 'details' && (
@@ -934,6 +956,7 @@ function IntroStep({
   menuPhotoUrls,
   deliveryClosed,
   orderingClosed,
+  closedMessage,
   onPick,
 }: {
   slug: string;
@@ -942,6 +965,8 @@ function IntroStep({
   menuPhotoUrls: string[];
   deliveryClosed: boolean;
   orderingClosed: boolean;
+  /** Recado da pausa feita no painel; sem ele, cai no recado de horário. */
+  closedMessage?: string;
   onPick: (kind: OrderKind | 'MENU') => void;
 }) {
   const [kind, setKind] = useState<OrderKind>(deliveryClosed ? 'PICKUP' : 'DELIVERY');
@@ -1021,14 +1046,14 @@ function IntroStep({
             </div>
 
             <div className="mt-3 space-y-2">
-              <StoreClosedNote show={orderingClosed} />
+              <StoreClosedNote show={orderingClosed} message={closedMessage} />
               <DeliveryClosedNote show={deliveryClosed && !orderingClosed} />
               {!orderingClosed && <EtaNote eta={eta} />}
             </div>
 
             {/* Antes das 18h ainda dá pra olhar o cardápio ("Ver cardápio" abaixo), só não começar pedido. */}
             <button className={`${PRIMARY_CTA} mt-4`} disabled={orderingClosed} onClick={() => onPick(kind)}>
-              {orderingClosed ? reopenLabel() : 'Começar pedido'}
+              {orderingClosed ? (closedMessage ? 'Pedidos pausados' : reopenLabel()) : 'Começar pedido'}
             </button>
             <button
               className="mt-4 w-full text-center text-[14px] font-bold text-[#1E1024] underline underline-offset-2"

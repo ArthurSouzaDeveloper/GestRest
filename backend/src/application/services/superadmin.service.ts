@@ -174,6 +174,8 @@ export const superadminService = {
         brandColor: true,
         logoUrl: true,
         menuPhotoUrls: true,
+        onlineOrdersPaused: true,
+        onlineOrdersPausedReason: true,
       },
     });
     if (!r) throw new NotFoundError('Restaurante');

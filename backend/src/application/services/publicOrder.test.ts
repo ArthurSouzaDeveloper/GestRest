@@ -4,6 +4,7 @@ import { PaymentMethod, Station } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { orderService } from './order.service';
 import { publicOrderService } from './publicOrder.service';
+import { onlineOrdersPauseService } from './onlineOrdersPause.service';
 
 /**
  * Testes de integração (banco real) pros endereços de entrega salvos por cliente — pedido
@@ -271,6 +272,32 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
     ).rejects.toThrow('Fora do horário de pedidos.');
 
     const order = await publicOrderService.createOrder(slug, input, undefined, new Date('2026-10-30T21:00:00Z'));
+    expect(order.orderType).toBe('PICKUP');
+  });
+  it('pedidos pausados pelo painel: site recusa (com o motivo), mesmo no horário; ao retomar aceita de novo', async () => {
+    const input = {
+      orderType: 'PICKUP' as const,
+      customerName: 'Cliente Pausa',
+      customerPhone: '19990003333',
+      customerCpf: '10000014826',
+      declaredPaymentMethod: PaymentMethod.CASH,
+      items: [{ productId, quantity: 1 }],
+    };
+    const quartaAsOitoEmSP = new Date('2026-10-28T23:00:00Z');
+    const actor = {};
+
+    const paused = await onlineOrdersPauseService.update(restaurantId, { paused: true, reason: '  Estamos sem energia.  ' }, actor);
+    expect(paused).toMatchObject({ paused: true, reason: 'Estamos sem energia.' });
+    expect(paused.pausedAt).toBeInstanceOf(Date);
+    await expect(publicOrderService.createOrder(slug, input, undefined, quartaAsOitoEmSP)).rejects.toThrow(
+      'Este restaurante não está aceitando pedidos online no momento. Estamos sem energia.',
+    );
+    // Restaurante continua ativo: o cardápio público segue respondendo.
+    await expect(publicOrderService.products(slug)).resolves.toBeDefined();
+
+    const resumed = await onlineOrdersPauseService.update(restaurantId, { paused: false, reason: 'ignorado' }, actor);
+    expect(resumed).toEqual({ paused: false, reason: null, pausedAt: null });
+    const order = await publicOrderService.createOrder(slug, input, undefined, quartaAsOitoEmSP);
     expect(order.orderType).toBe('PICKUP');
   });
 });

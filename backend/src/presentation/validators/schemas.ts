@@ -179,6 +179,11 @@ export const deliveryPricingSettingsSchema = z
 // que sabe o que já está salvo.
 export const autoAcceptSchema = z.object({ enabled: z.boolean() }).strict();
 
+// Pausar/retomar pedidos online pelo painel — motivo opcional, aparece pro cliente no site.
+export const onlineOrdersPauseSchema = z
+  .object({ paused: z.boolean(), reason: z.string().max(200).nullable().optional() })
+  .strict();
+
 // null desliga; 1–120 minutos parado em "Pronto" antes de fechar sozinho uma retirada.
 export const autoDeliverPickupSchema = z.object({ minutes: z.number().int().min(1).max(120).nullable() }).strict();
 
