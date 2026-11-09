@@ -191,9 +191,9 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
     });
 
     const result = await publicOrderService.customerLogin(slug, 'Marcia Trocou Celular', '10000029696');
-    // Os dois pedidos aparecem pro mesmo cliente, e o endereço do primeiro pedido continua
-    // reconhecido mesmo com o telefone já tendo trocado.
-    expect(result.orders).toHaveLength(2);
+    // Reconhece o mesmo cliente, e o endereço do primeiro pedido continua reconhecido
+    // mesmo com o telefone já tendo trocado.
+    expect(result.name).toBe('Marcia Trocou Celular');
     expect(result.addresses).toHaveLength(1);
     expect(result.addresses[0].street).toBe('Rua do Celular Antigo');
 
@@ -217,7 +217,7 @@ describe('endereços de entrega salvos pro próximo pedido (CustomerAddress)', (
 
   it('nome que não bate com o CPF não reconhece (e não vaza o endereço de outra pessoa)', async () => {
     const result = await publicOrderService.customerLogin(slug, 'Nome Errado', '10000014826');
-    expect(result).toEqual({ name: null, orders: [], addresses: [] });
+    expect(result).toEqual({ name: null, addresses: [] });
   });
   it('entre 23h e 23:15 (horário de SP) o site recusa entrega e aceita retirada', async () => {
     const onzeEDezEmSP = new Date('2026-10-30T02:10:00Z'); // 23:10 em SP

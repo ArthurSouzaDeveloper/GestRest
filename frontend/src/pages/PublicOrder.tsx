@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { deriveBrandVars } from '../lib/publicBrand';
 import {
   DELIVERY_CLOSED_MESSAGE,
@@ -28,11 +28,11 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import api, { apiError } from '../lib/api';
-import { brl, dateTime } from '../lib/format';
+import { brl } from '../lib/format';
 import { Spinner } from '../components/ui';
 import { OrderComposer, draftItemUnitPrice, draftItemLabel, type DraftItem } from '../components/OrderComposer';
 import AddressAutocomplete from '../components/AddressAutocomplete';
-import type { DeliveryZone, EtaEstimate, OrderStatus, OrderType, PaymentMethod, PlaceDetails } from '../types';
+import type { DeliveryZone, EtaEstimate, PaymentMethod, PlaceDetails } from '../types';
 import { searchZones } from '../lib/zoneSearch';
 
 /** "19:45" a partir de um ISO — usado pra mostrar a previsão travada na confirmação. */
@@ -240,16 +240,6 @@ function pausedMessage(reason: string | null | undefined): string {
   return r ? `${PAUSED_MESSAGE} ${r}` : PAUSED_MESSAGE;
 }
 
-interface CustomerOrderSummary {
-  id: string;
-  number: number;
-  status: OrderStatus;
-  orderType: OrderType;
-  total: number;
-  estimatedReadyAt: string | null;
-  createdAt: string;
-}
-
 /** Um endereço de entrega salvo pro telefone desse cliente — devolvido por
  * POST /public/:slug/customers/login (ver publicOrder.service.ts#customerLogin). Lista
  * vazia quando o cliente nunca pediu entrega (só retirada) ou é cliente novo. */
@@ -322,15 +312,6 @@ function formatCpf(value: string): string {
   if (digits.length > 9) out += `-${digits.slice(9, 11)}`;
   return out;
 }
-
-const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
-  PENDING: 'Aguardando confirmação',
-  OPEN: 'Em preparo',
-  IN_PRODUCTION: 'Em preparo',
-  READY_FOR_PAYMENT: 'Pronto',
-  PAID: 'Concluído',
-  CANCELLED: 'Cancelado',
-};
 
 /**
  * Site público de pedidos (delivery/retirada) — sem login, alcançado por um link
@@ -435,8 +416,8 @@ export default function PublicOrder() {
 
   // Pedido explícito do cliente/dono: assim que nome+CPF identificam alguém que já pediu
   // ENTREGA antes, mostra uma caixa com os endereços salvos pra escolher (ou cadastrar um
-  // novo) — mesma identificação (nome+CPF) já usada em "Já pediu antes? Ver meus pedidos"
-  // (CustomerLoginPanel), aqui disparada sozinha em vez de exigir clique.
+  // novo) — mesma identificação (nome+CPF) do
+  // POST /customers/login, disparada sozinha.
   const addressStillEmpty = !deliveryStreet.trim() && !deliveryNumber.trim();
   const trimmedNameForLookup = customerName.trim();
   const normalizedCpfForLookup = normalizeCpf(customerCpf);
@@ -1104,8 +1085,6 @@ function IntroStep({
           Funcionamento: quarta a domingo, das 18h às 23:30
         </div>
 
-        <CustomerLoginPanel slug={slug} />
-
         <div className="flex items-center gap-2.5">
           <a
             href="https://www.instagram.com/oreidosucoamericana"
@@ -1136,129 +1115,6 @@ function IntroStep({
           </a>
         </div>
       </div>
-    </div>
-  );
-}
-
-/**
- * "Entrar" no site público por nome+CPF — não é autenticação de verdade (sem senha), é só
- * o jeito do cliente reencontrar os próprios pedidos depois de fechar o navegador (sem o
- * link de acompanhamento salvo). CPF, e não telefone, porque o telefone pode mudar entre
- * visitas e o CPF não (pedido do cliente/dono). Se o navegador já tem uma identidade salva
- * de um pedido anterior, mostra direto "bem-vindo de volta"; senão, oferece o link discreto
- * que abre o formulário.
- */
-function CustomerLoginPanel({ slug }: { slug: string }) {
-  const [saved] = useState(() => readSavedCustomer(slug));
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState(saved?.name ?? '');
-  const [cpf, setCpf] = useState(saved?.cpf ?? '');
-  const [result, setResult] = useState<{ name: string | null; orders: CustomerOrderSummary[] } | null>(null);
-
-  const login = useMutation({
-    mutationFn: async () => {
-      const normalizedCpf = normalizeCpf(cpf);
-      const data = (
-        await api.post<{ name: string | null; orders: CustomerOrderSummary[] }>(`/public/${slug}/customers/login`, {
-          name: name.trim(),
-          cpf: normalizedCpf,
-        })
-      ).data;
-      if (data.name) saveCustomer(slug, { name: name.trim(), cpf: normalizedCpf, phone: saved?.phone ?? '' });
-      return data;
-    },
-    onSuccess: setResult,
-  });
-
-  if (!open && !saved) {
-    return (
-      <button
-        className="mt-3 text-[11.5px] font-semibold text-brand underline decoration-brand/35 underline-offset-2"
-        onClick={() => setOpen(true)}
-      >
-        Já pediu antes? Ver meus pedidos
-      </button>
-    );
-  }
-
-  return (
-    <div className="mt-3 w-full max-w-md">
-      {!open && saved && !result && (
-        <div className="flex items-center justify-between rounded-2xl border border-[#1E1024]/10 bg-white px-3.5 py-2.5">
-          <span className="text-[12px] font-semibold text-[#1E1024]">Bem-vindo de volta, {saved.name.split(' ')[0]}</span>
-          <button
-            className="text-[11.5px] font-bold text-brand disabled:opacity-50"
-            disabled={login.isPending}
-            onClick={() => login.mutate()}
-          >
-            {login.isPending ? 'Buscando...' : 'Ver meus pedidos'}
-          </button>
-        </div>
-      )}
-
-      {open && !result && (
-        <div className="rounded-2xl border border-[#1E1024]/10 bg-white p-3.5">
-          <p className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Meus pedidos</p>
-          <div className="flex flex-col gap-2">
-            <input className={FIELD_INPUT} value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" />
-            <input
-              className={FIELD_INPUT}
-              value={formatCpf(cpf)}
-              onChange={(e) => setCpf(normalizeCpf(e.target.value))}
-              placeholder="CPF: 000.000.000-00"
-              inputMode="numeric"
-              maxLength={14}
-            />
-            <button
-              className="rounded-2xl bg-brand py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
-              disabled={login.isPending || name.trim().length < 2 || !isValidCpf(normalizeCpf(cpf))}
-              onClick={() => login.mutate()}
-            >
-              {login.isPending ? 'Buscando...' : 'Entrar'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {result && (
-        <div className="rounded-2xl border border-[#1E1024]/10 bg-white p-3.5">
-          {result.name === null ? (
-            <p className="text-[12px] text-red-600">Nenhum pedido encontrado com esse nome e CPF.</p>
-          ) : result.orders.length === 0 ? (
-            <p className="text-[12px] text-[#6B4A78]">Você ainda não tem pedidos por aqui.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <p className="text-[11.5px] font-bold uppercase tracking-wide text-[#6B4A78]">Seus pedidos</p>
-              <p className="-mt-1 text-[11px] text-[#6B4A78]">Toque num pedido para ver os detalhes.</p>
-              {result.orders.map((o) => (
-                <Link
-                  key={o.id}
-                  to={`/pedido/${slug}/rastreio/${o.id}`}
-                  className="flex items-center justify-between rounded-2xl border border-[#1E1024]/10 px-3 py-2 text-[12.5px] hover:bg-brand-100"
-                >
-                  <span className="flex flex-col">
-                    <span className="font-bold text-[#1E1024]">Pedido #{o.number}</span>
-                    <span className="text-[11px] text-[#6B4A78]">{dateTime(o.createdAt)}</span>
-                  </span>
-                  <span className="flex flex-col items-end">
-                    <span className="font-bold text-[#1E1024]">{brl(o.total)}</span>
-                    <span className="text-[11px] text-brand">{ORDER_STATUS_LABEL[o.status]}</span>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-          <button
-            className="mt-2.5 text-[11px] font-semibold text-[#6B4A78] underline underline-offset-2"
-            onClick={() => {
-              setResult(null);
-              setOpen(false);
-            }}
-          >
-            Fechar
-          </button>
-        </div>
-      )}
     </div>
   );
 }

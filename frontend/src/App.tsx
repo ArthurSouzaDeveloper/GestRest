@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { Spinner } from './components/ui';
@@ -17,7 +17,6 @@ import Reports from './pages/Reports';
 import Audit from './pages/Audit';
 import DeliveryZones from './pages/DeliveryZones';
 import PublicOrder from './pages/PublicOrder';
-import OrderTracking from './pages/OrderTracking';
 
 function Protected({ children, roles }: { children: JSX.Element; roles?: Role[] }) {
   const { user, loading, hasRole } = useAuth();
@@ -55,13 +54,22 @@ function Home() {
   }
 }
 
+/**
+ * O acompanhamento de pedido pelo cliente foi desativado (pedido do dono, 09/11/2026):
+ * um link antigo de rastreio só leva de volta pro site de pedidos.
+ */
+function TrackingRedirect() {
+  const { slug } = useParams();
+  return <Navigate to={`/pedido/${slug}`} replace />;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/r/:slug" element={<Login />} />
       <Route path="/pedido/:slug" element={<PublicOrder />} />
-      <Route path="/pedido/:slug/rastreio/:orderId" element={<OrderTracking />} />
+      <Route path="/pedido/:slug/rastreio/:orderId" element={<TrackingRedirect />} />
       <Route path="/super" element={<SuperAdmin />} />
       <Route path="/" element={<Protected><Home /></Protected>} />
       <Route path="/mesas" element={<Protected roles={['ADMIN', 'MANAGER', 'WAITER']}><Tables /></Protected>} />

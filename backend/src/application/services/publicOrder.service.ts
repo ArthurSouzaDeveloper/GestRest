@@ -6,7 +6,7 @@ import { DELIVERY_CLOSED_MESSAGE, ORDERS_CLOSED_MESSAGE, isDeliveryClosed, isOrd
 import { etaService } from './eta.service';
 import { pausedMessage } from './onlineOrdersPause.service';
 import { googleMapsClient } from './googleMaps.client';
-import { computeTotals, normalizeCpf, orderInclude, serializePublicStatus } from './order.helpers';
+import { normalizeCpf } from './order.helpers';
 import { orderService, type PublicOrderInput } from './order.service';
 
 /** Resolves a public :slug to a tenant id, rejecting unknown or inactive restaurants. */
@@ -78,22 +78,8 @@ export const publicOrderService = {
     return deliveryPricingService.quote(tenantId, destination);
   },
   /**
-   * Link de acompanhamento — o id do pedido (UUID, não-adivinhável) já autoriza o acesso,
-   * sem precisar de login. Escopado por slug+id juntos pra um id de outro tenant nunca vazar.
-   */
-  async orderStatus(slug: string, orderId: string) {
-    const tenantId = await resolveActiveTenant(slug);
-    const order = await prisma.order.findFirst({
-      where: { id: orderId, restaurantId: tenantId },
-      include: orderInclude,
-    });
-    if (!order) throw new NotFoundError('Pedido');
-    return serializePublicStatus(order);
-  },
-  /**
-   * "Login" do site público por nome+CPF — sem senha, só serve pra um cliente que já pediu
-   * antes reencontrar os próprios pedidos depois de fechar o navegador (não tem link de
-   * rastreio salvo). Exige nome E CPF batendo (não só CPF) como uma barreira mínima contra
+   * "Login" do site público por nome+CPF — sem senha, só serve pra preencher os endereços
+   * salvos de quem já pediu entrega antes (o site não mostra mais os pedidos). Exige nome E CPF batendo (não só CPF) como uma barreira mínima contra
    * alguém só adivinhando um CPF. Casa por CPF normalizado (só dígitos) pra não depender de
    * como cada visita formatou o campo. CPF, e não telefone, porque o telefone do cliente
    * pode mudar entre visitas e o CPF não (pedido do cliente/dono).
@@ -107,34 +93,19 @@ export const publicOrderService = {
     });
     const nameNormalized = name.trim().toLowerCase();
     const matched = candidates.find((c) => c.name.trim().toLowerCase() === nameNormalized);
-    if (!matched) return { name: null, orders: [], addresses: [] };
+    if (!matched) return { name: null, addresses: [] };
 
-    const [orders, addresses] = await Promise.all([
-      prisma.order.findMany({
-        where: { restaurantId: tenantId, customerId: { in: candidates.map((c) => c.id) } },
-        include: orderInclude,
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      }),
-      // Endereços salvos desse cliente (ver order.service.ts#openPublic) — mais usado/
-      // recente primeiro, pra aparecer no topo da caixa de endereços salvos do site
-      // público. Lista vazia quando o cliente nunca pediu entrega (só retirada).
-      prisma.customerAddress.findMany({
-        where: { restaurantId: tenantId, customerId: { in: candidates.map((c) => c.id) } },
-        orderBy: { lastUsedAt: 'desc' },
-      }),
-    ]);
+    // Endereços salvos desse cliente (ver order.service.ts#openPublic) — mais usado/
+    // recente primeiro, pra aparecer no topo da caixa de endereços salvos do site
+    // público. Lista vazia quando o cliente nunca pediu entrega (só retirada).
+    // Não devolve mais a lista de pedidos: o cliente não vê pedido nenhum pelo site
+    // (pedido do dono, 09/11/2026).
+    const addresses = await prisma.customerAddress.findMany({
+      where: { restaurantId: tenantId, customerId: { in: candidates.map((c) => c.id) } },
+      orderBy: { lastUsedAt: 'desc' },
+    });
     return {
       name: matched.name,
-      orders: orders.map((o) => ({
-        id: o.id,
-        number: o.number,
-        status: o.status,
-        orderType: o.orderType,
-        total: computeTotals(o).total,
-        estimatedReadyAt: o.estimatedReadyAt,
-        createdAt: o.createdAt,
-      })),
       addresses: addresses.map((a) => ({
         id: a.id,
         zoneId: a.zoneId,
