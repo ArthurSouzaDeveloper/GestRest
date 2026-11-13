@@ -360,6 +360,7 @@ export default function PublicOrder() {
   // (campos chamados "website"/"empresa" são alvo comum de autofill, o que barraria
   // um cliente de verdade sem ele nunca ter digitado nada aqui).
   const [grHp, setGrHp] = useState('');
+  const [confirmedNumber, setConfirmedNumber] = useState<number | null>(null);
   const [confirmedEta, setConfirmedEta] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState('');
 
@@ -567,6 +568,7 @@ export default function PublicOrder() {
     onSuccess: (order) => {
       setSubmitError('');
       setConfirmedEta(order.estimatedReadyAt);
+      setConfirmedNumber(order.number);
       setStep('confirmation');
       // A Revisão costuma estar rolada até o fim quando o cliente aperta "Fazer Pedido";
       // sobe pro topo pra ele cair direto no "Obrigado pelo pedido!".
@@ -810,6 +812,7 @@ export default function PublicOrder() {
           <ConfirmationStep
             orderKind={orderKind}
             estimatedReadyAt={confirmedEta}
+            orderNumber={confirmedNumber}
             onNewOrder={() => {
               // Mantém nome/telefone/endereço de propósito (não limpa) — mesmo cliente
               // pedindo de novo na mesma visita não deveria ter que redigitar tudo outra
@@ -821,6 +824,7 @@ export default function PublicOrder() {
               setPaymentMethod('');
               setChangeFor('');
               setConfirmedEta(null);
+              setConfirmedNumber(null);
             }}
           />
         )}
@@ -1951,10 +1955,12 @@ function ReviewStep({
 function ConfirmationStep({
   orderKind,
   estimatedReadyAt,
+  orderNumber,
   onNewOrder,
 }: {
   orderKind: OrderKind | null;
   estimatedReadyAt: string | null;
+  orderNumber: number | null;
   onNewOrder: () => void;
 }) {
   // A pedido do cliente (08/11/2026), a tela de pedido feito mostra só o agradecimento e
@@ -1978,6 +1984,9 @@ function ConfirmationStep({
           <Check size={44} strokeWidth={3} />
         </div>
         <h1 className="mt-1 font-display text-[34px] font-extrabold tracking-tight text-[#1E1024]">Obrigado pelo pedido!</h1>
+        {orderNumber !== null && (
+          <p className="text-lg font-bold text-[#1E1024]">Pedido nº {orderNumber}</p>
+        )}
         {estimatedReadyAt && (
           <div className="mx-auto flex w-fit items-center gap-2 rounded-2xl bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
             <Clock size={16} />
