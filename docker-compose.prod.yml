@@ -41,6 +41,10 @@ services:
       # HTTPS de verdade (Caddy na frente) — cookie de refresh só é enviado pelo
       # navegador em conexão segura, e é exatamente isso que temos agora.
       COOKIE_SECURE: 'true'
+      # Duas camadas de proxy na frente (Caddy -> nginx). Sem isso o backend enxerga o IP
+      # interno do Caddy como IP de todo mundo e o limite de pedidos do site vira um só
+      # pro restaurante inteiro: no pico, o 9º pedido em 10 min era recusado.
+      TRUST_PROXY_HOPS: '2'
       # Origem pública usada pelo Socket.IO / CORS.
       CORS_ORIGIN: https://${DOMAIN}
       # fatal | error | warn | info | debug
