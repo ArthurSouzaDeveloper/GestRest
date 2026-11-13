@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, origin_badge, csrf %}
+{% block title %}Início{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow">{{ today|dia_extenso }}</p>
+    <h1>Olá, {{ current_user.name.split()[0] if current_user.role == 'dentista' else current_user.name }}</h1>
+  </div>
+  {% if current_user.role in ('admin', 'recepcao') %}
+  <a href="{{ url_for('scheduling.create') }}" class="btn btn-primary">+ Nova consulta</a>
+  {% endif %}
+</header>
+
+<section class="kpis">
+  <div class="kpi"><span>Consultas hoje</span><strong>{{ kpis.hoje }}</strong></div>
+  <div class="kpi"><span>Agendados pelo site (7 dias)</span><strong>{{ kpis.site_semana }}</strong></div>
+  <div class="kpi"><span>Pacientes cadastrados</span><strong>{{ kpis.pacientes }}</strong></div>
+  <div class="kpi"><span>Comparecimento (30 dias)</span><strong>{{ kpis.comparecimento ~ '%' if kpis.comparecimento is not none else '—' }}</strong></div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h2>Agenda de hoje</h2>
+      <a href="{{ url_for('scheduling.day_view') }}" class="link">Abrir agenda →</a>
+    </div>
+    {% if today_list %}
+    <ul class="appt-list">
+      {% for a in today_list %}
+      <li>
+        <a href="{{ url_for('scheduling.detail', id=a.id) }}" class="appt-row" style="--c: {{ a.dentist.color }}">
+          <time>{{ a.start|hora }}</time>
+          <div class="grow">
+            <strong>{{ a.patient.name }}</strong>
+            <small>{{ a.service.name }} · {{ a.dentist.name }}</small>
+          </div>
+          {{ origin_badge(a.origin) }} {{ status_badge(a) }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      <p class="empty">Nenhuma consulta hoje.</p>
+    {% endif %}
+  </section>
+
+  <div class="stack">
+    <section class="card highlight">
+      <div class="card-head">
+        <h2>Novos pedidos pelo site</h2>
+        <span class="badge origin-site">{{ pending_site|length }}</span>
+      </div>
+      <p class="muted small">Agendamentos feitos pela landing page aguardando confirmação.</p>
+      {% if pending_site %}
+      <ul class="appt-list compact">
+        {% for a in pending_site %}
+        <li class="appt-row" style="--c: {{ a.dentist.color }}">
+          <time>{{ a.start.strftime('%d/%m') }}<br>{{ a.start|hora }}</time>
+          <a href="{{ url_for('scheduling.detail', id=a.id) }}" class="grow">
+            <strong>{{ a.patient.name }}</strong>
+            <small>{{ a.service.name }} · {{ a.dentist.name }}</small>
+          </a>
+          <form method="post" action="{{ url_for('scheduling.set_status', id=a.id) }}">
+            {{ csrf() }}<input type="hidden" name="status" value="confirmado">
+            <button class="btn btn-sm btn-outline">Confirmar</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="empty">Tudo confirmado por aqui.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Próximos 7 dias</h2></div>
+      <div class="bars">
+        {% for d, n in upcoming %}
+        <a class="bar" href="{{ url_for('scheduling.day_view', data=d.isoformat()) }}">
+          <span class="bar-val">{{ n }}</span>
+          <span class="bar-fill" style="height: {{ (n / max_up * 100)|round }}%"></span>
+          <span class="bar-lbl">{{ ['seg','ter','qua','qui','sex','sáb','dom'][d.weekday()] }}<br>{{ d.day }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

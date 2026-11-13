@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Pacientes{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">Controle de pacientes</p><h1>Pacientes <span class="count">{{ patients|length }}</span></h1></div>
+  {% if current_user.role in ('admin', 'recepcao') %}<a href="{{ url_for('patients.create') }}" class="btn btn-primary">+ Novo paciente</a>{% endif %}
+</header>
+<form class="filters card" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Buscar por nome, telefone ou CPF" class="grow">
+  <select name="origem" onchange="this.form.submit()">
+    <option value="">Todas as origens</option>
+    <option value="site" {{ 'selected' if origem == 'site' }}>Vieram pelo site</option>
+    <option value="recepcao" {{ 'selected' if origem == 'recepcao' }}>Recepção</option>
+  </select>
+  <button class="btn btn-outline">Buscar</button>
+</form>
+<section class="card table-card">
+  <table class="table">
+    <thead><tr><th>Paciente</th><th>Telefone</th><th class="hide-sm">Idade</th><th class="hide-sm">Origem</th><th class="hide-sm">Cadastro</th></tr></thead>
+    <tbody>
+    {% for p in patients %}
+      <tr onclick="location.href='{{ url_for('patients.detail', id=p.id) }}'">
+        <td><a href="{{ url_for('patients.detail', id=p.id) }}" class="pt-cell"><span class="avatar sm">{{ p.initials }}</span>{{ p.name }}</a></td>
+        <td>{{ p.phone_fmt }}</td>
+        <td class="hide-sm">{{ p.age ~ ' anos' if p.age is not none else '—' }}</td>
+        <td class="hide-sm">{% if p.origin == 'site' %}<span class="badge origin-site">Site</span>{% else %}Recepção{% endif %}</td>
+        <td class="hide-sm">{{ p.created_at|data }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="empty">Nenhum paciente encontrado.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

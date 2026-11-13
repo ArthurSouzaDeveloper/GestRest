@@ -1,0 +1,9 @@
+{
+  "name": "Inspiralle · Painel da clínica",
+  "short_name": "Inspiralle",
+  "start_url": "/painel/",
+  "display": "standalone",
+  "background_color": "#faf6ef",
+  "theme_color": "#0f1b30",
+  "icons": [{ "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

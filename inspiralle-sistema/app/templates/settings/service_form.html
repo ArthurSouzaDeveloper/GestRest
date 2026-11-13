@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Serviço{% endblock %}
+{% block content %}
+<header class="page-head"><div><p class="eyebrow">Cadastros</p><h1>{{ s.name if s else 'Novo serviço' }}</h1></div></header>
+<form method="post" class="card form">
+  {{ csrf() }}
+  <label>Nome *<input name="name" required value="{{ s.name if s }}"></label>
+  <label>Descrição (aparece no site)<input name="description" value="{{ s.description or '' if s }}"></label>
+  <div class="row-2">
+    <label>Duração (min)<input type="number" name="duration_min" min="15" step="15" value="{{ s.duration_min if s else 30 }}"></label>
+    <label>Valor (R$)<input name="price" inputmode="decimal" value="{{ s.price if s and s.price is not none }}"></label>
+  </div>
+  <fieldset><legend>Profissionais que realizam</legend>
+    <div class="checks">{% for d in dentists %}<label class="check"><input type="checkbox" name="dentists" value="{{ d.id }}" {{ 'checked' if s and d in s.dentists }}> {{ d.name }}</label>{% endfor %}</div>
+  </fieldset>
+  <div class="checks">
+    <label class="check"><input type="checkbox" name="online_booking" {{ 'checked' if not s or s.online_booking }}> Disponível para agendamento online</label>
+    <label class="check"><input type="checkbox" name="active" {{ 'checked' if not s or s.active }}> Ativo</label>
+  </div>
+  <div class="form-actions"><a href="{{ url_for('settings.index') }}" class="btn btn-outline">Cancelar</a><button class="btn btn-primary">Salvar</button></div>
+</form>
+{% endblock %}

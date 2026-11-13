@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Profissional{% endblock %}
+{% block content %}
+<header class="page-head"><div><p class="eyebrow">Cadastros</p><h1>{{ d.name if d else 'Novo profissional' }}</h1></div></header>
+<form method="post" class="card form">
+  {{ csrf() }}
+  <label>Nome *<input name="name" required value="{{ d.name if d }}" placeholder="Dra. Nome Sobrenome"></label>
+  <div class="row-2">
+    <label>CRO<input name="cro" value="{{ d.cro or '' if d }}"></label>
+    <label>Especialidade<input name="specialty" value="{{ d.specialty or '' if d }}"></label>
+  </div>
+  <label>Cor na agenda<input type="color" name="color" value="{{ d.color if d else '#c9a468' }}"></label>
+  <fieldset><legend>Dias de atendimento</legend>
+    <div class="checks">{% for lbl in weekday_labels[:6] %}<label class="check"><input type="checkbox" name="weekdays" value="{{ loop.index0 }}" {{ 'checked' if (not d and loop.index0 < 5) or (d and loop.index0 in d.weekday_set) }}> {{ lbl }}</label>{% endfor %}</div>
+  </fieldset>
+  <fieldset><legend>Serviços que realiza</legend>
+    <div class="checks">{% for s in services %}<label class="check"><input type="checkbox" name="services" value="{{ s.id }}" {{ 'checked' if d and s in d.services }}> {{ s.name }}</label>{% endfor %}</div>
+  </fieldset>
+  <label class="check"><input type="checkbox" name="active" {{ 'checked' if not d or d.active }}> Ativo</label>
+  <div class="form-actions"><a href="{{ url_for('settings.index') }}" class="btn btn-outline">Cancelar</a><button class="btn btn-primary">Salvar</button></div>
+</form>
+{% endblock %}

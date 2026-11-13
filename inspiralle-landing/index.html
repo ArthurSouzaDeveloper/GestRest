@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inspiralle Odontologia Especializada | Clínica Odontológica em Americana - SP</title>
-<meta name="description" content="Inspiralle Odontologia Especializada, em Americana-SP. Clareamento dental, próteses fixas, extração de siso e cuidado com sensibilidade dentária. Avaliação 5.0 no Google. Agende pelo WhatsApp.">
+<meta name="description" content="Inspiralle Odontologia Especializada, em Americana-SP. Clareamento dental, próteses fixas, extração de siso e cuidado com sensibilidade dentária. Avaliação 5.0 no Google. Agende online ou pelo WhatsApp.">
 <meta name="keywords" content="odontologia Americana SP, dentista Americana, clareamento dental Americana, próteses fixas, extração de siso, clínica odontológica Vila Molon, Inspiralle Odontologia">
 <link rel="canonical" href="https://inspiralleodontologia.com.br/">
 
@@ -64,9 +64,10 @@
       <a href="#sobre">Sobre</a>
       <a href="#tratamentos">Tratamentos</a>
       <a href="#diferenciais">Diferenciais</a>
+      <a href="#agendar">Agendar</a>
       <a href="#galeria">Galeria</a>
       <a href="#localizacao">Localização</a>
-      <a href="https://wa.me/5519999393772?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20uma%20avalia%C3%A7%C3%A3o%20na%20Inspiralle%20Odontologia." class="btn btn-primary btn-nav" target="_blank" rel="noopener">Agende sua avaliação</a>
+      <a href="#agendar" class="btn btn-primary btn-nav">Agendar online</a>
     </nav>
 
     <button class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false">
@@ -90,7 +91,7 @@
     <p class="hero-sub fade-up" data-delay="2">Odontologia especializada, planejamento individual e um cuidado pensado para cada etapa do seu tratamento — do primeiro contato ao sorriso que você imaginou.</p>
 
     <div class="hero-actions fade-up" data-delay="3">
-      <a href="https://wa.me/5519999393772?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20uma%20avalia%C3%A7%C3%A3o%20na%20Inspiralle%20Odontologia." class="btn btn-primary btn-lg" target="_blank" rel="noopener">Agende sua avaliação</a>
+      <a href="#agendar" class="btn btn-primary btn-lg">Agende sua avaliação</a>
       <a href="#sobre" class="btn btn-ghost btn-lg">Conheça a clínica</a>
     </div>
 
@@ -186,6 +187,76 @@
   </div>
 </section>
 
+<!-- ===== AGENDAMENTO ONLINE ===== -->
+<section class="section agendar" id="agendar">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Agendamento online</p>
+      <h2>Agende sua consulta em poucos passos</h2>
+      <p class="section-sub">Escolha o tratamento, o profissional e o horário que cabe na sua rotina. A clínica confirma pelo WhatsApp.</p>
+    </div>
+
+    <div class="booking reveal" id="booking" data-api="">
+      <ol class="bk-steps" aria-label="Etapas do agendamento">
+        <li class="on" data-step="1"><span>1</span>Tratamento</li>
+        <li data-step="2"><span>2</span>Profissional</li>
+        <li data-step="3"><span>3</span>Data e horário</li>
+        <li data-step="4"><span>4</span>Seus dados</li>
+      </ol>
+
+      <div class="bk-panel on" data-panel="1">
+        <h3>Qual cuidado você procura?</h3>
+        <div class="bk-options" id="bkServices"><p class="bk-loading">Carregando tratamentos…</p></div>
+      </div>
+
+      <div class="bk-panel" data-panel="2">
+        <h3>Com quem você prefere ser atendido?</h3>
+        <div class="bk-options" id="bkDentists"></div>
+      </div>
+
+      <div class="bk-panel" data-panel="3">
+        <h3>Escolha o dia</h3>
+        <div class="bk-days" id="bkDays"></div>
+        <h3 class="bk-times-title" id="bkTimesTitle" hidden>Horários disponíveis</h3>
+        <div class="bk-times" id="bkTimes"></div>
+      </div>
+
+      <div class="bk-panel" data-panel="4">
+        <h3>Para quem é a consulta?</h3>
+        <div class="bk-summary" id="bkSummary"></div>
+        <form id="bkForm" class="bk-form" novalidate>
+          <label>Nome completo<input name="nome" autocomplete="name" required placeholder="Seu nome e sobrenome"></label>
+          <div class="bk-row">
+            <label>WhatsApp<input name="telefone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="(19) 99999-9999"></label>
+            <label>E-mail <small>(opcional)</small><input name="email" type="email" autocomplete="email" placeholder="voce@email.com"></label>
+          </div>
+          <label>Quer contar algo para o dentista? <small>(opcional)</small><textarea name="observacoes" rows="2" placeholder="Ex.: sinto sensibilidade ao tomar gelado"></textarea></label>
+          <input type="text" name="website" class="bk-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <label class="bk-check"><input type="checkbox" name="aceite" required> Autorizo a Inspiralle a usar meus dados para este agendamento e contato pelo WhatsApp (LGPD).</label>
+          <p class="bk-error" id="bkError" role="alert" hidden></p>
+          <button type="submit" class="btn btn-primary btn-lg">Confirmar agendamento</button>
+        </form>
+      </div>
+
+      <div class="bk-panel bk-done" data-panel="5">
+        <div class="bk-check-icon" aria-hidden="true">✓</div>
+        <h3>Consulta agendada!</h3>
+        <p id="bkDoneText"></p>
+        <p class="bk-code">Código do agendamento: <strong id="bkCode"></strong></p>
+        <p class="bk-small">Você vai receber a confirmação da clínica pelo WhatsApp. Se precisar remarcar, é só chamar.</p>
+        <div class="bk-done-actions">
+          <a href="#" id="bkWhats" class="btn btn-primary" target="_blank" rel="noopener">Avisar a clínica no WhatsApp</a>
+          <button type="button" class="btn btn-outline" id="bkRestart">Fazer outro agendamento</button>
+        </div>
+      </div>
+
+      <div class="bk-nav">
+        <button type="button" class="bk-back" id="bkBack" hidden>← Voltar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ===== DIFERENCIAIS ===== -->
 <section class="section diferenciais" id="diferenciais">
   <div class="container">
@@ -212,8 +283,8 @@
       </div>
       <div class="diff-item">
         <span class="diff-num">04</span>
-        <h3>Contato próximo</h3>
-        <p>Agendamento e dúvidas resolvidos diretamente pelo WhatsApp, de forma rápida e acessível.</p>
+        <h3>Agendamento online</h3>
+        <p>Escolha seu horário direto pelo site, 24 horas por dia, e tire dúvidas pelo WhatsApp quando quiser.</p>
       </div>
     </div>
   </div>
@@ -307,10 +378,11 @@
   <div class="cta-bg" aria-hidden="true"></div>
   <div class="container cta-inner reveal">
     <h2>Seu sorriso merece<br>um cuidado especial.</h2>
-    <p>Fale agora com a Inspiralle e agende sua avaliação — é rápido, é pelo WhatsApp.</p>
-    <a href="https://wa.me/5519999393772?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20uma%20avalia%C3%A7%C3%A3o%20na%20Inspiralle%20Odontologia." class="btn btn-primary btn-xl" target="_blank" rel="noopener">
-      Agende sua avaliação pelo WhatsApp
-    </a>
+    <p>Escolha o tratamento, o profissional e o melhor horário em menos de um minuto — ou fale com a gente pelo WhatsApp.</p>
+    <div class="cta-actions">
+      <a href="#agendar" class="btn btn-primary btn-xl">Agendar online agora</a>
+      <a href="https://wa.me/5519999393772?text=Ol%C3%A1%2C%20gostaria%20de%20agendar%20uma%20avalia%C3%A7%C3%A3o%20na%20Inspiralle%20Odontologia." class="btn btn-ghost btn-xl" target="_blank" rel="noopener">Prefiro o WhatsApp</a>
+    </div>
   </div>
 </section>
 
@@ -345,5 +417,6 @@
 </a>
 
 <script src="script.js" defer></script>
+<script src="agendamento.js" defer></script>
 </body>
 </html>

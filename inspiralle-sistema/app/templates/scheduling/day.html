@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, origin_badge %}
+{% block title %}Agenda{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Agenda</p>
+    <h1 class="cap">{{ day|dia_extenso }}</h1>
+  </div>
+  <div class="head-actions">
+    <div class="day-nav">
+      <a href="?data={{ prev_day.isoformat() }}" class="btn btn-outline btn-sm" aria-label="Dia anterior">‹</a>
+      <a href="?data={{ today.isoformat() }}" class="btn btn-outline btn-sm">Hoje</a>
+      <a href="?data={{ next_day.isoformat() }}" class="btn btn-outline btn-sm" aria-label="Próximo dia">›</a>
+      <form method="get" class="inline"><input type="date" name="data" value="{{ day.isoformat() }}" onchange="this.form.submit()" class="input-sm"></form>
+    </div>
+    {% if current_user.role in ('admin', 'recepcao') %}
+    <a href="{{ url_for('scheduling.create', data=day.isoformat()) }}" class="btn btn-primary">+ Nova consulta</a>
+    {% endif %}
+  </div>
+</header>
+
+{% if closed %}
+  <div class="card"><p class="empty">Clínica fechada neste dia.</p></div>
+{% else %}
+<div class="legend">
+  {% for d in dentists %}<span><i style="background: {{ d.color }}"></i>{{ d.name }}</span>{% endfor %}
+  <span><i class="origin-dot"></i>Agendado pelo site</span>
+</div>
+
+<div class="calendar card" style="--cols: {{ dentists|length }}">
+  <div class="cal-head">
+    <div></div>
+    {% for d in dentists %}<div class="cal-col-head" style="--c: {{ d.color }}">{{ d.name }}<small>{{ d.specialty }}</small></div>{% endfor %}
+  </div>
+  <div class="cal-body" style="height: {{ grid_height * 1.6 }}px">
+    <div class="cal-hours">
+      {% for h in hours %}<span style="top: {{ loop.index0 * 30 * 1.6 }}px">{{ h }}</span>{% endfor %}
+    </div>
+    {% for d in dentists %}
+    <div class="cal-col {{ 'off' if day.weekday() not in d.weekday_set }}">
+      {% for h in hours %}
+        {% if current_user.role in ('admin', 'recepcao') and day.weekday() in d.weekday_set %}
+        <a class="cal-slot" style="top: {{ loop.index0 * 30 * 1.6 }}px; height: {{ 30 * 1.6 }}px"
+           href="{{ url_for('scheduling.create', data=day.isoformat(), hora=h, dentista=d.id) }}" title="Agendar {{ h }}"></a>
+        {% endif %}
+      {% endfor %}
+      {% for item in by_dentist[d.id] %}
+        {% set a = item.a %}
+        <a href="{{ url_for('scheduling.detail', id=a.id) }}" class="cal-event st-{{ a.status }}"
+           style="top: {{ item.top * 1.6 }}px; height: {{ item.height * 1.6 - 3 }}px; --c: {{ d.color }}">
+          <strong>{{ a.start|hora }} {{ a.patient.name }}</strong>
+          <small>{{ a.service.name }}</small>
+          {% if a.origin == 'site' %}<i class="origin-dot" title="Agendado pelo site"></i>{% endif %}
+        </a>
+      {% endfor %}
+      {% if day.weekday() not in d.weekday_set %}<div class="off-label">Não atende neste dia</div>{% endif %}
+    </div>
+    {% endfor %}
+    {% if day == today %}
+      {% set nm = now.hour * 60 + now.minute - grid_start %}
+      {% if 0 <= nm <= grid_height %}<div class="now-line" style="top: {{ nm * 1.6 }}px"></div>{% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{# Lista para celular #}
+<section class="card day-list">
+  {% if appts %}
+  <ul class="appt-list">
+    {% for a in appts if a.dentist in dentists %}
+    <li><a href="{{ url_for('scheduling.detail', id=a.id) }}" class="appt-row" style="--c: {{ a.dentist.color }}">
+      <time>{{ a.start|hora }}</time>
+      <div class="grow"><strong>{{ a.patient.name }}</strong><small>{{ a.service.name }} · {{ a.dentist.name }}</small></div>
+      {{ origin_badge(a.origin) }} {{ status_badge(a) }}
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="empty">Nenhuma consulta neste dia.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

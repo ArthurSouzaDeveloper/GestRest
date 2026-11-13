@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Cadastros{% endblock %}
+{% block content %}
+<header class="page-head"><div><p class="eyebrow">Administração</p><h1>Cadastros</h1></div></header>
+<div class="grid-2">
+  <section class="card table-card">
+    <div class="card-head"><h2>Serviços</h2><a href="{{ url_for('settings.service_form') }}" class="btn btn-sm btn-outline">+ Serviço</a></div>
+    <table class="table">
+      <thead><tr><th>Serviço</th><th>Duração</th><th class="hide-sm">Valor</th><th>Online</th></tr></thead>
+      <tbody>
+      {% for s in services %}
+        <tr onclick="location.href='{{ url_for('settings.service_form', id=s.id) }}'" class="{{ 'inactive' if not s.active }}">
+          <td><strong>{{ s.name }}</strong><br><small class="muted">{{ s.dentists|map(attribute='name')|join(', ') }}</small></td>
+          <td>{{ s.duration_min }} min</td>
+          <td class="hide-sm">{{ s.price|moeda }}</td>
+          <td>{{ '✓' if s.online_booking and s.active else '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <div class="stack">
+    <section class="card table-card">
+      <div class="card-head"><h2>Profissionais</h2><a href="{{ url_for('settings.dentist_form') }}" class="btn btn-sm btn-outline">+ Profissional</a></div>
+      <table class="table">
+        <thead><tr><th>Profissional</th><th>Dias</th></tr></thead>
+        <tbody>
+        {% for d in dentists %}
+          <tr onclick="location.href='{{ url_for('settings.dentist_form', id=d.id) }}'" class="{{ 'inactive' if not d.active }}">
+            <td><span class="dot" style="background: {{ d.color }}"></span><strong>{{ d.name }}</strong><br><small class="muted">{{ d.specialty or '' }} {{ d.cro or '' }}</small></td>
+            <td>{% for i in d.weekday_set|sort %}{{ weekday_labels[i] }}{{ ', ' if not loop.last }}{% endfor %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    <section class="card table-card">
+      <div class="card-head"><h2>Usuários do painel</h2></div>
+      <table class="table">
+        <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th></tr></thead>
+        <tbody>{% for u in users %}<tr><td>{{ u.name }}</td><td>{{ u.email }}</td><td>{{ u.role_label }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </section>
+  </div>
+</div>
+{% endblock %}
