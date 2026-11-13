@@ -56,4 +56,8 @@ sejam enviados os arquivos reais. Para finalizar:
   grid responsivo, animações).
 - `script.js` — header dinâmico, menu mobile, fade-in no scroll
   (`IntersectionObserver`).
+- `agendamento.js` — agendamento online (seção `#agendar`), conversa com a
+  API do sistema em `../inspiralle-sistema`. Para testar com dados, rode o
+  sistema (`python run.py`) e abra http://localhost:5000/#agendar. Aberta
+  sozinha, a seção mostra um aviso com o link do WhatsApp.
 - `assets/favicon.svg` — ícone com o mesmo desenho do dente do logo.

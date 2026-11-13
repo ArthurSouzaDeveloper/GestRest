@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, origin_badge, csrf %}
+{% block title %}Consulta {{ appt.code }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Consulta #{{ appt.code }} {{ origin_badge(appt.origin) }}</p>
+    <h1>{{ appt.patient.name }}</h1>
+  </div>
+  <div class="head-actions">
+    <a href="{{ url_for('scheduling.day_view', data=appt.start.date().isoformat()) }}" class="btn btn-outline">← Agenda do dia</a>
+    {% if current_user.role in ('admin', 'recepcao') %}<a href="{{ url_for('scheduling.edit', id=appt.id) }}" class="btn btn-outline">Editar / remarcar</a>{% endif %}
+  </div>
+</header>
+<div class="grid-2">
+  <section class="card">
+    <dl class="dl">
+      <dt>Status</dt><dd>{{ status_badge(appt) }}</dd>
+      <dt>Data</dt><dd class="cap">{{ appt.start.date()|dia_extenso }}</dd>
+      <dt>Horário</dt><dd>{{ appt.start|hora }} – {{ appt.end|hora }} ({{ appt.duration_min }} min)</dd>
+      <dt>Serviço</dt><dd>{{ appt.service.name }}</dd>
+      <dt>Profissional</dt><dd>{{ appt.dentist.name }}</dd>
+      <dt>Origem</dt><dd>{{ 'Agendamento online (site)' if appt.origin == 'site' else 'Recepção' }} · criado em {{ appt.created_at|datahora }}</dd>
+      {% if appt.notes %}<dt>Observações</dt><dd>{{ appt.notes }}</dd>{% endif %}
+    </dl>
+    <h3>Alterar status</h3>
+    <div class="status-actions">
+      {% for key, label in statuses.items() if key != appt.status %}
+      <form method="post" action="{{ url_for('scheduling.set_status', id=appt.id) }}">
+        {{ csrf() }}<input type="hidden" name="status" value="{{ key }}">
+        <button class="btn btn-sm btn-status st-{{ key }}">{{ label }}</button>
+      </form>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-head"><h2>Paciente</h2><a href="{{ url_for('patients.detail', id=appt.patient.id) }}" class="link">Abrir ficha →</a></div>
+    <dl class="dl">
+      <dt>Telefone</dt><dd>{{ appt.patient.phone_fmt }}</dd>
+      {% if appt.patient.email %}<dt>E-mail</dt><dd>{{ appt.patient.email }}</dd>{% endif %}
+      {% if appt.patient.allergies %}<dt>Alergias</dt><dd class="alert-text">{{ appt.patient.allergies }}</dd>{% endif %}
+    </dl>
+    {% set msg = 'Olá, ' ~ appt.patient.name.split()[0] ~ '! Aqui é da Inspiralle Odontologia. Confirmando sua consulta de ' ~ appt.service.name ~ ' em ' ~ appt.start.strftime('%d/%m') ~ ' às ' ~ appt.start|hora ~ ' com ' ~ appt.dentist.name ~ '. Podemos confirmar?' %}
+    <a class="btn btn-whats" target="_blank" rel="noopener" href="{{ appt.patient.whatsapp_link }}?text={{ msg|urlencode }}">Enviar confirmação pelo WhatsApp</a>
+  </section>
+</div>
+{% endblock %}

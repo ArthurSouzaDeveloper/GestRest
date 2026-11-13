@@ -1,0 +1,7 @@
+{% macro status_badge(a) -%}
+<span class="badge st-{{ a.status }}">{{ a.status_label }}</span>
+{%- endmacro %}
+{% macro origin_badge(o) -%}
+{% if o == 'site' %}<span class="badge origin-site" title="Agendado pelo site">Site</span>{% endif %}
+{%- endmacro %}
+{% macro csrf() -%}<input type="hidden" name="_csrf" value="{{ csrf_token() }}">{%- endmacro %}

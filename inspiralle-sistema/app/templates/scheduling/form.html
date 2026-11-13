@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}{{ 'Editar consulta' if appt else 'Nova consulta' }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">Agenda</p><h1>{{ 'Editar consulta' if appt else 'Nova consulta' }}</h1></div>
+</header>
+<form method="post" class="card form" id="apptForm">
+  {{ csrf() }}
+  <fieldset>
+    <legend>Paciente</legend>
+    <label>Paciente cadastrado
+      <select name="paciente" id="pacienteSel">
+        <option value="">— Selecione ou cadastre abaixo —</option>
+        {% for p in patients %}<option value="{{ p.id }}" {{ 'selected' if prefill.paciente == p.id }}>{{ p.name }} · {{ p.phone_fmt }}</option>{% endfor %}
+      </select>
+    </label>
+    {% if not appt %}
+    <div class="row-2 new-patient">
+      <label>Ou novo paciente: nome<input name="novo_nome" placeholder="Nome completo"></label>
+      <label>Telefone / WhatsApp<input name="novo_telefone" inputmode="tel" placeholder="(19) 99999-9999"></label>
+    </div>
+    {% endif %}
+  </fieldset>
+  <fieldset>
+    <legend>Consulta</legend>
+    <div class="row-2">
+      <label>Serviço
+        <select name="servico" id="servicoSel" required>
+          {% for s in services %}<option value="{{ s.id }}" data-dur="{{ s.duration_min }}" {{ 'selected' if appt and appt.service_id == s.id }}>{{ s.name }} ({{ s.duration_min }} min)</option>{% endfor %}
+        </select>
+      </label>
+      <label>Profissional
+        <select name="dentista" id="dentistaSel" required>
+          {% for d in dentists %}<option value="{{ d.id }}" {{ 'selected' if prefill.dentista == d.id }}>{{ d.name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="row-2">
+      <label>Data<input type="date" name="data" id="dataInp" value="{{ prefill.data }}" required></label>
+      <label>Horário<input type="time" name="hora" id="horaInp" value="{{ prefill.hora }}" step="900" required></label>
+    </div>
+    <div class="slot-suggest" id="slotSuggest" data-url="{{ url_for('scheduling.free_slots_json') }}"></div>
+    <label>Observações<textarea name="observacoes" rows="3">{{ appt.notes if appt and appt.notes }}</textarea></label>
+  </fieldset>
+  <div class="form-actions">
+    <a href="{{ url_for('scheduling.day_view', data=prefill.data) }}" class="btn btn-outline">Cancelar</a>
+    <button class="btn btn-primary">Salvar consulta</button>
+  </div>
+</form>
+{% endblock %}

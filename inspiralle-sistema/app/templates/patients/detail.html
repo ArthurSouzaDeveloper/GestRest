@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, origin_badge, csrf %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div class="pt-head">
+    <span class="avatar lg">{{ p.initials }}</span>
+    <div>
+      <p class="eyebrow">Ficha do paciente {{ origin_badge(p.origin) }}</p>
+      <h1>{{ p.name }}</h1>
+      <p class="muted">{{ p.phone_fmt }}{% if p.age is not none %} · {{ p.age }} anos{% endif %} · paciente desde {{ p.created_at|data }}</p>
+    </div>
+  </div>
+  <div class="head-actions">
+    <a href="{{ p.whatsapp_link }}" target="_blank" rel="noopener" class="btn btn-whats">WhatsApp</a>
+    {% if current_user.role in ('admin', 'recepcao') %}
+    <a href="{{ url_for('scheduling.create', paciente=p.id) }}" class="btn btn-primary">+ Agendar</a>
+    <a href="{{ url_for('patients.edit', id=p.id) }}" class="btn btn-outline">Editar</a>
+    {% endif %}
+  </div>
+</header>
+
+<section class="kpis small">
+  <div class="kpi"><span>Consultas realizadas</span><strong>{{ stats.consultas }}</strong></div>
+  <div class="kpi"><span>Faltas</span><strong>{{ stats.faltas }}</strong></div>
+  <div class="kpi"><span>Última consulta</span><strong>{{ stats.ultima|data }}</strong></div>
+  <div class="kpi"><span>Próxima</span><strong>{{ upcoming[0].start|data if upcoming else '—' }}</strong></div>
+</section>
+
+<div class="grid-2">
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h2>Dados e anamnese</h2></div>
+      {% if p.allergies %}<div class="alert-box">⚠ Alergia: {{ p.allergies }}</div>{% endif %}
+      <dl class="dl">
+        <dt>E-mail</dt><dd>{{ p.email or '—' }}</dd>
+        <dt>CPF</dt><dd>{{ p.cpf or '—' }}</dd>
+        <dt>Nascimento</dt><dd>{{ p.birth_date|data }}</dd>
+        <dt>Endereço</dt><dd>{{ p.address or '—' }}</dd>
+        <dt>Medicamentos</dt><dd>{{ p.medications or '—' }}</dd>
+        <dt>Saúde</dt><dd>{{ p.health_notes or '—' }}</dd>
+        {% if p.notes %}<dt>Observações</dt><dd>{{ p.notes }}</dd>{% endif %}
+      </dl>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Consultas</h2></div>
+      {% if upcoming %}
+      <h3 class="sub">Próximas</h3>
+      <ul class="appt-list compact">
+        {% for a in upcoming %}
+        <li><a href="{{ url_for('scheduling.detail', id=a.id) }}" class="appt-row" style="--c: {{ a.dentist.color }}">
+          <time>{{ a.start.strftime('%d/%m') }}<br>{{ a.start|hora }}</time>
+          <div class="grow"><strong>{{ a.service.name }}</strong><small>{{ a.dentist.name }}</small></div>
+          {{ status_badge(a) }}</a></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <h3 class="sub">Histórico</h3>
+      {% if history %}
+      <ul class="appt-list compact">
+        {% for a in history %}
+        <li><a href="{{ url_for('scheduling.detail', id=a.id) }}" class="appt-row" style="--c: {{ a.dentist.color }}">
+          <time>{{ a.start.strftime('%d/%m/%y') }}</time>
+          <div class="grow"><strong>{{ a.service.name }}</strong><small>{{ a.dentist.name }}</small></div>
+          {{ status_badge(a) }}</a></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="empty">Sem consultas anteriores.</p>{% endif %}
+    </section>
+  </div>
+
+  <section class="card" id="prontuario">
+    <div class="card-head"><h2>Prontuário · evolução clínica</h2></div>
+    {% if current_user.role in ('admin', 'dentista') %}
+    <form method="post" action="{{ url_for('patients.add_note', id=p.id) }}" class="form note-form">
+      {{ csrf() }}
+      <div class="row-2">
+        <label>Procedimento<input name="procedimento" list="procs" placeholder="Ex.: Profilaxia"></label>
+        <label>Dente / região<input name="dente" placeholder="Ex.: 36"></label>
+      </div>
+      <datalist id="procs">{% for s in ['Avaliação inicial','Limpeza e profilaxia','Clareamento dental','Próteses fixas','Extração de siso','Sensibilidade dentária','Restauração','Canal'] %}<option value="{{ s }}">{% endfor %}</datalist>
+      <label>Evolução<textarea name="texto" rows="3" required placeholder="Descreva o atendimento realizado..."></textarea></label>
+      <button class="btn btn-primary btn-sm">Registrar evolução</button>
+    </form>
+    {% endif %}
+    <ol class="timeline">
+      {% for n in p.clinical_notes %}
+      <li>
+        <div class="tl-date">{{ n.created_at|datahora }}</div>
+        <div class="tl-body">
+          <strong>{{ n.procedure or 'Anotação' }}{% if n.tooth %} · dente {{ n.tooth }}{% endif %}</strong>
+          <p>{{ n.text }}</p>
+          <small>{{ n.appointment.dentist.name if n.appointment else (n.author.name if n.author else '') }}</small>
+        </div>
+      </li>
+      {% else %}
+      <li class="empty">Nenhuma evolução registrada ainda.</li>
+      {% endfor %}
+    </ol>
+  </section>
+</div>
+
+{% if current_user.role == 'admin' %}
+<form method="post" action="{{ url_for('patients.delete', id=p.id) }}" class="danger-zone" onsubmit="return confirm('Arquivar este paciente? O prontuário continua guardado.')">
+  {{ csrf() }}<button class="btn btn-sm btn-link-danger">Arquivar paciente</button>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Entrar{% endblock %}
+{% block body_class %}login-page{% endblock %}
+{% block public %}
+<div class="login-wrap">
+  <form method="post" class="login-card">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="brand dark">
+      <svg width="40" height="40" viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 6c-5.2 0-8.4 2.9-11.4 2.9-2.6 0-4.6-1.6-4.6-1.6s-1 4.7-1 9.4c0 9.6 4.9 21.3 9.3 21.3 2.9 0 3.2-6.1 4.9-6.1 1.6 0 2 6.1 4.9 6.1 4.4 0 9.3-11.7 9.3-21.3 0-4.7-1-9.4-1-9.4s-2 1.6-4.6 1.6C32.4 8.9 29.2 6 24 6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <span>Inspiralle<small>Odontologia especializada</small></span>
+    </div>
+    <h1>Painel da clínica</h1>
+    <p class="muted">Agenda, pacientes e prontuários em um só lugar.</p>
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, m in msgs %}<div class="flash flash-{{ cat }}">{{ m }}</div>{% endfor %}
+    {% endwith %}
+    <label>E-mail<input type="email" name="email" required autofocus value="admin@inspiralle.demo"></label>
+    <label>Senha<input type="password" name="senha" required value="admin123"></label>
+    <label class="check"><input type="checkbox" name="lembrar" checked> Manter conectado</label>
+    <button class="btn btn-primary btn-block">Entrar</button>
+    <p class="demo-hint">Demonstração: admin@ / recepcao@ / lucio@inspiralle.demo<br>senhas admin123 · recepcao123 · dentista123</p>
+  </form>
+</div>
+{% endblock %}

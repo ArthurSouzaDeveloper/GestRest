@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}{{ 'Editar paciente' if p else 'Novo paciente' }}{% endblock %}
+{% block content %}
+<header class="page-head"><div><p class="eyebrow">Pacientes</p><h1>{{ 'Editar ' ~ p.name if p else 'Novo paciente' }}</h1></div></header>
+<form method="post" class="card form">
+  {{ csrf() }}
+  <fieldset>
+    <legend>Dados pessoais</legend>
+    <label>Nome completo *<input name="name" required value="{{ p.name if p }}"></label>
+    <div class="row-2">
+      <label>Telefone / WhatsApp *<input name="phone" required inputmode="tel" value="{{ p.phone_fmt if p }}" placeholder="(19) 99999-9999"></label>
+      <label>E-mail<input type="email" name="email" value="{{ p.email or '' if p }}"></label>
+    </div>
+    <div class="row-2">
+      <label>CPF<input name="cpf" inputmode="numeric" value="{{ p.cpf or '' if p }}"></label>
+      <label>Data de nascimento<input type="date" name="birth_date" value="{{ p.birth_date.isoformat() if p and p.birth_date }}"></label>
+    </div>
+    <label>Endereço<input name="address" value="{{ p.address or '' if p }}"></label>
+  </fieldset>
+  <fieldset>
+    <legend>Anamnese</legend>
+    <div class="row-2">
+      <label>Alergias<input name="allergies" value="{{ p.allergies or '' if p }}" placeholder="Ex.: penicilina, látex"></label>
+      <label>Medicamentos em uso<input name="medications" value="{{ p.medications or '' if p }}"></label>
+    </div>
+    <label>Condições de saúde<textarea name="health_notes" rows="2" placeholder="Hipertensão, diabetes, gestação...">{{ p.health_notes or '' if p }}</textarea></label>
+    <label>Observações gerais<textarea name="notes" rows="2">{{ p.notes or '' if p }}</textarea></label>
+  </fieldset>
+  <div class="form-actions">
+    <a href="{{ url_for('patients.detail', id=p.id) if p else url_for('patients.index') }}" class="btn btn-outline">Cancelar</a>
+    <button class="btn btn-primary">Salvar</button>
+  </div>
+</form>
+{% endblock %}
