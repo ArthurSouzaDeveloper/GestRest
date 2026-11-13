@@ -22,7 +22,7 @@ python run.py
 |---|---|---|
 | Administrador | admin@inspiralle.demo | admin123 |
 | Recepção | recepcao@inspiralle.demo | recepcao123 |
-| Dentista | helena@inspiralle.demo | dentista123 |
+| Dentista (Dr. Lúcio) | lucio@inspiralle.demo | dentista123 |
 
 > Os dados de exemplo são gerados em volta do dia em que você roda o
 > `init-db` (30 dias de histórico + 14 dias de agenda). Rode de novo no dia

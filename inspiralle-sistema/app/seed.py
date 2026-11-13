@@ -1,4 +1,4 @@
-"""Dados de demonstração. Nomes de profissionais e pacientes são fictícios."""
+"""Dados de demonstração. Profissionais com os nomes reais da clínica; pacientes fictícios."""
 import random
 import unicodedata
 from datetime import date, datetime, timedelta
@@ -9,9 +9,9 @@ from app.models import Appointment, ClinicalNote, Dentist, Patient, Service, Use
 from app.services.availability import business_windows
 
 FIRST = ["Ana", "Bruno", "Carla", "Daniel", "Eduarda", "Felipe", "Gabriela", "Henrique", "Isabela", "João",
-         "Larissa", "Marcos", "Natália", "Otávio", "Paula", "Rafaela", "Sérgio", "Tatiane", "Vinícius", "Juliana",
-         "Lucas", "Mariana", "Pedro", "Beatriz", "Gustavo", "Letícia", "Rodrigo", "Fernanda", "Thiago", "Camila"]
-LAST = ["Almeida", "Barbosa", "Cardoso", "Costa", "Ferreira", "Gomes", "Lima", "Martins", "Oliveira", "Pereira",
+         "Larissa", "Marcos", "Natália", "Otávio", "Paula", "Renata", "Sérgio", "Tatiane", "Vinícius", "Juliana",
+         "Lucas", "Mariana", "Pedro", "Beatriz", "André", "Letícia", "Rodrigo", "Fernanda", "Thiago", "Camila"]
+LAST = ["Almeida", "Barbosa", "Cardoso", "Costa", "Ferreira", "Gomes", "Lima", "Martins", "Mendes", "Pereira",
         "Ribeiro", "Rodrigues", "Santos", "Silva", "Souza", "Teixeira", "Vieira", "Moraes", "Nunes", "Rocha"]
 
 NOTES = {
@@ -56,15 +56,15 @@ def seed_demo(rng_seed: int = 42) -> None:
     sv = {s.name: s for s in services}
 
     dentists = [
-        Dentist(name="Dra. Helena Prado", cro="CRO-SP 000001", specialty="Dentística e estética",
+        Dentist(name="Dr. Lúcio Scalco", specialty="Cirurgião-dentista",
                 color="#c9a468", weekdays="0,1,2,3,4,5"),
-        Dentist(name="Dr. Rafael Moretti", cro="CRO-SP 000002", specialty="Cirurgia e prótese",
+        Dentist(name="Dra. Rafaela Beloni", specialty="Cirurgiã-dentista",
                 color="#4f7cac", weekdays="0,2,4"),
-        Dentist(name="Dra. Camila Duarte", cro="CRO-SP 000003", specialty="Clínica geral",
+        Dentist(name="Dr. Gustavo Oliveira", specialty="Cirurgião-dentista",
                 color="#6aa78c", weekdays="1,2,3,4,5"),
     ]
     db.session.add_all(dentists)
-    helena, rafael, camila = dentists
+    helena, rafael, camila = dentists  # Lúcio, Rafaela, Gustavo
     helena.services = [sv["Avaliação inicial"], sv["Limpeza e profilaxia"], sv["Clareamento dental"], sv["Sensibilidade dentária"]]
     rafael.services = [sv["Avaliação inicial"], sv["Próteses fixas"], sv["Extração de siso"]]
     camila.services = [sv["Avaliação inicial"], sv["Limpeza e profilaxia"], sv["Sensibilidade dentária"], sv["Clareamento dental"]]
@@ -72,7 +72,7 @@ def seed_demo(rng_seed: int = 42) -> None:
     for name, email, role, pwd, den in [
         ("Administrador", "admin@inspiralle.demo", "admin", "admin123", None),
         ("Recepção", "recepcao@inspiralle.demo", "recepcao", "recepcao123", None),
-        ("Dra. Helena Prado", "helena@inspiralle.demo", "dentista", "dentista123", helena),
+        ("Dr. Lúcio Scalco", "lucio@inspiralle.demo", "dentista", "dentista123", helena),
     ]:
         u = User(name=name, email=email, role=role, dentist=den)
         u.set_password(pwd)
