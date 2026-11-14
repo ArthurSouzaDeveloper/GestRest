@@ -27,6 +27,7 @@ import {
   Store,
   CheckCircle2,
 } from 'lucide-react';
+import axios from 'axios';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Spinner } from '../components/ui';
@@ -359,6 +360,7 @@ export default function PublicOrder() {
   // (campos chamados "website"/"empresa" são alvo comum de autofill, o que barraria
   // um cliente de verdade sem ele nunca ter digitado nada aqui).
   const [grHp, setGrHp] = useState('');
+  const [confirmedNumber, setConfirmedNumber] = useState<number | null>(null);
   const [confirmedEta, setConfirmedEta] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState('');
 
@@ -561,15 +563,31 @@ export default function PublicOrder() {
       };
       return (await api.post<{ id: string; number: number; estimatedReadyAt: string | null }>(`/public/${slug}/orders`, payload)).data;
     },
+    // Limpa o recado anterior a cada tentativa, pra o mesmo erro repetido rolar a tela de novo.
+    onMutate: () => setSubmitError(''),
     onSuccess: (order) => {
       setSubmitError('');
       setConfirmedEta(order.estimatedReadyAt);
+      setConfirmedNumber(order.number);
       setStep('confirmation');
+      // A Revisão costuma estar rolada até o fim quando o cliente aperta "Fazer Pedido";
+      // sobe pro topo pra ele cair direto no "Obrigado pelo pedido!".
+      window.scrollTo({ top: 0 });
       // Lembra nome+telefone+CPF nesse navegador — é o que deixa o cliente "entrar" de novo
       // na Capa depois de fechar o site pra ver como o pedido está indo.
       saveCustomer(slug, { name: customerName.trim(), phone: customerPhone.trim(), cpf: normalizeCpf(customerCpf) });
     },
-    onError: (e) => setSubmitError(apiError(e)),
+    onError: (e) => {
+      // Sem resposta do servidor (sinal caiu, 4G oscilou) não dá pra saber se o pedido
+      // chegou. "Network Error" não diz nada pro cliente e ele tentava de novo às cegas.
+      if (axios.isAxiosError(e) && !e.response) {
+        setSubmitError(
+          'Não conseguimos confirmar se o seu pedido chegou (a conexão caiu). Antes de tentar de novo, fale com o restaurante pra conferir e não pedir em dobro.',
+        );
+        return;
+      }
+      setSubmitError(apiError(e));
+    },
   });
 
   if (loadingRestaurant) {
@@ -794,6 +812,7 @@ export default function PublicOrder() {
           <ConfirmationStep
             orderKind={orderKind}
             estimatedReadyAt={confirmedEta}
+            orderNumber={confirmedNumber}
             onNewOrder={() => {
               // Mantém nome/telefone/endereço de propósito (não limpa) — mesmo cliente
               // pedindo de novo na mesma visita não deveria ter que redigitar tudo outra
@@ -805,6 +824,7 @@ export default function PublicOrder() {
               setPaymentMethod('');
               setChangeFor('');
               setConfirmedEta(null);
+              setConfirmedNumber(null);
             }}
           />
         )}
@@ -1847,6 +1867,13 @@ function ReviewStep({
   eta?: EtaEstimate;
 }) {
   const paymentLabel = PAYMENT_OPTIONS.find((p) => p.key === paymentMethod)?.label ?? '—';
+  // O recado de erro fica no fim da Revisão, embaixo da barra fixa do "Fazer Pedido" e às
+  // vezes fora da tela. Sem rolar até ele, o cliente apertava, via "Enviando..." e mais
+  // nada: nem confirmação, nem erro. Agora a tela rola até o recado.
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [error]);
   return (
     <div className="space-y-2.5">
       <EtaNote eta={eta} />
@@ -1915,7 +1942,12 @@ function ReviewStep({
         aria-hidden="true"
       />
 
-      {error && <p className="text-[12.5px] text-red-600">{error}</p>}
+      {error && (
+        <div ref={errorRef} role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <p className="font-bold">Pedido não confirmado</p>
+          <p className="mt-0.5">{error}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1923,10 +1955,12 @@ function ReviewStep({
 function ConfirmationStep({
   orderKind,
   estimatedReadyAt,
+  orderNumber,
   onNewOrder,
 }: {
   orderKind: OrderKind | null;
   estimatedReadyAt: string | null;
+  orderNumber: number | null;
   onNewOrder: () => void;
 }) {
   // A pedido do cliente (08/11/2026), a tela de pedido feito mostra só o agradecimento e
@@ -1950,6 +1984,9 @@ function ConfirmationStep({
           <Check size={44} strokeWidth={3} />
         </div>
         <h1 className="mt-1 font-display text-[34px] font-extrabold tracking-tight text-[#1E1024]">Obrigado pelo pedido!</h1>
+        {orderNumber !== null && (
+          <p className="text-lg font-bold text-[#1E1024]">Pedido nº {orderNumber}</p>
+        )}
         {estimatedReadyAt && (
           <div className="mx-auto flex w-fit items-center gap-2 rounded-2xl bg-brand-100 px-4 py-2 text-xs font-medium text-brand">
             <Clock size={16} />

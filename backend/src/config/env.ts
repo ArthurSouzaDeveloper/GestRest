@@ -20,6 +20,13 @@ export const env = {
   nodeEnv,
   isProd,
   port: Number(process.env.PORT ?? 4000),
+  // Quantos proxies reversos ficam na frente do backend. O Express só confia nesse número
+  // de saltos do X-Forwarded-For pra descobrir o IP real do cliente (usado pelos rate
+  // limits e pelos logs). docker-compose.yml (só nginx) = 1; docker-compose.prod.yml
+  // (Caddy + nginx) = 2. Com valor menor que o real, todo cliente aparece com o IP interno
+  // do Caddy e o limite de 8 pedidos a cada 10 min vira um limite do site inteiro; com
+  // valor maior, o cliente consegue forjar o próprio IP mandando um X-Forwarded-For.
+  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 1),
   // Aceita uma lista separada por vírgula — permite o site responder por mais de um
   // endereço ao mesmo tempo (ex.: domínio novo com HTTPS + o link antigo por IP:porta
   // continuando a funcionar durante a transição), sem quebrar nenhum link já distribuído.

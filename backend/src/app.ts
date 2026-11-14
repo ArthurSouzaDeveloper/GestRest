@@ -15,7 +15,7 @@ import { openApiDocument } from './config/swagger';
 export function createApp(): Application {
   const app = express();
 
-  app.set('trust proxy', 1);
+  app.set('trust proxy', env.trustProxyHops);
   // First middleware: opens the requestId/ip context so every log line from here on is correlated.
   app.use(requestContextMiddleware);
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
