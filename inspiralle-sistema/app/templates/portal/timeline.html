@@ -1,0 +1,90 @@
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import logo %}
+{% block title %}Meu tratamento{% endblock %}
+{% block body %}
+<header class="pt-top">
+  <div class="pt-top-in">
+    <a href="{{ url_for('portal.timeline') }}" class="brand">{{ logo(28) }}<span>Inspiralle<small>Área do paciente</small></span></a>
+    <nav class="pt-menu">
+      <a href="{{ url_for('portal.password') }}">Senha</a>
+      <a href="{{ url_for('portal.logout') }}">Sair</a>
+    </nav>
+  </div>
+  <div class="pt-hero">
+    <p class="eyebrow">Olá, {{ p.name.split()[0] }}</p>
+    <h1>Acompanhe seu tratamento</h1>
+    <div class="pt-stats">
+      <div><strong>{{ done }}</strong><span>consulta{{ 's' if done != 1 }} realizada{{ 's' if done != 1 }}</span></div>
+      <div><strong>{{ notes|length }}</strong><span>registro{{ 's' if notes|length != 1 }} de evolução</span></div>
+      <div><strong>{{ photos|length }}</strong><span>foto{{ 's' if photos|length != 1 }}</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="pt-main">
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% if msgs %}<div class="flashes">{% for cat, m in msgs %}<div class="flash flash-{{ cat }}">{{ m }}</div>{% endfor %}</div>{% endif %}
+  {% endwith %}
+
+  <section class="card">
+    <div class="card-head"><h2>Próximas consultas</h2></div>
+    {% if upcoming %}
+    <ul class="appt-list">
+      {% for a in upcoming %}
+      <li class="appt-row" style="--c: {{ a.dentist.color }}">
+        <time>{{ a.start.strftime('%d/%m') }}<br>{{ a.start|hora }}</time>
+        <div class="grow"><strong>{{ a.service.name }}</strong><small class="cap">{{ a.start.date()|dia_extenso }} · {{ a.dentist.name }}</small></div>
+        <span class="badge st-{{ a.status }}">{{ a.status_label }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">Nenhuma consulta marcada.</p>
+    {% endif %}
+    <div class="pt-cta">
+      <a class="btn btn-primary btn-sm" href="/#agendar">Agendar consulta</a>
+      <a class="btn btn-whats btn-sm" target="_blank" rel="noopener" href="https://wa.me/{{ config.CLINIC_WHATSAPP }}?text={{ ('Olá! Sou ' ~ p.name ~ ', paciente da clínica.')|urlencode }}">Falar com a clínica</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Sua evolução</h2></div>
+    {% if notes %}
+    <ol class="timeline pt-timeline">
+      {% for n in notes %}
+      <li>
+        <div class="tl-date cap">{{ n.created_at.date()|dia_extenso }} de {{ n.created_at.year }}</div>
+        <div class="tl-body">
+          <strong>{{ n.procedure or 'Acompanhamento' }}{% if n.tooth %} · dente {{ n.tooth }}{% endif %}</strong>
+          <p>{{ n.text }}</p>
+          {% if n.images %}
+          <div class="thumbs big">
+            {% for img in n.images %}
+            <figure class="thumb">
+              <button type="button" class="zoom" data-full="{{ url_for('portal.image', img_id=img.id) }}" data-caption="{{ img.caption or n.procedure or '' }}">
+                <img src="{{ url_for('portal.image', img_id=img.id) }}" alt="{{ img.caption or 'Foto do tratamento' }}" loading="lazy">
+              </button>
+              {% if img.caption %}<figcaption>{{ img.caption }}</figcaption>{% endif %}
+            </figure>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <small>{{ n.professional_name }}</small>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="empty">Assim que sua dentista ou seu dentista registrar a evolução do tratamento, ela aparece aqui.</p>
+    {% endif %}
+  </section>
+
+  <p class="pt-foot muted small">Dúvidas sobre o seu tratamento? Fale com a clínica pelo WhatsApp.<br>Inspiralle Odontologia</p>
+</main>
+
+<dialog class="lightbox" id="lightbox">
+  <button type="button" class="lb-close" aria-label="Fechar">×</button>
+  <img alt="">
+  <p class="lb-cap"></p>
+</dialog>
+{% endblock %}

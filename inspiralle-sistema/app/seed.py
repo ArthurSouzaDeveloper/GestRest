@@ -1,12 +1,21 @@
 """Dados de demonstração. Profissionais com os nomes reais da clínica; pacientes fictícios."""
 import random
+import shutil
 import unicodedata
+import uuid
+from pathlib import Path
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from app.extensions import db
-from app.models import Appointment, ClinicalNote, Dentist, Patient, Service, User
+from app.models import Appointment, ClinicalNote, Dentist, DentistPrice, NoteImage, Patient, Service, User
 from app.services.availability import business_windows
+from app.services.finance import sync_appointment_entry
+from app.services.uploads import upload_dir
+
+ASSETS = Path(__file__).resolve().parent / "seed_assets"
+DEMO_CPF = "12345678909"
+DEMO_PORTAL_PASSWORD = "paciente123"
 
 FIRST = ["Ana", "Bruno", "Carla", "Daniel", "Eduarda", "Felipe", "Gabriela", "Henrique", "Isabela", "João",
          "Larissa", "Marcos", "Natália", "Otávio", "Paula", "Renata", "Sérgio", "Tatiane", "Vinícius", "Juliana",
@@ -68,6 +77,16 @@ def seed_demo(rng_seed: int = 42) -> None:
     helena.services = [sv["Avaliação inicial"], sv["Limpeza e profilaxia"], sv["Clareamento dental"], sv["Sensibilidade dentária"]]
     rafael.services = [sv["Avaliação inicial"], sv["Próteses fixas"], sv["Extração de siso"]]
     camila.services = [sv["Avaliação inicial"], sv["Limpeza e profilaxia"], sv["Sensibilidade dentária"], sv["Clareamento dental"]]
+
+    # Cada dentista define o próprio preço (o resto usa o valor padrão do serviço)
+    db.session.add_all([
+        DentistPrice(dentist=helena, service=sv["Clareamento dental"], price=Decimal("950")),
+        DentistPrice(dentist=helena, service=sv["Limpeza e profilaxia"], price=Decimal("200")),
+        DentistPrice(dentist=rafael, service=sv["Próteses fixas"], price=Decimal("2800")),
+        DentistPrice(dentist=rafael, service=sv["Extração de siso"], price=Decimal("520")),
+        DentistPrice(dentist=camila, service=sv["Limpeza e profilaxia"], price=Decimal("180")),
+        DentistPrice(dentist=camila, service=sv["Clareamento dental"], price=Decimal("880")),
+    ])
 
     for name, email, role, pwd, den in [
         ("Administrador", "admin@inspiralle.demo", "admin", "admin123", None),
@@ -143,4 +162,73 @@ def seed_demo(rng_seed: int = 42) -> None:
     for a in Appointment.query.filter(Appointment.start > now, Appointment.status == "agendado").limit(5):
         a.origin = "site"
         a.created_at = now - timedelta(hours=rnd.randint(1, 30))
+    db.session.flush()
+
+    _seed_portal_patient(patients[0], helena, sv, admin_user)
+
+    # Financeiro: toda consulta concluída gera o lançamento com o preço do dentista
+    for a in Appointment.query.filter_by(status="concluido").all():
+        sync_appointment_entry(a)
     db.session.commit()
+
+
+def _copy_asset(name: str) -> str:
+    target = f"{uuid.uuid4().hex}{Path(name).suffix}"
+    shutil.copyfile(ASSETS / name, upload_dir() / target)
+    return target
+
+
+def _seed_portal_patient(p: Patient, lucio: Dentist, sv: dict, author: User) -> None:
+    """Paciente de demonstração com portal liberado e evolução de clareamento com fotos."""
+    p.name = "Juliana Ribeiro"
+    p.cpf = DEMO_CPF
+    p.email = "juliana.ribeiro@email.com"
+    p.allergies = None
+    p.set_portal_password(DEMO_PORTAL_PASSWORD, temporary=False)
+    p.portal_last_login = datetime.now() - timedelta(days=2)
+
+    # Usa consultas já concluídas do Dr. Lúcio para montar a história dela (sem criar conflitos na agenda)
+    past = (Appointment.query
+            .filter(Appointment.dentist_id == lucio.id, Appointment.status == "concluido")
+            .order_by(Appointment.start).all())
+    plan = [
+        ("Avaliação inicial", None,
+         "Avaliação clínica completa e radiografia panorâmica. Dentes saudáveis, sem cáries. "
+         "Combinamos limpeza seguida de clareamento em consultório.",
+         [("radiografia.jpg", "Radiografia panorâmica")]),
+        ("Limpeza e profilaxia", None,
+         "Limpeza completa, remoção de tártaro e aplicação de flúor. Gengiva saudável, pronta para o clareamento.",
+         [("profilaxia.jpg", "Depois da limpeza")]),
+        ("Clareamento dental", None,
+         "Primeira sessão de clareamento. Cor inicial registrada na foto. Sem sensibilidade durante a sessão. "
+         "Evite café, vinho e alimentos com corante por 48 horas.",
+         [("clareamento-antes.jpg", "Antes do clareamento")]),
+        ("Clareamento dental", None,
+         "Segunda sessão concluída. Resultado de 4 tons mais claro, dentro do esperado. "
+         "Manter a placa de manutenção 1 vez por semana.",
+         [("clareamento-antes.jpg", "Antes"), ("clareamento-depois.jpg", "Depois")]),
+    ]
+    # Limpa anotações aleatórias dela para a história do portal ficar coerente
+    ClinicalNote.query.filter_by(patient_id=p.id).delete()
+    chosen = [past[int(i * len(past) / len(plan))] for i in range(len(plan))] if len(past) >= len(plan) else past
+    for a, (svc_name, tooth, text, imgs) in zip(chosen, plan):
+        ClinicalNote.query.filter_by(appointment_id=a.id).delete()
+        a.patient = p
+        a.service = sv[svc_name]
+        note = ClinicalNote(patient=p, appointment=a, author=author, procedure=svc_name, tooth=tooth,
+                            text=text, created_at=a.end, visible_to_patient=True)
+        for fname, caption in imgs:
+            note.images.append(NoteImage(filename=_copy_asset(fname), original_name=fname, caption=caption))
+        db.session.add(note)
+    if chosen:
+        db.session.add(ClinicalNote(patient=p, appointment=chosen[0], author=author, procedure="Anotação interna",
+                                    text="Paciente prefere horários no fim da tarde. Avaliar desconto no pacote.",
+                                    created_at=chosen[0].end, visible_to_patient=False))
+
+    nxt = (Appointment.query
+           .filter(Appointment.dentist_id == lucio.id, Appointment.start > datetime.now(),
+                   Appointment.status.in_(("confirmado", "agendado")))
+           .order_by(Appointment.start).first())
+    if nxt:
+        nxt.patient = p
+        nxt.service = sv["Limpeza e profilaxia"] if nxt.duration_min >= 45 else sv["Sensibilidade dentária"]

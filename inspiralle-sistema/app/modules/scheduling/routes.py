@@ -7,6 +7,7 @@ from app.extensions import db
 from app.models import STATUSES, Appointment, Dentist, Patient, Service, only_digits
 from app.modules.auth.decorators import role_required
 from app.services.availability import BookingError, business_windows, free_slots, validate_booking
+from app.services.finance import sync_appointment_entry
 
 bp = Blueprint("scheduling", __name__)
 
@@ -102,6 +103,7 @@ def _form(appt: Appointment | None):
         appt.patient, appt.dentist, appt.service = patient, dentist, service
         appt.start, appt.end = start, end
         appt.notes = f.get("observacoes") or None
+        sync_appointment_entry(appt)
         db.session.commit()
         flash("Consulta salva na agenda.", "success")
         return redirect(url_for("scheduling.day_view", data=start.date().isoformat()))
@@ -155,6 +157,11 @@ def set_status(id):
             flash(str(e), "danger")
             return redirect(request.referrer or url_for("scheduling.detail", id=id))
     appt.status = status
+    entry = sync_appointment_entry(appt)
     db.session.commit()
-    flash(f"Consulta marcada como “{appt.status_label}”.", "success")
+    msg = f"Consulta marcada como “{appt.status_label}”."
+    if entry is not None and current_user.role in ("admin", "dentista"):
+        msg += " Valor lançado no financeiro." if not entry.price_missing else \
+            " Atenção: este tratamento ainda não tem preço definido."
+    flash(msg, "success")
     return redirect(request.referrer or url_for("scheduling.detail", id=id))

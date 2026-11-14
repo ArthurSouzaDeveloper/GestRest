@@ -13,6 +13,24 @@
     if (b) { b.disabled = true; b.classList.add('loading'); }
   }));
 
+  // Pré-visualização das fotos antes de registrar a evolução
+  document.querySelectorAll('input[type=file][data-preview]').forEach((inp) => {
+    const box = document.getElementById(inp.dataset.preview);
+    inp.addEventListener('change', () => {
+      box.innerHTML = '';
+      Array.from(inp.files).forEach((f) => {
+        if (!f.type.startsWith('image/')) return;
+        const fig = document.createElement('figure');
+        fig.className = 'thumb';
+        const im = document.createElement('img');
+        im.src = URL.createObjectURL(f);
+        im.alt = f.name;
+        fig.appendChild(im);
+        box.appendChild(fig);
+      });
+    });
+  });
+
   // Formulário de consulta: sugere horários livres
   const box = document.getElementById('slotSuggest');
   if (box) {

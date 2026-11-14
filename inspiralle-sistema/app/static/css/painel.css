@@ -214,3 +214,61 @@ form.inline{display:inline}
 .login-card{background:#fff;border-radius:22px;padding:34px 28px;width:100%;max-width:400px;display:grid;gap:14px;box-shadow:0 30px 60px -30px rgba(0,0,0,.6)}
 .login-card h1{font-size:1.8rem;margin-top:10px}
 .demo-hint{font-size:.74rem;color:var(--ink-soft);text-align:center;margin:0;line-height:1.6}
+
+/* Evolução com imagens */
+.file-drop{border:1.5px dashed var(--gold-300);background:#fff;border-radius:12px;padding:12px 14px;cursor:pointer}
+.file-drop input{border:none;padding:6px 0 0;min-height:0}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.thumbs:empty{display:none}
+.thumb{position:relative;margin:0;width:96px}
+.thumb img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block;background:var(--cream-2)}
+.thumb figcaption{font-size:.7rem;color:var(--ink-soft);margin-top:4px;line-height:1.3}
+.thumb-del{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;border:none;background:var(--bad);color:#fff;font-weight:700;cursor:pointer;line-height:1}
+.note-actions{display:flex;gap:14px;margin-top:8px}
+.link-btn{background:none;border:none;padding:0;font:600 .78rem var(--font-body);color:var(--gold-600);cursor:pointer;display:inline}
+.timeline li.staff-only .tl-body{opacity:.75}
+.timeline li.staff-only::before{background:var(--ink-soft)}
+.badge.vis-on{background:#e1efe8;color:var(--ok)}.badge.vis-off{background:var(--cream-2);color:var(--ink-soft)}
+.tl-date .badge{margin-left:6px;font-size:.6rem;padding:2px 7px}
+
+/* Portal na ficha */
+.temp-pass{background:var(--navy-900);color:#fff;border-radius:12px;padding:16px;display:grid;gap:6px;margin-bottom:12px}
+.temp-pass span{font-size:.72rem;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,.6)}
+.temp-pass strong{font-family:var(--font-display);font-size:2.2rem;letter-spacing:.2em;color:var(--gold-300)}
+.temp-pass small{color:rgba(255,255,255,.7);font-size:.78rem;margin-bottom:6px}
+.temp-pass .btn{justify-self:start}
+.portal-actions{margin-top:12px}
+
+/* Financeiro */
+.fin-strip{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:-4px 0 18px}
+.fin-chip{background:#fff;border:1px solid var(--gold-300);border-radius:12px;padding:10px 16px;display:flex;flex-direction:column;min-width:150px;flex:1}
+.fin-chip span{font-size:.72rem;color:var(--ink-soft)}.fin-chip strong{font-family:var(--font-display);font-size:1.4rem;color:var(--navy-900)}
+@media (min-width:900px){.fin-chip{flex:none}}
+.fin-filters{align-items:center}
+.seg{display:inline-flex;background:var(--cream-2);border-radius:99px;padding:3px}
+.seg a{padding:8px 16px;border-radius:99px;font-weight:600;font-size:.85rem;color:var(--ink-soft);min-height:36px;display:flex;align-items:center}
+.seg a.on{background:var(--navy-900);color:var(--gold-300)}
+.kpi em.trend{display:block;font-style:normal;font-size:.72rem;font-weight:700;margin-top:2px}
+.trend.up{color:#8fd3b0}.trend.down{color:#f0a3a1}
+.money-bars{height:200px;overflow-x:auto}
+.money-bars .bar{min-width:26px}
+.money-bars.dense{gap:3px}.money-bars.dense .bar{min-width:16px}.money-bars.dense .bar-val{display:none}
+.money-bars .bar-val{font-size:.64rem}
+.split-row{display:flex;justify-content:space-between;gap:10px;font-size:.88rem;margin-top:10px}
+.split-row .dot{margin-right:6px}
+.split-bar{height:6px;background:var(--cream-2);border-radius:99px;overflow:hidden;margin-top:6px}
+.split-bar span{display:block;height:100%;background:var(--gold-500);border-radius:99px}
+.table .num{text-align:right;white-space:nowrap}
+.privacy-note{padding:0 4px}
+.price-form{max-width:720px}
+.price-row{display:flex;gap:14px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.price-row strong{display:block}.price-row small{display:block;font-size:.78rem}
+.price-input{position:relative;width:150px;flex:none}
+.price-input .prefix{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-weight:600}
+.price-input input{padding-left:38px;text-align:right}
+.adjust-form{display:flex;gap:10px;align-items:flex-end;margin-top:14px;flex-wrap:wrap}
+.adjust-form label{flex:1;min-width:200px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.fin-grid .table-card .table-scroll{max-height:640px;overflow:auto}
+.fin-grid .table-card thead th{position:sticky;top:0;z-index:1}
+@media (max-width:640px){.kpi strong{font-size:1.55rem;white-space:nowrap}}

@@ -6,6 +6,7 @@ from sqlalchemy import func
 
 from app.extensions import db
 from app.models import Appointment, Patient
+from app.services.finance import period_bounds, revenue_between
 
 bp = Blueprint("dashboard", __name__)
 
@@ -56,8 +57,16 @@ def index():
         "pacientes": Patient.query_active().count(),
         "comparecimento": attendance,
     }
+    # Resumo financeiro: só para administração e para o próprio dentista
+    finance = None
+    if current_user.role == "admin" or (current_user.role == "dentista" and current_user.dentist_id):
+        scope = current_user.dentist_id if current_user.role == "dentista" else None
+        finance = []
+        for key, label in (("dia", "Faturamento hoje"), ("semana", "Esta semana"), ("mes", "Este mês")):
+            s, e, *_ = period_bounds(key, today)
+            finance.append((key, label, revenue_between(s, e, scope)))
     return render_template("dashboard/index.html", kpis=kpis, today_list=today_list,
-                           pending_site=pending_site, upcoming=upcoming, max_up=max_up)
+                           pending_site=pending_site, upcoming=upcoming, max_up=max_up, finance=finance)
 
 
 @bp.route("/inicio")

@@ -5,3 +5,6 @@
 {% if o == 'site' %}<span class="badge origin-site" title="Agendado pelo site">Site</span>{% endif %}
 {%- endmacro %}
 {% macro csrf() -%}<input type="hidden" name="_csrf" value="{{ csrf_token() }}">{%- endmacro %}
+{% macro logo(size=30) -%}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 6c-5.2 0-8.4 2.9-11.4 2.9-2.6 0-4.6-1.6-4.6-1.6s-1 4.7-1 9.4c0 9.6 4.9 21.3 9.3 21.3 2.9 0 3.2-6.1 4.9-6.1 1.6 0 2 6.1 4.9 6.1 4.4 0 9.3-11.7 9.3-21.3 0-4.7-1-9.4-1-9.4s-2 1.6-4.6 1.6C32.4 8.9 29.2 6 24 6Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+{%- endmacro %}

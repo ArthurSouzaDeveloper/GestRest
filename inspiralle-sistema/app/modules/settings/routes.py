@@ -1,10 +1,9 @@
-from decimal import Decimal, InvalidOperation
-
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app.extensions import db
 from app.models import Dentist, Service, User
 from app.modules.auth.decorators import role_required
+from app.services.finance import parse_money
 
 bp = Blueprint("settings", __name__)
 WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
@@ -37,10 +36,7 @@ def service_form(id=None):
         s.name = f["name"].strip()
         s.description = f.get("description") or None
         s.duration_min = max(15, f.get("duration_min", type=int) or 30)
-        try:
-            s.price = Decimal(f.get("price").replace(",", ".")) if f.get("price") else None
-        except InvalidOperation:
-            s.price = None
+        s.price = parse_money(f.get("price") or "")
         s.online_booking = bool(f.get("online_booking"))
         s.active = bool(f.get("active"))
         s.dentists = [d for d in dentists if str(d.id) in f.getlist("dentists")]

@@ -20,6 +20,14 @@ class Dentist(TimestampMixin, db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True)
 
     services = db.relationship("Service", secondary=service_dentists, back_populates="dentists")
+    prices = db.relationship("DentistPrice", back_populates="dentist", cascade="all, delete-orphan")
+
+    def price_for(self, service):
+        """Preço deste dentista para o serviço; cai no valor padrão do serviço se não houver."""
+        for p in self.prices:
+            if p.service_id == service.id:
+                return p.price
+        return service.price
 
     @property
     def weekday_set(self) -> set[int]:

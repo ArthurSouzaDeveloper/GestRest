@@ -22,7 +22,22 @@
       <dt>Profissional</dt><dd>{{ appt.dentist.name }}</dd>
       <dt>Origem</dt><dd>{{ 'Agendamento online (site)' if appt.origin == 'site' else 'Recepção' }} · criado em {{ appt.created_at|datahora }}</dd>
       {% if appt.notes %}<dt>Observações</dt><dd>{{ appt.notes }}</dd>{% endif %}
+      {% if current_user.role == 'admin' or (current_user.role == 'dentista' and current_user.dentist_id == appt.dentist_id) %}
+      {% set fe = appt.financial_entry %}
+      <dt>Valor</dt>
+      <dd>{% if fe %}<strong>{{ fe.amount|moeda }}</strong> <span class="muted small">lançado no financeiro{{ ' · ajustado' if fe.adjusted_by_id }}</span>
+          {% if fe.price_missing %}<br><span class="alert-text small">Tratamento sem preço definido.</span>{% endif %}
+        {% else %}{{ appt.dentist.price_for(appt.service)|moeda }} <span class="muted small">entra no financeiro quando a consulta for concluída</span>{% endif %}
+      </dd>
+      {% endif %}
     </dl>
+    {% if current_user.role == 'admin' and appt.financial_entry %}
+    <form method="post" action="{{ url_for('finance.adjust', id=appt.financial_entry.id) }}" class="adjust-form">
+      {{ csrf() }}
+      <label>Ajustar valor cobrado (desconto, pacote…)<input name="valor" inputmode="decimal" value="{{ '%.2f'|format(appt.financial_entry.amount)|replace('.', ',') }}"></label>
+      <button class="btn btn-sm btn-outline">Salvar valor</button>
+    </form>
+    {% endif %}
     <h3>Alterar status</h3>
     <div class="status-actions">
       {% for key, label in statuses.items() if key != appt.status %}
