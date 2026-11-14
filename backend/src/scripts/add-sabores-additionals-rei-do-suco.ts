@@ -17,8 +17,7 @@
  *
  * Idempotente: identifica cada adicional por (restaurantId, categoryId, name, kind=ADDON).
  * Rodar de novo não duplica; se já existir, só reativa. O preço de um adicional que já
- * existia NÃO é alterado por padrão (o "Pepperoni" já estava a R$4,00 e a lista nova pede
- * R$6,00) — passe --atualizar-precos pra acertar os preços também.
+ * existia NÃO é alterado por padrão — passe --atualizar-precos pra acertar os preços também.
  *
  * Uso:
  *   node dist/scripts/add-sabores-additionals-rei-do-suco.js --slug=rei-do-suco --dry-run
@@ -44,7 +43,10 @@ const PASTEL_CATEGORY = 'Sugestão da Casa e Monte Seu Pastel';
 const SABORES: [string, number][] = [
   ['Linguiça', 4.5],
   ['Atum', 8.0],
-  ['Pepperoni', 6.0],
+  // A lista pedia R$6,00, mas o Pepperoni já existia como adicional a R$4,00 e o dono
+  // decidiu manter esse preço — então aqui fica R$4,00 mesmo, e nem --atualizar-precos
+  // mexe nele.
+  ['Pepperoni', 4.0],
   ['Brócolis', 4.5],
   ['Costela', 8.0],
   ['Calabresa', 4.5],
