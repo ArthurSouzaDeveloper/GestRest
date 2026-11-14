@@ -1,6 +1,8 @@
 import re
 from datetime import date
 
+import bcrypt
+
 from app.extensions import db
 from app.models.base import TimestampMixin
 
@@ -25,6 +27,10 @@ class Patient(TimestampMixin, db.Model):
     notes = db.Column(db.Text)
     origin = db.Column(db.String(20), nullable=False, default="recepcao")  # site | recepcao
     deleted_at = db.Column(db.DateTime)  # exclusão lógica (prontuário deve ser mantido)
+    # Portal do paciente (acesso separado do painel da clínica)
+    portal_password_hash = db.Column(db.String(128))
+    portal_must_change = db.Column(db.Boolean, nullable=False, default=True)  # senha provisória
+    portal_last_login = db.Column(db.DateTime)
 
     appointments = db.relationship(
         "Appointment", back_populates="patient", cascade="all, delete-orphan",
@@ -34,6 +40,19 @@ class Patient(TimestampMixin, db.Model):
         "ClinicalNote", back_populates="patient", cascade="all, delete-orphan",
         order_by="desc(ClinicalNote.created_at)",
     )
+
+    @property
+    def portal_enabled(self) -> bool:
+        return bool(self.portal_password_hash)
+
+    def set_portal_password(self, raw: str, temporary: bool = True) -> None:
+        self.portal_password_hash = bcrypt.hashpw(raw.encode(), bcrypt.gensalt()).decode()
+        self.portal_must_change = temporary
+
+    def check_portal_password(self, raw: str) -> bool:
+        if not self.portal_password_hash:
+            return False
+        return bcrypt.checkpw(raw.encode(), self.portal_password_hash.encode())
 
     @classmethod
     def query_active(cls):

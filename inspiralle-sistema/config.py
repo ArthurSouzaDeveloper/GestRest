@@ -30,6 +30,12 @@ class Config:
     }
     CLINIC_WHATSAPP = "5519999393772"
 
+    # Fotos e radiografias da evolução (fora da pasta static: só saem por rota com login)
+    UPLOAD_DIR = os.environ.get("UPLOAD_DIR", str(BASE_DIR / "instance" / "uploads"))
+    MAX_CONTENT_LENGTH = 30 * 1024 * 1024     # limite por envio (várias fotos)
+    MAX_IMAGE_MB = 10                          # limite por foto
+    MAX_IMAGES_PER_NOTE = 8
+
 
 class ProdConfig(Config):
     SESSION_COOKIE_SECURE = True
@@ -40,3 +46,4 @@ class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
     MIN_HOURS_NOTICE = 0
+    UPLOAD_DIR = os.environ.get("TEST_UPLOAD_DIR", "/tmp/inspiralle-test-uploads")

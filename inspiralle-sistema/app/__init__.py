@@ -41,7 +41,9 @@ def create_app(env: str = "dev") -> Flask:
 
     from app.modules.auth.routes import bp as auth_bp
     from app.modules.dashboard.routes import bp as dashboard_bp
+    from app.modules.finance.routes import bp as finance_bp
     from app.modules.patients.routes import bp as patients_bp
+    from app.modules.portal.routes import bp as portal_bp
     from app.modules.public_api.routes import bp as public_api_bp
     from app.modules.scheduling.routes import bp as scheduling_bp
     from app.modules.settings.routes import bp as settings_bp
@@ -51,9 +53,12 @@ def create_app(env: str = "dev") -> Flask:
     app.register_blueprint(scheduling_bp, url_prefix="/painel/agenda")
     app.register_blueprint(patients_bp, url_prefix="/painel/pacientes")
     app.register_blueprint(settings_bp, url_prefix="/painel/cadastros")
+    app.register_blueprint(finance_bp, url_prefix="/painel/financeiro")
+    app.register_blueprint(portal_bp, url_prefix="/portal")  # área do paciente (login próprio)
     app.register_blueprint(public_api_bp, url_prefix="/api/public")
 
     _register_csrf(app)
+    _register_errors(app)
     _register_filters(app)
     _register_landing(app)
     _register_cli(app)
@@ -77,10 +82,20 @@ def _register_csrf(app: Flask) -> None:
     def _check_csrf():
         if app.config.get("TESTING") and not app.config.get("CSRF_IN_TESTS"):
             return
-        if request.method == "POST" and request.path.startswith("/painel"):
+        if request.method == "POST" and request.path.startswith(("/painel", "/portal")):
             sent = request.form.get("_csrf") or request.headers.get("X-CSRF-Token")
             if not sent or sent != session.get("_csrf"):
                 abort(400, "Sessão expirada. Recarregue a página e tente novamente.")
+
+
+def _register_errors(app: Flask) -> None:
+    from flask import flash, redirect, request
+
+    @app.errorhandler(413)
+    def too_large(_e):
+        mb = app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
+        flash(f"Envio muito grande (máximo {mb} MB por vez). Envie menos fotos ou fotos menores.", "danger")
+        return redirect(request.referrer or "/painel/")
 
 
 def _register_filters(app: Flask) -> None:
@@ -123,7 +138,7 @@ def _register_landing(app: Flask) -> None:
 
     @app.route("/<path:filename>")
     def landing_static(filename):
-        if filename.startswith(("painel", "api")):
+        if filename.startswith(("painel", "api", "portal")):
             abort(404)
         return send_from_directory(landing, filename)
 
@@ -132,7 +147,10 @@ def _register_cli(app: Flask) -> None:
     @app.cli.command("init-db")
     def init_db():
         """Cria as tabelas e popula com dados de demonstração."""
+        import shutil
+
         from app.seed import seed_demo
+        shutil.rmtree(app.config["UPLOAD_DIR"], ignore_errors=True)  # fotos antigas da demo
         db.drop_all()
         db.create_all()
         seed_demo()

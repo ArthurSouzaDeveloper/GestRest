@@ -36,6 +36,8 @@ class Appointment(TimestampMixin, db.Model):
     patient = db.relationship("Patient", back_populates="appointments")
     dentist = db.relationship("Dentist")
     service = db.relationship("Service")
+    financial_entry = db.relationship("FinancialEntry", back_populates="appointment",
+                                      uselist=False, cascade="all, delete-orphan")
 
     @property
     def status_label(self) -> str:

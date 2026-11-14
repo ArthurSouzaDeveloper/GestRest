@@ -4,9 +4,9 @@
 <header class="page-head"><div><p class="eyebrow">Administração</p><h1>Cadastros</h1></div></header>
 <div class="grid-2">
   <section class="card table-card">
-    <div class="card-head"><h2>Serviços</h2><a href="{{ url_for('settings.service_form') }}" class="btn btn-sm btn-outline">+ Serviço</a></div>
+    <div class="card-head"><h2>Serviços</h2><div class="head-actions"><a href="{{ url_for('finance.prices') }}" class="btn btn-sm btn-outline">Preços por dentista</a><a href="{{ url_for('settings.service_form') }}" class="btn btn-sm btn-outline">+ Serviço</a></div></div>
     <table class="table">
-      <thead><tr><th>Serviço</th><th>Duração</th><th class="hide-sm">Valor</th><th>Online</th></tr></thead>
+      <thead><tr><th>Serviço</th><th>Duração</th><th class="hide-sm">Valor padrão</th><th>Online</th></tr></thead>
       <tbody>
       {% for s in services %}
         <tr onclick="location.href='{{ url_for('settings.service_form', id=s.id) }}'" class="{{ 'inactive' if not s.active }}">

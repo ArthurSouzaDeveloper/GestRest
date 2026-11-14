@@ -9,7 +9,7 @@
   <label>Descrição (aparece no site)<input name="description" value="{{ s.description or '' if s }}"></label>
   <div class="row-2">
     <label>Duração (min)<input type="number" name="duration_min" min="15" step="15" value="{{ s.duration_min if s else 30 }}"></label>
-    <label>Valor (R$)<input name="price" inputmode="decimal" value="{{ s.price if s and s.price is not none }}"></label>
+    <label>Valor padrão (R$) <small class="muted">cada dentista pode ter o seu em Financeiro → Preços</small><input name="price" inputmode="decimal" value="{{ s.price if s and s.price is not none }}"></label>
   </div>
   <fieldset><legend>Profissionais que realizam</legend>
     <div class="checks">{% for d in dentists %}<label class="check"><input type="checkbox" name="dentists" value="{{ d.id }}" {{ 'checked' if s and d in s.dentists }}> {{ d.name }}</label>{% endfor %}</div>

@@ -68,30 +68,100 @@
       </ul>
       {% else %}<p class="empty">Sem consultas anteriores.</p>{% endif %}
     </section>
+
+    <section class="card portal-card" id="portal">
+      <div class="card-head"><h2>Portal do paciente</h2>
+        {% if p.portal_enabled %}<span class="badge vis-on">Ativo</span>{% else %}<span class="badge">Sem acesso</span>{% endif %}
+      </div>
+      <p class="muted small">Área separada onde o paciente acompanha a própria evolução, com fotos e descrições, e vê as próximas consultas. Valores e dados financeiros nunca aparecem lá.</p>
+      {% if portal_temp %}
+      <div class="temp-pass">
+        <span>Senha provisória</span><strong>{{ portal_temp.pwd }}</strong>
+        <small>Login: {{ portal_login }}. Ela aparece só agora; o paciente troca no primeiro acesso.</small>
+        {% set pmsg = 'Olá, ' ~ p.name.split()[0] ~ '! Sua área do paciente da Inspiralle Odontologia já está liberada. Acesse ' ~ request.host_url ~ 'portal com seu ' ~ portal_login.split(' ')[0] ~ ' e a senha provisória ' ~ portal_temp.pwd ~ '. No primeiro acesso você cria sua senha.' %}
+        <a class="btn btn-whats btn-sm" target="_blank" rel="noopener" href="{{ p.whatsapp_link }}?text={{ pmsg|urlencode }}">Enviar acesso pelo WhatsApp</a>
+      </div>
+      {% elif p.portal_enabled %}
+      <dl class="dl">
+        <dt>Login</dt><dd>{{ portal_login }}</dd>
+        <dt>Último acesso</dt><dd>{{ p.portal_last_login|datahora }}</dd>
+        <dt>Senha</dt><dd>{{ 'Provisória (ainda não trocou)' if p.portal_must_change else 'Definida pelo paciente' }}</dd>
+      </dl>
+      {% endif %}
+      {% if current_user.role in ('admin', 'recepcao') %}
+      <div class="head-actions portal-actions">
+        <form method="post" action="{{ url_for('patients.portal_access', id=p.id) }}">
+          {{ csrf() }}<button class="btn btn-sm {{ 'btn-outline' if p.portal_enabled else 'btn-primary' }}">{{ 'Gerar nova senha' if p.portal_enabled else 'Liberar acesso ao portal' }}</button>
+        </form>
+        {% if p.portal_enabled %}
+        <form method="post" action="{{ url_for('patients.portal_revoke', id=p.id) }}" onsubmit="return confirm('Remover o acesso deste paciente ao portal?')">
+          {{ csrf() }}<button class="btn btn-sm btn-link-danger">Remover acesso</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+    </section>
   </div>
 
   <section class="card" id="prontuario">
-    <div class="card-head"><h2>Prontuário · evolução clínica</h2></div>
-    {% if current_user.role in ('admin', 'dentista') %}
-    <form method="post" action="{{ url_for('patients.add_note', id=p.id) }}" class="form note-form">
+    <div class="card-head"><h2>Prontuário · evolução do tratamento</h2></div>
+    {% set can_write = current_user.role in ('admin', 'dentista') %}
+    {% if can_write %}
+    <form method="post" action="{{ url_for('patients.add_note', id=p.id) }}" class="form note-form" enctype="multipart/form-data">
       {{ csrf() }}
       <div class="row-2">
         <label>Procedimento<input name="procedimento" list="procs" placeholder="Ex.: Profilaxia"></label>
         <label>Dente / região<input name="dente" placeholder="Ex.: 36"></label>
       </div>
       <datalist id="procs">{% for s in ['Avaliação inicial','Limpeza e profilaxia','Clareamento dental','Próteses fixas','Extração de siso','Sensibilidade dentária','Restauração','Canal'] %}<option value="{{ s }}">{% endfor %}</datalist>
-      <label>Evolução<textarea name="texto" rows="3" required placeholder="Descreva o atendimento realizado..."></textarea></label>
+      <label>Descrição da evolução<textarea name="texto" rows="3" required placeholder="Descreva o atendimento realizado. Se for liberado no portal, o paciente lê este texto."></textarea></label>
+      <label class="file-drop">
+        <span><strong>Fotos / radiografias</strong> <small class="muted">JPG, PNG ou WEBP · até {{ max_images }} por evolução</small></span>
+        <input type="file" name="imagens" accept="image/jpeg,image/png,image/webp" multiple data-preview="notePreview">
+      </label>
+      <div class="thumbs" id="notePreview"></div>
+      <label>Legenda das imagens <input name="legenda" placeholder="Ex.: Antes do clareamento"></label>
+      <label class="check"><input type="checkbox" name="visivel" checked> Mostrar esta evolução no portal do paciente</label>
       <button class="btn btn-primary btn-sm">Registrar evolução</button>
     </form>
     {% endif %}
     <ol class="timeline">
       {% for n in p.clinical_notes %}
-      <li>
-        <div class="tl-date">{{ n.created_at|datahora }}</div>
+      <li id="nota-{{ n.id }}" class="{{ 'staff-only' if not n.visible_to_patient }}">
+        <div class="tl-date">{{ n.created_at|datahora }}
+          {% if n.visible_to_patient %}<span class="badge vis-on" title="O paciente vê esta evolução no portal">No portal</span>
+          {% else %}<span class="badge vis-off" title="Só a equipe vê">Só equipe</span>{% endif %}
+        </div>
         <div class="tl-body">
           <strong>{{ n.procedure or 'Anotação' }}{% if n.tooth %} · dente {{ n.tooth }}{% endif %}</strong>
           <p>{{ n.text }}</p>
-          <small>{{ n.appointment.dentist.name if n.appointment else (n.author.name if n.author else '') }}</small>
+          {% if n.images %}
+          <div class="thumbs">
+            {% for img in n.images %}
+            <figure class="thumb">
+              <a href="{{ url_for('patients.image', img_id=img.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('patients.image', img_id=img.id) }}" alt="{{ img.caption or 'Imagem da evolução' }}" loading="lazy"></a>
+              {% if img.caption %}<figcaption>{{ img.caption }}</figcaption>{% endif %}
+              {% if can_write %}
+              <form method="post" action="{{ url_for('patients.delete_image', img_id=img.id) }}" onsubmit="return confirm('Remover esta imagem?')">
+                {{ csrf() }}<button class="thumb-del" title="Remover imagem" aria-label="Remover imagem">×</button>
+              </form>
+              {% endif %}
+            </figure>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <small>{{ n.professional_name }}</small>
+          {% if can_write %}
+          <div class="note-actions">
+            <form method="post" action="{{ url_for('patients.add_images', id=p.id, note_id=n.id) }}" enctype="multipart/form-data" class="inline add-img">
+              {{ csrf() }}
+              <label class="link-btn">+ Imagens<input type="file" name="imagens" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="this.form.submit()"></label>
+            </form>
+            <form method="post" action="{{ url_for('patients.toggle_visibility', id=p.id, note_id=n.id) }}" class="inline">
+              {{ csrf() }}<button class="link-btn">{{ 'Esconder do portal' if n.visible_to_patient else 'Mostrar no portal' }}</button>
+            </form>
+          </div>
+          {% endif %}
         </div>
       </li>
       {% else %}

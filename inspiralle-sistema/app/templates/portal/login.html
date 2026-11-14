@@ -1,0 +1,23 @@
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import logo %}
+{% block title %}Entrar{% endblock %}
+{% block body_class %}login-page{% endblock %}
+{% block body %}
+<div class="login-wrap">
+  <form method="post" class="login-card">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="brand dark">{{ logo(40) }}<span>Inspiralle<small>Odontologia especializada</small></span></div>
+    <h1>Área do paciente</h1>
+    <p class="muted">Acompanhe a evolução do seu tratamento, com fotos e explicações da sua dentista ou do seu dentista.</p>
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, m in msgs %}<div class="flash flash-{{ cat }}">{{ m }}</div>{% endfor %}
+    {% endwith %}
+    <label>CPF ou celular<input name="login" inputmode="numeric" autocomplete="username" required autofocus placeholder="Somente números"></label>
+    <label>Senha<input type="password" name="senha" autocomplete="current-password" required></label>
+    <button class="btn btn-primary btn-block">Entrar</button>
+    <p class="demo-hint">Ainda não tem senha? Peça para a recepção liberar seu acesso.<br>
+      <a class="link" href="https://wa.me/{{ config.CLINIC_WHATSAPP }}?text={{ 'Olá! Gostaria de acesso à área do paciente.'|urlencode }}" target="_blank" rel="noopener">Falar com a clínica no WhatsApp</a></p>
+    <p class="demo-hint">Demonstração: CPF 123.456.789-09 · senha paciente123</p>
+  </form>
+</div>
+{% endblock %}
