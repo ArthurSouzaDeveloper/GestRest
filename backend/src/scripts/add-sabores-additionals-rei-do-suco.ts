@@ -3,10 +3,11 @@
  * cliente/dono: quem pede um pastel de Frango pode acrescentar Calabresa, Costela etc. por
  * cima, com preço de adicional (bem menor que o pastel inteiro do mesmo sabor).
  *
- * Mesmo modelo do add-barbecue-additional-rei-do-suco.ts: entra em toda categoria que já
- * tem o "Molho de Alho" como adicional ativo (hoje "Sugestão da Casa e Monte Seu Pastel" e
- * "Mini Pizza Salgada", ver ADICIONAIS_SALGADOS em import-menu-rei-do-suco.ts), sempre
- * como kind ADDON.
+ * Mesmo modelo do add-barbecue-additional-rei-do-suco.ts, sempre como kind ADDON — mas só
+ * na categoria dos pastéis ("Sugestão da Casa e Monte Seu Pastel"): o dono decidiu que a
+ * Mini Pizza Salgada NÃO recebe esses sabores, mesmo ela compartilhando os adicionais
+ * salgados dos pastéis desde o import (ver ADICIONAIS_SALGADOS em
+ * import-menu-rei-do-suco.ts). Passe --com-mini-pizza pra incluí-la.
  *
  * Nome igual ao do sabor-base de propósito: "Frango" existe como adicional BASE (o pastel
  * inteiro, R$14,50) E como ADDON (a cobertura, R$4,50) na mesma categoria — dois registros
@@ -23,18 +24,18 @@
  *   node dist/scripts/add-sabores-additionals-rei-do-suco.js --slug=rei-do-suco --dry-run
  *   node dist/scripts/add-sabores-additionals-rei-do-suco.js --slug=rei-do-suco
  *   node dist/scripts/add-sabores-additionals-rei-do-suco.js --slug=rei-do-suco --atualizar-precos
- *   node dist/scripts/add-sabores-additionals-rei-do-suco.js --slug=rei-do-suco --so-pasteis
- *
- * --so-pasteis deixa a Mini Pizza Salgada de fora (só a categoria dos pastéis recebe).
+ *   node dist/scripts/add-sabores-additionals-rei-do-suco.js --slug=rei-do-suco --com-mini-pizza
  */
 import { AdditionalKind, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Categoria de referência: as que têm esse adicional ativo recebem os sabores.
+// Categoria de referência: a categoria tem que ter esse adicional ativo pra receber os
+// sabores — garante que o script não cria cobertura salgada onde ela não faz sentido.
 const REFERENCE = 'Molho de Alho';
 
-// Com --so-pasteis, só esta categoria recebe (a Mini Pizza Salgada fica de fora).
+// A única categoria que recebe por padrão. Com --com-mini-pizza, toda categoria com o
+// "Molho de Alho" ativo recebe (inclui a Mini Pizza Salgada).
 const PASTEL_CATEGORY = 'Sugestão da Casa e Monte Seu Pastel';
 
 // Sabores x preço de cobertura, como o dono passou. Os nomes seguem a grafia que o
@@ -85,10 +86,10 @@ async function main() {
   const slug = args.slug;
   const dryRun = args['dry-run'] === 'true';
   const updatePrices = args['atualizar-precos'] === 'true';
-  const onlyPasteis = args['so-pasteis'] === 'true';
+  const withMiniPizza = args['com-mini-pizza'] === 'true';
   if (!slug) {
     console.error(
-      'Uso: node dist/scripts/add-sabores-additionals-rei-do-suco.js --slug=rei-do-suco [--dry-run] [--atualizar-precos] [--so-pasteis]',
+      'Uso: node dist/scripts/add-sabores-additionals-rei-do-suco.js --slug=rei-do-suco [--dry-run] [--atualizar-precos] [--com-mini-pizza]',
     );
     process.exit(1);
   }
@@ -107,7 +108,7 @@ async function main() {
       kind: AdditionalKind.ADDON,
       active: true,
       categoryId: { not: null },
-      ...(onlyPasteis ? { category: { name: PASTEL_CATEGORY } } : {}),
+      ...(withMiniPizza ? {} : { category: { name: PASTEL_CATEGORY } }),
     },
     include: { category: { select: { name: true } } },
   });
