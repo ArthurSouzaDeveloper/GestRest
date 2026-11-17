@@ -43,7 +43,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="Dashboard" subtitle="Visão geral da operação em tempo real" />
+      <PageHeader title="Dashboard" />
 
       <OnlineOrdersCard />
 

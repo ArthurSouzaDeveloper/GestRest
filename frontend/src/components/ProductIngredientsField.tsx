@@ -41,19 +41,13 @@ export function ProductIngredientsField({
   return (
     <div>
       <label className="label">Ingredientes</label>
-      <p className="mb-2 text-xs text-gray-500">
-        Se um ingrediente acabar, o produto pode <b>sumir do cardápio</b> (não existe sem ele) ou <b>dá pra tirar</b>
-        (continua à venda e sai "SEM ..." na cozinha).
-      </p>
       {value.length > 0 && (
         <ul className="mb-2 space-y-1">
           {value.map((i) => (
             <li key={i.name} className="flex items-center gap-2 text-sm">
               <span className="min-w-0 flex-1 truncate">{i.name}</span>
               <select
-                className={`rounded border px-1.5 py-0.5 text-xs dark:bg-gray-900 ${
-                  i.optional ? 'border-amber-300 text-amber-700' : 'border-red-200 text-red-700'
-                }`}
+                className="input !w-auto !py-0.5 !text-sm"
                 value={i.optional ? 'optional' : 'essential'}
                 onChange={(e) =>
                   onChange(value.map((x) => (x.name === i.name ? { ...x, optional: e.target.value === 'optional' } : x)))

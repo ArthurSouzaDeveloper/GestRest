@@ -48,7 +48,6 @@ export default function Tables() {
     <div>
       <PageHeader
         title="Mesas"
-        subtitle="Uma mesa pode ter várias comandas abertas ao mesmo tempo — cada grupo fecha a sua"
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
@@ -180,11 +179,6 @@ function OpenTableModal({
       title={isAdditional ? `Nova Comanda — Mesa ${table?.number ?? ''}` : `Abrir Mesa ${table?.number ?? ''}`}
     >
       <div className="space-y-4">
-        {isAdditional && (
-          <p className="text-xs text-gray-500">
-            Esta mesa já tem comanda(s) aberta(s). Esta será uma comanda separada, com conta própria.
-          </p>
-        )}
         <div>
           <label className="label">Nome do cliente (opcional)</label>
           <input className="input" value={customerName} onChange={(e) => setName(e.target.value)} />

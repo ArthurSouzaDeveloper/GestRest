@@ -28,7 +28,6 @@ export default function Reports() {
     <div>
       <PageHeader
         title="Relatórios"
-        subtitle="Análise de vendas e desempenho"
         action={<button className="btn-secondary" onClick={exportCsv}>Exportar CSV</button>}
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

@@ -66,7 +66,6 @@ export default function Products() {
     <div>
       <PageHeader
         title="Produtos"
-        subtitle="Catálogo do restaurante"
         action={<button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Novo Produto</button>}
       />
 
@@ -124,10 +123,7 @@ export default function Products() {
         </div>
       </Card>
 
-      <h2 className="mb-1 mt-8 text-lg font-semibold">Sabores e adicionais</h2>
-      <p className="mb-3 text-sm text-gray-500">
-        Sabores do "Monte o Seu" e adicionais. Marcado como esgotado, some do site e do pedido até ser reativado.
-      </p>
+      <h2 className="mb-3 mt-8 text-lg font-semibold">Sabores e adicionais</h2>
       <Card className="!p-0">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
@@ -293,9 +289,6 @@ function ProductForm({
           />
           <span>
             Produto montável (cliente escolhe a base)
-            <span className="block text-xs text-gray-500">
-              Exige um adicional do tipo "base" na categoria — a base dá o preço; deixe o preço do produto em R$ 0.
-            </span>
           </span>
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}

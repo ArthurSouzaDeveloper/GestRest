@@ -55,7 +55,6 @@ export default function Users() {
     <div>
       <PageHeader
         title="Usuários"
-        subtitle="Equipe e níveis de acesso"
         action={<button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Novo Usuário</button>}
       />
       {notice && (

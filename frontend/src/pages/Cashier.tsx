@@ -64,7 +64,7 @@ export default function Cashier() {
 
   return (
     <div>
-      <PageHeader title="Caixa" subtitle="Pedidos prontos para pagamento" />
+      <PageHeader title="Caixa" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         {/* Left: ready orders, grouped by table */}
         <div className="space-y-4">
@@ -298,9 +298,6 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
               Gerar {Math.max(1, Math.floor(splitCount))}x de {brl(perPerson)}
             </button>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
-            Gera uma parcela por pessoa com o valor restante dividido igualmente. Você ainda pode ajustar cada valor abaixo.
-          </p>
         </div>
 
         <div className="mb-3 flex flex-wrap gap-2">

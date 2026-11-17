@@ -9,7 +9,6 @@ import type { ProductionTicket } from '../types';
 
 interface Props {
   title: string;
-  subtitle: string;
   endpoint: string; // '/production/kitchen' | '/production/juice-bar'
   room: string; // 'kitchen' | 'juice_bar'
   queryKey: string;
@@ -54,7 +53,7 @@ function groupByOrder(tickets: ProductionTicket[]): OrderBlock[] {
 }
 
 /** Full-station board for Kitchen / Juice Bar with large touch targets. */
-export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: Props) {
+export function ProductionBoard({ title, endpoint, room, queryKey }: Props) {
   useRealtime([room], [[queryKey]]);
   const qc = useQueryClient();
 
@@ -79,7 +78,7 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
 
   return (
     <div>
-      <PageHeader title={title} subtitle={subtitle} action={<span className="text-sm text-gray-500">{tickets.length} em fila</span>} />
+      <PageHeader title={title} action={<span className="text-sm text-gray-500">{tickets.length} em fila</span>} />
 
       {blocks.length === 0 ? (
         <div className="card p-10 text-center text-gray-400">

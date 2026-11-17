@@ -35,7 +35,6 @@ export default function DeliveryZones() {
     <div>
       <PageHeader
         title="Entrega"
-        subtitle="Como o sistema calcula a taxa de entrega no site de pedidos online"
       />
 
       <EtaSettingsCard />
@@ -134,10 +133,6 @@ function EtaSettingsCard() {
         </p>
       ) : (
         <>
-          <p className="mb-3 text-sm text-gray-500">
-            Automático ajusta a previsão sozinho conforme a fila de pedidos. Manual trava um tempo fixo, pra você
-            decidir olhando o fluxo real da cozinha.
-          </p>
           <div className="mb-3 flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-950">
             <button
               className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
@@ -257,12 +252,6 @@ function AutoCompleteCard() {
         </p>
       ) : (
         <>
-          <p className="mb-3 text-sm text-gray-500">
-            Pedido de retirada ou entrega já aceito que passa do horário previsto (o mesmo mostrado ao cliente,
-            definido no tempo estimado acima) mais a margem abaixo é marcado como pronto e entregue sozinho, e
-            entra no caixa com a forma de pagamento escolhida pelo cliente. Pedidos aguardando aceite ou
-            cancelados nunca são mexidos.
-          </p>
           <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
             Ativar conclusão automática
@@ -352,11 +341,6 @@ function AutoDeliverPickupCard() {
         </p>
       ) : (
         <>
-          <p className="mb-3 text-sm text-gray-500">
-            Pedido de retirada que fica "Pronto" é marcado como entregue sozinho depois do tempo abaixo, sem
-            precisar clicar em "Marcar Entregue". Nunca se aplica a entrega (delivery) — lá o clique continua
-            manual, porque também confirma que o motoboy saiu com o pedido.
-          </p>
           <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
             Ativar entrega automática de retirada
@@ -441,8 +425,7 @@ function ZonesPanel({ active }: { active: boolean }) {
         )}
       </div>
 
-      <div className="mb-4 flex items-end justify-between">
-        <p className="text-sm text-gray-500">O cliente escolhe o bairro no site e a taxa é aplicada automaticamente.</p>
+      <div className="mb-4 flex items-end justify-end">
         <button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Novo Bairro</button>
       </div>
 
@@ -659,11 +642,7 @@ function DistanceBandsPanel({ settings }: { settings: DeliveryPricingSettings })
 
       <OriginForm settings={settings} />
 
-      <div className="mb-4 flex items-end justify-between">
-        <p className="text-sm text-gray-500">
-          O sistema calcula a distância até o endereço do cliente e aplica a primeira faixa que cobrir. Endereço mais
-          longe que a maior faixa cadastrada = fora da área de entrega.
-        </p>
+      <div className="mb-4 flex items-end justify-end">
         <button className="btn-primary shrink-0" onClick={() => setCreating(true)}><Plus size={16} /> Nova Faixa</button>
       </div>
 

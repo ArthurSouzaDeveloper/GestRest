@@ -86,9 +86,6 @@ function PauseDialog({
         value={reason}
         onChange={(e) => setReason(e.target.value)}
       />
-      <p className="mt-1 text-xs text-gray-500">
-        O cliente vê: "Este restaurante não está aceitando pedidos online no momento.{reason.trim() ? ` ${reason.trim()}` : ''}"
-      </p>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       <div className="mt-5 flex justify-end gap-2">
         <button className="btn-secondary" onClick={onClose}>

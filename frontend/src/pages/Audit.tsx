@@ -38,7 +38,7 @@ export default function Audit() {
 
   return (
     <div>
-      <PageHeader title="Auditoria" subtitle="Registro de todas as ações do sistema" />
+      <PageHeader title="Auditoria" />
       <Card className="!p-0">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">

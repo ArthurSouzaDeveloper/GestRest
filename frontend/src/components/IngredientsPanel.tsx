@@ -42,16 +42,12 @@ export function IngredientsPanel({
 
   return (
     <div className="mb-8">
-      <div className="mb-1 flex items-center justify-between gap-2">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">Insumos</h2>
         <button className="btn-secondary !py-1 text-sm" onClick={() => setEditing('new')}>
           <Plus size={14} /> Novo insumo
         </button>
       </div>
-      <p className="mb-3 text-sm text-gray-500">
-        Acabou um ingrediente (ex.: laranja)? Marque "Em falta" e tudo que leva ele sai do cardápio. Quando chegar, marque
-        "Em estoque" e volta tudo, menos o que você já tinha esgotado por conta própria.
-      </p>
       {ingredients.length === 0 ? (
         <Card className="text-sm text-gray-500">Nenhum insumo cadastrado ainda.</Card>
       ) : (
@@ -248,7 +244,6 @@ function IngredientForm({
   });
 
   const total = productIds.size + additionalIds.size;
-  const upper = name.trim().toUpperCase() || 'INSUMO';
 
   return (
     <Modal open onClose={onClose} title={ingredient ? 'Editar insumo' : 'Novo insumo'} wide>
@@ -276,7 +271,6 @@ function IngredientForm({
           </div>
           {suggestions.length > 0 && (
             <div className="mt-2">
-              <p className="mb-1 text-xs text-gray-500">Mais usados no seu cardápio (1 clique já marca tudo):</p>
               <div className="flex flex-wrap gap-1.5">
                 {suggestions.map((s) => (
                   <button
@@ -298,14 +292,8 @@ function IngredientForm({
               </div>
             </div>
           )}
-          {summary ? (
+          {summary && (
             <p className="mt-2 rounded-md bg-blue-50 px-2 py-1.5 text-xs text-blue-800 dark:bg-blue-950 dark:text-blue-200">{summary}</p>
-          ) : (
-            <p className="mt-1 text-xs text-gray-500">
-              "Marcar pelo nome" acha o insumo no nome do produto (esses <b>somem do cardápio</b> quando acabar) e na
-              receita/descrição (esses <b>dá pra tirar</b>: continuam à venda e sai "SEM {upper}" na cozinha). Você
-              confere e ajusta.
-            </p>
           )}
         </div>
 
@@ -360,9 +348,7 @@ function IngredientForm({
                       </label>
                       {productIds.has(p.id) && (
                         <select
-                          className={`rounded border px-1.5 py-0.5 text-xs dark:bg-gray-900 ${
-                            optionalIds.has(p.id) ? 'border-amber-300 text-amber-700' : 'border-red-200 text-red-700'
-                          }`}
+                          className="input !w-auto !py-0.5 !text-sm"
                           value={optionalIds.has(p.id) ? 'optional' : 'essential'}
                           onChange={(e) => {
                             const next = new Set(optionalIds);

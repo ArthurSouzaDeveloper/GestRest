@@ -6,12 +6,11 @@ export function Card({ children, className }: { children: ReactNode; className?:
   return <div className={clsx('card p-4', className)}>{children}</div>;
 }
 
-export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+export function PageHeader({ title, action }: { title: string; action?: ReactNode }) {
   return (
     <div className="mb-6 flex items-end justify-between">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
       </div>
       {action}
     </div>

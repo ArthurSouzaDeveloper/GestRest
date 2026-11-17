@@ -117,7 +117,6 @@ function Console({ onLogout, name }: { onLogout: () => void; name: string }) {
         <div className="mb-6 flex items-end justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Restaurantes</h1>
-            <p className="mt-1 text-sm text-gray-500">Cada restaurante tem seu próprio link, equipe e cardápio.</p>
           </div>
           <button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Novo Restaurante</button>
         </div>
@@ -251,10 +250,6 @@ function EditBranding({ restaurant, onClose }: { restaurant: RestaurantSummary; 
         <div className="space-y-5">
           <div>
             <h3 className="mb-2 text-sm font-semibold">Cor da marca</h3>
-            <p className="mb-3 text-xs text-gray-500">
-              Os tons claros/escuros usados no site (fundo de painel, gradiente de botão) são calculados
-              automaticamente a partir dessa cor só.
-            </p>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="color"
@@ -278,10 +273,6 @@ function EditBranding({ restaurant, onClose }: { restaurant: RestaurantSummary; 
 
           <div>
             <h3 className="mb-2 text-sm font-semibold">Logo</h3>
-            <p className="mb-3 text-xs text-gray-500">
-              Sem logo enviada, o site mostra as iniciais do restaurante num distintivo na cor da marca. PNG,
-              JPEG ou WebP, até 3 MB.
-            </p>
             <div className="flex items-center gap-3">
               {settings.logoUrl ? (
                 <img src={settings.logoUrl} alt="Logo atual" className="h-16 w-16 rounded-full object-cover" />
