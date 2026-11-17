@@ -38,11 +38,11 @@ export default function Audit() {
 
   return (
     <div>
-      <PageHeader title="Auditoria" subtitle="Registro de todas as ações do sistema" />
+      <PageHeader title="Auditoria" />
       <Card className="!p-0">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
+          <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-900 dark:text-gray-100 dark:border-gray-800">
             <tr>
               <th className="p-3">Data/Hora</th>
               <th className="p-3">Usuário</th>
@@ -54,11 +54,11 @@ export default function Audit() {
           <tbody>
             {data.map((row) => (
               <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800">
-                <td className="p-3 text-gray-500">{new Date(row.createdAt).toLocaleString('pt-BR')}</td>
+                <td className="p-3 text-gray-900 dark:text-gray-100">{new Date(row.createdAt).toLocaleString('pt-BR')}</td>
                 <td className="p-3">{row.user?.name ?? '—'}</td>
                 <td className="p-3 font-medium">{ACTION_LABELS[row.action] ?? row.action}</td>
-                <td className="p-3 text-gray-500">{row.entity ?? '—'}</td>
-                <td className="p-3 text-gray-400">{row.ip ?? '—'}</td>
+                <td className="p-3 text-gray-900 dark:text-gray-100">{row.entity ?? '—'}</td>
+                <td className="p-3 text-gray-900 dark:text-gray-100">{row.ip ?? '—'}</td>
               </tr>
             ))}
           </tbody>

@@ -1,12 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { Card, Modal } from './ui';
+import { matchIngredient, norm, suggestIngredients, type MatchSource } from '../lib/ingredientMatch';
 import type { Additional, Category, Ingredient, Product } from '../types';
-
-/** Sem acento e minúsculo, pra "laranja" achar "Laranja" e "LARANJA". */
-const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /**
  * Insumos (ex.: Laranja): um insumo liga vários produtos e sabores. "Em falta" tira do
@@ -44,18 +42,14 @@ export function IngredientsPanel({
 
   return (
     <div className="mb-8">
-      <div className="mb-1 flex items-center justify-between gap-2">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">Insumos</h2>
         <button className="btn-secondary !py-1 text-sm" onClick={() => setEditing('new')}>
           <Plus size={14} /> Novo insumo
         </button>
       </div>
-      <p className="mb-3 text-sm text-gray-500">
-        Acabou um ingrediente (ex.: laranja)? Marque "Em falta" e tudo que leva ele sai do cardápio. Quando chegar, marque
-        "Em estoque" e volta tudo, menos o que você já tinha esgotado por conta própria.
-      </p>
       {ingredients.length === 0 ? (
-        <Card className="text-sm text-gray-500">Nenhum insumo cadastrado ainda.</Card>
+        <Card className="text-sm text-gray-900 dark:text-gray-100">Nenhum insumo cadastrado ainda.</Card>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {ingredients.map((i) => {
@@ -64,7 +58,7 @@ export function IngredientsPanel({
               <Card key={i.id} className="flex items-center justify-between gap-3 !p-3">
                 <div className="min-w-0">
                   <p className="truncate font-medium">{i.name}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-900 dark:text-gray-100">
                     {count} {count === 1 ? 'item ligado' : 'itens ligados'}
                   </p>
                 </div>
@@ -97,6 +91,7 @@ export function IngredientsPanel({
       {editing && (
         <IngredientForm
           ingredient={editing === 'new' ? null : editing}
+          existingNames={ingredients.map((i) => i.name)}
           products={products}
           additionals={additionals}
           categories={categories}
@@ -113,6 +108,7 @@ export function IngredientsPanel({
 
 function IngredientForm({
   ingredient,
+  existingNames,
   products,
   additionals,
   categories,
@@ -120,6 +116,7 @@ function IngredientForm({
   onSaved,
 }: {
   ingredient: Ingredient | null;
+  existingNames: string[];
   products: Product[];
   additionals: Additional[];
   categories: Category[];
@@ -134,36 +131,77 @@ function IngredientForm({
   );
   const [optionalIds, setOptionalIds] = useState<Set<string>>(new Set(ingredient?.optionalProductIds ?? []));
   const [additionalIds, setAdditionalIds] = useState<Set<string>>(new Set(ingredient?.additionalIds ?? []));
+  // Onde o "Marcar pelo nome" achou cada produto, pra mostrar o porquê na lista.
+  const [matchedBy, setMatchedBy] = useState<Map<string, MatchSource>>(new Map());
   const [filter, setFilter] = useState('');
-  const [onlyLinked, setOnlyLinked] = useState(false);
+  const [onlyLinked, setOnlyLinked] = useState(!!ingredient);
   const [error, setError] = useState('');
 
   const categoryName = (id?: string) => categories.find((c) => c.id === id)?.name ?? 'Todas as categorias';
 
-  // Sugestão: tudo cujo nome tem o nome do insumo (ex.: "Morango (Laranja)", "Suco de
-  // Laranja"). O admin desmarca o que não leva de verdade (ex.: "Fanta Laranja Lata").
-  const suggest = () => {
-    const term = norm(name.trim());
-    if (term.length < 2) return;
-    setProductIds((prev) => new Set([...prev, ...products.filter((p) => norm(p.name).includes(term)).map((p) => p.id)]));
-    setAdditionalIds(
-      (prev) => new Set([...prev, ...additionals.filter((a) => norm(a.name).includes(term)).map((a) => a.id)]),
-    );
+  const suggestions = useMemo(
+    () => (ingredient ? [] : suggestIngredients(products, additionals, existingNames)),
+    [ingredient, products, additionals, existingNames],
+  );
+
+  // Marca tudo que leva o insumo. No nome (ex.: "Morango (Laranja)") → some do cardápio;
+  // só na descrição/receita (ex.: Caipira leva milho) → dá pra tirar. Não desmarca nada
+  // e não muda o tipo do que já estava marcado. O admin confere e ajusta.
+  const autoMark = (rawName: string) => {
+    const m = matchIngredient(rawName, products, additionals);
+    const newOptional = new Set(optionalIds);
+    for (const [id, source] of m.products) {
+      if (productIds.has(id)) continue;
+      if (source === 'description') newOptional.add(id);
+    }
+    setProductIds(new Set([...productIds, ...m.products.keys()]));
+    setOptionalIds(newOptional);
+    setAdditionalIds(new Set([...additionalIds, ...m.additionalIds]));
+    setMatchedBy(new Map([...matchedBy, ...m.products]));
+    setOnlyLinked(true);
+    setFilter('');
   };
 
   const term = norm(filter);
   const visibleProducts = products
-        .filter((p) => (!onlyLinked || productIds.has(p.id)) && (norm(p.name).includes(term) || norm(p.category?.name ?? '').includes(term)))
-        .sort((a, b) => (a.category?.name ?? '').localeCompare(b.category?.name ?? '', 'pt-BR') || a.name.localeCompare(b.name, 'pt-BR'));
+    .filter((p) => (!onlyLinked || productIds.has(p.id)) && (norm(p.name).includes(term) || norm(p.category?.name ?? '').includes(term)))
+    .sort((a, b) => (a.category?.name ?? '').localeCompare(b.category?.name ?? '', 'pt-BR') || a.name.localeCompare(b.name, 'pt-BR'));
   const visibleAdditionals = additionals
-        .filter((a) => (!onlyLinked || additionalIds.has(a.id)) && (norm(a.name).includes(term) || norm(categoryName(a.categoryId)).includes(term)))
-        .sort((a, b) => categoryName(a.categoryId).localeCompare(categoryName(b.categoryId), 'pt-BR') || a.name.localeCompare(b.name, 'pt-BR'));
+    .filter((a) => (!onlyLinked || additionalIds.has(a.id)) && (norm(a.name).includes(term) || norm(categoryName(a.categoryId)).includes(term)))
+    .sort((a, b) => categoryName(a.categoryId).localeCompare(categoryName(b.categoryId), 'pt-BR') || a.name.localeCompare(b.name, 'pt-BR'));
+
+  // Produtos agrupados por categoria (já vêm ordenados), pra marcar/desmarcar o grupo todo.
+  const groups: { name: string; items: Product[] }[] = [];
+  for (const p of visibleProducts) {
+    const g = p.category?.name ?? 'Sem categoria';
+    if (groups[groups.length - 1]?.name !== g) groups.push({ name: g, items: [] });
+    groups[groups.length - 1].items.push(p);
+  }
 
   const flip = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
     const next = new Set(set);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setter(next);
+  };
+
+  const setGroup = (items: Product[], on: boolean) => {
+    const next = new Set(productIds);
+    for (const p of items) {
+      if (on) next.add(p.id);
+      else next.delete(p.id);
+    }
+    setProductIds(next);
+  };
+
+  const setGroupOptional = (items: Product[], optional: boolean) => {
+    const next = new Set(optionalIds);
+    for (const p of items) {
+      if (!productIds.has(p.id)) continue;
+      if (optional) next.add(p.id);
+      else next.delete(p.id);
+    }
+    setOptionalIds(next);
   };
 
   const save = useMutation({
@@ -196,17 +234,47 @@ function IngredientForm({
         <div>
           <label className="label">Nome do insumo</label>
           <div className="flex gap-2">
-            <input className="input" placeholder="Ex.: Laranja" value={name} onChange={(e) => setName(e.target.value)} />
-            <button className="btn-secondary shrink-0" disabled={name.trim().length < 2} onClick={suggest} title="Marca tudo que tem esse nome">
+            <input
+              className="input"
+              placeholder="Ex.: Laranja"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && name.trim().length >= 2) autoMark(name);
+              }}
+            />
+            <button
+              className="btn-secondary shrink-0"
+              disabled={name.trim().length < 2}
+              onClick={() => autoMark(name)}
+              title="Marca tudo que leva esse insumo no nome ou na receita"
+            >
               Marcar pelo nome
             </button>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
-            "Marcar pelo nome" marca tudo que tem o nome do insumo. Confira a lista e desmarque o que não leva de verdade, e
-            marque o que leva sem ter no nome (ex.: Salada de Frutas). Em cada produto marcado, escolha se ele{' '}
-            <b>some do cardápio</b> quando o insumo acabar ou se <b>dá pra tirar</b> (continua à venda e sai "SEM{' '}
-            {name.trim().toUpperCase() || 'INSUMO'}" na cozinha).
-          </p>
+          {suggestions.length > 0 && (
+            <div className="mt-2">
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((s) => (
+                  <button
+                    key={s.name}
+                    type="button"
+                    className={`rounded-full border px-2.5 py-0.5 text-xs transition ${
+                      norm(name.trim()) === norm(s.name)
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-gray-200 text-gray-700 hover:border-brand-100 dark:border-gray-700 dark:text-gray-300'
+                    }`}
+                    onClick={() => {
+                      setName(s.name);
+                      autoMark(s.name);
+                    }}
+                  >
+                    {s.name} <span className="text-gray-900 dark:text-gray-100">· {s.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -219,43 +287,74 @@ function IngredientForm({
 
         <div className="max-h-[50vh] space-y-4 overflow-y-auto rounded-lg border border-gray-100 p-3 dark:border-gray-800">
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase text-gray-400">Produtos ({productIds.size})</p>
-            {visibleProducts.length === 0 && <p className="text-sm text-gray-400">Nada aqui.</p>}
-            {visibleProducts.map((p) => (
-              <div key={p.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5 text-sm">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={productIds.has(p.id)} onChange={() => flip(productIds, setProductIds, p.id)} />
-                  <span>{p.name}</span>
-                  <span className="text-xs text-gray-400">{p.category?.name}</span>
-                </label>
-                {productIds.has(p.id) && (
-                  <select
-                    className={`rounded border px-1.5 py-0.5 text-xs dark:bg-gray-900 ${
-                      optionalIds.has(p.id) ? 'border-amber-300 text-amber-700' : 'border-red-200 text-red-700'
-                    }`}
-                    value={optionalIds.has(p.id) ? 'optional' : 'essential'}
-                    onChange={(e) => {
-                      const next = new Set(optionalIds);
-                      if (e.target.value === 'optional') next.add(p.id);
-                      else next.delete(p.id);
-                      setOptionalIds(next);
-                    }}
-                  >
-                    <option value="essential">Some do cardápio</option>
-                    <option value="optional">Dá pra tirar</option>
-                  </select>
-                )}
-              </div>
-            ))}
+            <p className="mb-1 text-xs font-semibold uppercase text-gray-900 dark:text-gray-100">Produtos ({productIds.size})</p>
+            {groups.length === 0 && (
+              <p className="text-sm text-gray-900 dark:text-gray-100">
+                {onlyLinked ? 'Nada marcado. Use "Marcar pelo nome" ou desmarque "Só os marcados".' : 'Nada aqui.'}
+              </p>
+            )}
+            {groups.map((g) => {
+              const marked = g.items.filter((p) => productIds.has(p.id)).length;
+              return (
+                <div key={g.name} className="mb-3">
+                  <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-gray-100 pb-1 dark:border-gray-800">
+                    <span className="text-sm font-semibold">
+                      {g.name} <span className="font-normal text-gray-900 dark:text-gray-100">({marked}/{g.items.length})</span>
+                    </span>
+                    <button type="button" className="text-xs text-brand-600 hover:underline" onClick={() => setGroup(g.items, marked < g.items.length)}>
+                      {marked < g.items.length ? 'Marcar todos' : 'Desmarcar todos'}
+                    </button>
+                    {marked > 0 && (
+                      <>
+                        <button type="button" className="text-xs text-red-600 hover:underline" onClick={() => setGroupOptional(g.items, false)}>
+                          Todos somem
+                        </button>
+                        <button type="button" className="text-xs text-amber-700 hover:underline" onClick={() => setGroupOptional(g.items, true)}>
+                          Todos dá pra tirar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {g.items.map((p) => (
+                    <div key={p.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5 text-sm">
+                      <label className="flex items-center gap-2">
+                        <input type="checkbox" checked={productIds.has(p.id)} onChange={() => flip(productIds, setProductIds, p.id)} />
+                        <span>{p.name}</span>
+                        {productIds.has(p.id) && matchedBy.get(p.id) && (
+                          <span className="rounded bg-gray-100 px-1 text-[10px] uppercase text-gray-900 dark:text-gray-100 dark:bg-gray-800" title={p.description}>
+                            {matchedBy.get(p.id) === 'name' ? 'no nome' : 'na receita'}
+                          </span>
+                        )}
+                      </label>
+                      {productIds.has(p.id) && (
+                        <select
+                          className="input !w-auto !py-0.5 !text-sm"
+                          value={optionalIds.has(p.id) ? 'optional' : 'essential'}
+                          onChange={(e) => {
+                            const next = new Set(optionalIds);
+                            if (e.target.value === 'optional') next.add(p.id);
+                            else next.delete(p.id);
+                            setOptionalIds(next);
+                          }}
+                        >
+                          <option value="essential">Some do cardápio</option>
+                          <option value="optional">Dá pra tirar</option>
+                        </select>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase text-gray-400">Sabores e adicionais ({additionalIds.size})</p>
-            {visibleAdditionals.length === 0 && <p className="text-sm text-gray-400">Nada aqui.</p>}
+            <p className="mb-1 text-xs font-semibold uppercase text-gray-900 dark:text-gray-100">Sabores e adicionais ({additionalIds.size})</p>
+            {visibleAdditionals.length === 0 && <p className="text-sm text-gray-900 dark:text-gray-100">Nada aqui.</p>}
             {visibleAdditionals.map((a) => (
               <label key={a.id} className="flex items-center gap-2 py-0.5 text-sm">
                 <input type="checkbox" checked={additionalIds.has(a.id)} onChange={() => flip(additionalIds, setAdditionalIds, a.id)} />
                 <span>{a.name}</span>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-900 dark:text-gray-100">
                   {categoryName(a.categoryId)} · {a.kind === 'BASE' ? 'Sabor' : 'Adicional'}
                 </span>
               </label>

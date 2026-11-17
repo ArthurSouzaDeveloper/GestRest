@@ -354,7 +354,7 @@ export function OrderComposer({
         <div className="relative mb-3">
           <Search
             size={17}
-            className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${isPublic ? 'text-[#6B4A78]' : 'text-gray-400'}`}
+            className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${isPublic ? 'text-[#6B4A78]' : 'text-gray-900 dark:text-gray-100'}`}
           />
           <input
             className={
@@ -368,7 +368,7 @@ export function OrderComposer({
           />
           {search && (
             <button
-              className={`absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 ${isPublic ? 'text-[#6B4A78] hover:text-brand' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 ${isPublic ? 'text-[#6B4A78] hover:text-brand' : 'text-gray-900 dark:text-gray-100 hover:text-black'}`}
               onClick={() => setSearch('')}
               title="Limpar"
             >
@@ -392,7 +392,7 @@ export function OrderComposer({
                     className={
                       isPublic
                         ? `flex min-h-12 items-center justify-center gap-1.5 rounded-full px-2 text-center text-[13.5px] font-bold leading-tight transition ${active ? 'bg-brand text-white shadow-sm' : 'bg-white text-[#6B4A78]'}`
-                        : `flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 text-center text-[14px] font-bold leading-tight transition ${active ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
+                        : `flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 text-center text-[14px] font-bold leading-tight transition ${active ? 'border-transparent bg-brand text-white shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
                     }
                     onClick={() => setTopGroup(group)}
                   >
@@ -416,7 +416,7 @@ export function OrderComposer({
                     className={
                       isPublic
                         ? `h-10 shrink-0 whitespace-nowrap rounded-full px-4 text-[13.5px] font-bold transition ${activeCat === chip.key ? 'bg-brand text-white' : 'bg-white text-[#6B4A78]'}`
-                        : `h-9 shrink-0 whitespace-nowrap rounded-full border px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'border-transparent bg-brand text-white' : 'border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
+                        : `h-9 shrink-0 whitespace-nowrap rounded-full border px-4 text-[13px] font-semibold transition ${activeCat === chip.key ? 'border-transparent bg-brand text-white' : 'border-gray-300 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`
                     }
                     onClick={() => setActiveCat(chip.key)}
                   >
@@ -436,7 +436,7 @@ export function OrderComposer({
             <JuiceBuilder products={filtered} categoryId={activeCat} onAdd={addFromBuilder} basePath={basePath} variant={variant} />
           </div>
         ) : filtered.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-400">
+          <p className="py-8 text-center text-sm text-gray-900 dark:text-gray-100">
             {searching
               ? `Nenhum produto encontrado para "${search}".`
               : activeCat === 'all'
@@ -523,13 +523,13 @@ export function OrderComposer({
                         pastel e na mini pizza) ficavam indistinguíveis em "Todos", e dava pra
                         adicionar o item errado sem perceber. */}
                     {(searching || activeCat === 'all') && (
-                      <span className="mb-0.5 block w-fit rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800">
+                      <span className="mb-0.5 block w-fit rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-900 dark:text-gray-100 dark:bg-gray-800">
                         {productBadgeLabel(p)}
                       </span>
                     )}
                     <div className="text-[15px] font-semibold leading-tight text-gray-900 dark:text-gray-50">{p.name}</div>
                     {p.description && (
-                      <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-gray-500">{p.description}</div>
+                      <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-gray-900 dark:text-gray-100">{p.description}</div>
                     )}
                     {p.missingIngredients && p.missingIngredients.length > 0 && (
                         <div className="mt-0.5 text-xs font-semibold text-red-600">Sem {p.missingIngredients.join(', ').toLowerCase()} hoje</div>
@@ -542,7 +542,7 @@ export function OrderComposer({
                     {qty > 0 && (
                       <button
                         onClick={() => setConfiguring({ product: p, index: draft.findIndex((d) => d.product.id === p.id) })}
-                        className="-m-1.5 p-1.5 text-gray-400 hover:text-brand"
+                        className="-m-1.5 p-1.5 text-gray-900 dark:text-gray-100 hover:text-brand"
                         title="Personalizar"
                       >
                         <Pencil size={18} />
@@ -585,7 +585,7 @@ export function OrderComposer({
           este painel nunca aparece: a página já tem seu próprio carrinho (CartStep/CartBar). */}
       {!isPublic && draft.length > 0 && (
       <div>
-        <h4 className="mb-2 text-sm font-medium text-gray-600 dark:text-gray-300">Itens do pedido</h4>
+        <h4 className="mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">Itens do pedido</h4>
         <div className="space-y-2">
           {draft.map((item, i) => (
             <div key={i} className="card p-3">
@@ -593,14 +593,14 @@ export function OrderComposer({
                 <div className="min-w-0">
                   <div className="text-sm font-medium">{draftItemLabel(item)}</div>
                   {item.comboProductIds && item.comboProductIds.length > 1 && (
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-900 dark:text-gray-100">
                       + {brl(EXTRA_FRUIT_PRICE * (item.comboProductIds.length - 1))} fruta extra
                     </div>
                   )}
                   {/* "Monte o Seu" já mostra os ingredientes no nome acima (draftItemLabel)
                       — repetir "+N adicional(is)" aqui seria redundante. */}
                   {!item.product.isCustom && item.additionalIds.length > 0 && (
-                    <div className="text-xs text-gray-500">+ {item.additionalIds.length} adicional(is)</div>
+                    <div className="text-xs text-gray-900 dark:text-gray-100">+ {item.additionalIds.length} adicional(is)</div>
                   )}
                   <div className="text-xs font-semibold text-brand">{brl(draftItemUnitPrice(item) * item.quantity)}</div>
                 </div>
@@ -629,7 +629,7 @@ export function OrderComposer({
                   </button>
                 </div>
               </div>
-              {item.notes && <div className="mt-1 text-xs italic text-gray-500">“{item.notes}”</div>}
+              {item.notes && <div className="mt-1 text-xs italic text-gray-900 dark:text-gray-100">“{item.notes}”</div>}
             </div>
           ))}
         </div>
@@ -765,7 +765,7 @@ function ItemConfigModal({
                   >
                     <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{b.name}</span>
                     <span className="flex items-center gap-3">
-                      <span className="text-xs text-gray-400">{brl(b.price)}</span>
+                      <span className="text-xs text-gray-900 dark:text-gray-100">{brl(b.price)}</span>
                       <span
                         className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
                       >
@@ -790,7 +790,7 @@ function ItemConfigModal({
               className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left text-[13.5px] font-semibold transition ${
                 showAddons
                   ? 'border-brand text-brand'
-                  : 'border-gray-200 text-gray-600 hover:border-brand hover:text-brand dark:border-gray-700 dark:text-gray-300'
+                  : 'border-gray-200 text-gray-900 hover:border-brand hover:text-brand dark:border-gray-700 dark:text-gray-300'
               }`}
             >
               {showAddons ? 'Adicionais' : 'Adicionais (opcional)'}
@@ -800,7 +800,7 @@ function ItemConfigModal({
               <div className="mt-2">
                 {groupAddons(addons).map(({ group, items }, idx) => (
                   <div key={group} className={idx > 0 ? 'mt-3 border-t border-gray-200 pt-3 dark:border-gray-800' : ''}>
-                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{group}</div>
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-900 dark:text-gray-100">{group}</div>
                     <div className="space-y-2">
                       {items.map((a) => {
                         const on = selected.includes(a.id);
@@ -812,7 +812,7 @@ function ItemConfigModal({
                           >
                             <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
                             <span className="flex items-center gap-3">
-                              <span className="text-xs text-gray-400">+{brl(a.price)}</span>
+                              <span className="text-xs text-gray-900 dark:text-gray-100">+{brl(a.price)}</span>
                               <span
                                 className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
                               >

@@ -9,7 +9,6 @@ import type { ProductionTicket } from '../types';
 
 interface Props {
   title: string;
-  subtitle: string;
   endpoint: string; // '/production/kitchen' | '/production/juice-bar'
   room: string; // 'kitchen' | 'juice_bar'
   queryKey: string;
@@ -54,7 +53,7 @@ function groupByOrder(tickets: ProductionTicket[]): OrderBlock[] {
 }
 
 /** Full-station board for Kitchen / Juice Bar with large touch targets. */
-export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: Props) {
+export function ProductionBoard({ title, endpoint, room, queryKey }: Props) {
   useRealtime([room], [[queryKey]]);
   const qc = useQueryClient();
 
@@ -79,10 +78,10 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
 
   return (
     <div>
-      <PageHeader title={title} subtitle={subtitle} action={<span className="text-sm text-gray-500">{tickets.length} em fila</span>} />
+      <PageHeader title={title} action={<span className="text-sm text-gray-900 dark:text-gray-100">{tickets.length} em fila</span>} />
 
       {blocks.length === 0 ? (
-        <div className="card p-10 text-center text-gray-400">
+        <div className="card p-10 text-center text-gray-900 dark:text-gray-100">
           <Check size={22} className="mx-auto mb-2 text-green-500" />
           Nenhum item na fila
         </div>
@@ -99,21 +98,21 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
                     {block.tableNumber !== null ? `Mesa ${block.tableNumber}` : orderTypeLabels[block.orderType]}
                   </span>
                   {/* Uma mesa pode ter várias comandas simultâneas — o nº da comanda desambigua. */}
-                  <span className="rounded-md bg-gray-100 px-2.5 py-1.5 text-sm font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                  <span className="rounded-md bg-gray-100 px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:bg-gray-800 dark:text-gray-300">
                     #{block.orderNumber}
                   </span>
                 </span>
                 <span
                   className={clsx(
                     'flex items-center gap-1 text-base font-medium',
-                    block.critical ? 'text-red-600' : 'text-gray-500',
+                    block.critical ? 'text-red-600' : 'text-gray-900 dark:text-gray-100',
                   )}
                 >
                   {block.critical ? <AlertTriangle size={18} /> : <Clock size={18} />}
                   {block.waitingMin} min
                 </span>
               </div>
-              {block.customerName && <div className="mt-1 text-sm text-gray-500">Cliente: {block.customerName}</div>}
+              {block.customerName && <div className="mt-1 text-sm text-gray-900 dark:text-gray-100">Cliente: {block.customerName}</div>}
 
               <div className="mt-3 flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
                 {block.items.map((item) => (
@@ -132,7 +131,7 @@ export function ProductionBoard({ title, subtitle, endpoint, room, queryKey }: P
                       {item.quantity}× {item.productName}
                     </div>
                     {item.additionals.length > 0 && (
-                      <div className="mt-1 text-base text-gray-600 dark:text-gray-300">
+                      <div className="mt-1 text-base text-gray-900 dark:text-gray-300">
                         <span className="font-medium">Adicionais:</span> {item.additionals.join(', ')}
                       </div>
                     )}

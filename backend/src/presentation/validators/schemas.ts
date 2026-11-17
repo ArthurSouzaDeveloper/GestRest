@@ -79,6 +79,12 @@ export const categoryUpdateSchema = z
   })
   .strict();
 
+// Ingredientes do produto: por nome (o insumo é criado se ainda não existe). `optional`:
+// "dá pra tirar" (em falta, o produto continua à venda, sem ele). Sem `optional`: some do cardápio.
+const productIngredients = z
+  .array(z.object({ name: text(z.string().min(2).max(60)), optional: z.boolean().optional() }))
+  .max(60);
+
 export const productSchema = z.object({
   name: text(z.string().min(2)),
   description: text(z.string()).optional(),
@@ -88,6 +94,7 @@ export const productSchema = z.object({
   imageUrl: z.string().optional(),
   available: z.boolean().optional(),
   isCustom: z.boolean().optional(),
+  ingredients: productIngredients.optional(),
 });
 
 export const productUpdateSchema = z
@@ -100,6 +107,7 @@ export const productUpdateSchema = z
     imageUrl: z.string().optional(),
     available: z.boolean().optional(),
     isCustom: z.boolean().optional(),
+    ingredients: productIngredients.optional(),
   })
   .strict();
 

@@ -64,15 +64,15 @@ export default function Cashier() {
 
   return (
     <div>
-      <PageHeader title="Caixa" subtitle="Pedidos prontos para pagamento" />
+      <PageHeader title="Caixa" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         {/* Left: ready orders, grouped by table */}
         <div className="space-y-4">
-          {orders.length === 0 && <div className="card p-6 text-center text-sm text-gray-400">Nenhum pedido pronto.</div>}
+          {orders.length === 0 && <div className="card p-6 text-center text-sm text-gray-900 dark:text-gray-100">Nenhum pedido pronto.</div>}
 
           {tables.map((t) => (
             <div key={t.number}>
-              <div className="mb-1 flex items-center justify-between px-1 text-xs font-medium uppercase tracking-wide text-gray-400">
+              <div className="mb-1 flex items-center justify-between px-1 text-xs font-medium uppercase tracking-wide text-gray-900 dark:text-gray-100">
                 <span>
                   Mesa {t.number} {t.orders.length > 1 && `· ${t.orders.length} comandas`}
                 </span>
@@ -89,7 +89,7 @@ export default function Cashier() {
           {standalone.length > 0 && (
             <div>
               {tables.length > 0 && (
-                <div className="mb-1 px-1 text-xs font-medium uppercase tracking-wide text-gray-400">Delivery / Retirada</div>
+                <div className="mb-1 px-1 text-xs font-medium uppercase tracking-wide text-gray-900 dark:text-gray-100">Delivery / Retirada</div>
               )}
               <div className="space-y-2">
                 {standalone.map((o) => (
@@ -102,7 +102,7 @@ export default function Cashier() {
 
         {/* Right: detail + payment */}
         {selected ? <PaymentPanel order={selected} onPaid={() => qc.invalidateQueries({ queryKey: ['ready-orders'] })} /> : (
-          <div className="card flex items-center justify-center p-10 text-gray-400">
+          <div className="card flex items-center justify-center p-10 text-gray-900 dark:text-gray-100">
             <Receipt className="mr-2" /> Selecione um pedido
           </div>
         )}
@@ -122,11 +122,11 @@ function OrderButton({ order: o, selected, onSelect }: { order: Order; selected:
       <div className="flex items-center justify-between">
         <span className="font-semibold">
           {o.table ? `Mesa ${o.table.number}` : orderTypeLabels[o.orderType]}{' '}
-          <span className="font-normal text-gray-400">· Comanda #{o.number}</span>
+          <span className="font-normal text-gray-900 dark:text-gray-100">· Comanda #{o.number}</span>
         </span>
         <span className="font-semibold text-brand">{brl(o.totals.total)}</span>
       </div>
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-gray-900 dark:text-gray-100">
         {o.customer?.name ?? 'Sem nome'} · {o.items.length} itens · {time(o.openedAt)}
       </div>
     </button>
@@ -197,7 +197,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
           <h3 className="font-semibold">
             {order.table ? `Mesa ${order.table.number}` : orderTypeLabels[order.orderType]} — Comanda #{order.number}
           </h3>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-900 dark:text-gray-100">
             {order.waiter ? `Garçom: ${order.waiter.name}` : order.customer?.name ? `Cliente: ${order.customer.name}` : '—'}
           </span>
         </div>
@@ -206,7 +206,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
       {/* Items */}
       <div className="max-h-[38vh] overflow-y-auto p-4">
         <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-gray-400">
+          <thead className="text-left text-xs uppercase text-gray-900 dark:text-gray-100">
             <tr>
               <th className="pb-2">Item</th>
               <th className="pb-2 text-center">Qtd</th>
@@ -223,7 +223,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
                   <td className="py-2">
                     {it.comboLabel ?? it.product.name}
                     {it.additionals.length > 0 && (
-                      <div className="text-xs text-gray-400">+ {it.additionals.map((a) => a.name).join(', ')}</div>
+                      <div className="text-xs text-gray-900 dark:text-gray-100">+ {it.additionals.map((a) => a.name).join(', ')}</div>
                     )}
                     {!!it.removedIngredients?.length && (
                       <div className="text-xs font-semibold text-red-600">sem {it.removedIngredients.join(', ').toLowerCase()}</div>
@@ -248,7 +248,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
       <div className="space-y-1 border-t border-gray-100 p-4 text-sm dark:border-gray-800">
         <Row label="Subtotal" value={brl(order.totals.subtotal)} />
         <div className="flex items-center justify-between">
-          <span className="text-gray-500">Desconto</span>
+          <span className="text-gray-900 dark:text-gray-100">Desconto</span>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -276,7 +276,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
         <div className="mb-2 text-sm font-medium">Pagamento</div>
 
         <div className="mb-4 rounded-md border border-gray-200 p-3 dark:border-gray-800">
-          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Dividir a conta</div>
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-900 dark:text-gray-100">Dividir a conta</div>
           <div className="flex flex-wrap items-end gap-2">
             <div>
               <label className="label">Pessoas</label>
@@ -298,9 +298,6 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
               Gerar {Math.max(1, Math.floor(splitCount))}x de {brl(perPerson)}
             </button>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
-            Gera uma parcela por pessoa com o valor restante dividido igualmente. Você ainda pode ajustar cada valor abaixo.
-          </p>
         </div>
 
         <div className="mb-3 flex flex-wrap gap-2">
@@ -369,7 +366,7 @@ function PaymentPanel({ order, onPaid }: { order: Order; onPaid: () => void }) {
 function Row({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div className="flex justify-between">
-      <span className="text-gray-500">{label}</span>
+      <span className="text-gray-900 dark:text-gray-100">{label}</span>
       <span className={`font-medium ${accent ?? ''}`}>{value}</span>
     </div>
   );

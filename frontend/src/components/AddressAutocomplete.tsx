@@ -83,7 +83,7 @@ export default function AddressAutocomplete({
       {showDropdown && (
         <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-[6px] border border-[#14161C]/[0.15] bg-white shadow-lg">
           {isFetching && suggestions.length === 0 && (
-            <div className="flex items-center gap-2 p-3 text-xs text-gray-400">
+            <div className="flex items-center gap-2 p-3 text-xs text-gray-900 dark:text-gray-100">
               <Loader2 size={13} className="animate-spin" /> Buscando endereço...
             </div>
           )}

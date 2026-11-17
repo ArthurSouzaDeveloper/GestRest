@@ -48,7 +48,6 @@ export default function Tables() {
     <div>
       <PageHeader
         title="Mesas"
-        subtitle="Uma mesa pode ter várias comandas abertas ao mesmo tempo — cada grupo fecha a sua"
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
@@ -123,7 +122,7 @@ function ComandasListModal({
   return (
     <Modal open={!!table} onClose={onClose} title={`Mesa ${table?.number ?? ''} — Comandas`}>
       <div className="space-y-3">
-        {comandas.length === 0 && <p className="text-sm text-gray-400">Nenhuma comanda aberta nesta mesa.</p>}
+        {comandas.length === 0 && <p className="text-sm text-gray-900 dark:text-gray-100">Nenhuma comanda aberta nesta mesa.</p>}
         <div className="space-y-2">
           {comandas.map((o) => (
             <button
@@ -135,11 +134,11 @@ function ComandasListModal({
                 <div className="text-sm font-medium">
                   Comanda #{o.number} {o.customer?.name ? `— ${o.customer.name}` : ''}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-900 dark:text-gray-100">
                   {o.peopleCount} pessoa(s) · aberta às {time(o.openedAt)}
                 </div>
               </div>
-              <span className="text-xs font-medium text-gray-500">{orderStatusLabels[o.status]}</span>
+              <span className="text-xs font-medium text-gray-900 dark:text-gray-100">{orderStatusLabels[o.status]}</span>
             </button>
           ))}
         </div>
@@ -180,11 +179,6 @@ function OpenTableModal({
       title={isAdditional ? `Nova Comanda — Mesa ${table?.number ?? ''}` : `Abrir Mesa ${table?.number ?? ''}`}
     >
       <div className="space-y-4">
-        {isAdditional && (
-          <p className="text-xs text-gray-500">
-            Esta mesa já tem comanda(s) aberta(s). Esta será uma comanda separada, com conta própria.
-          </p>
-        )}
         <div>
           <label className="label">Nome do cliente (opcional)</label>
           <input className="input" value={customerName} onChange={(e) => setName(e.target.value)} />
@@ -277,7 +271,7 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
       ) : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-900 dark:text-gray-100">
               <span>Cliente: {order.customer?.name ?? '—'}</span>
               <span>Garçom: {order.waiter?.name ?? '—'}</span>
               <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-200">
@@ -311,18 +305,18 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
                     <div>
                       <span className="font-medium">{it.quantity}× {it.comboLabel ?? it.product.name}</span>
                       {it.additionals.length > 0 && (
-                        <span className="text-xs text-gray-500"> ({it.additionals.map((a) => a.name).join(', ')})</span>
+                        <span className="text-xs text-gray-900 dark:text-gray-100"> ({it.additionals.map((a) => a.name).join(', ')})</span>
                       )}
                       {!!it.removedIngredients?.length && (
                         <span className="ml-1 text-xs font-semibold text-red-600">sem {it.removedIngredients.join(', ').toLowerCase()}</span>
                       )}
-                      {it.notes && <span className="ml-1 text-xs italic text-gray-500">— {it.notes}</span>}
+                      {it.notes && <span className="ml-1 text-xs italic text-gray-900 dark:text-gray-100">— {it.notes}</span>}
                     </div>
                     <div className="flex items-center gap-2">
                       <ProductionBadge status={it.status} />
                       {it.status !== 'CANCELLED' && (
                         <button
-                          className="text-gray-400 hover:text-red-600"
+                          className="text-gray-900 dark:text-gray-100 hover:text-red-600"
                           title="Cancelar item (lançado por engano)"
                           disabled={cancelItem.isPending}
                           onClick={() => {
@@ -337,7 +331,7 @@ function OrderModal({ orderId, onClose }: { orderId: string; onClose: () => void
                 ))}
               </div>
               <div className="mt-3 flex justify-between border-t border-gray-100 pt-2 text-sm dark:border-gray-800">
-                <span className="text-gray-500">Total parcial</span>
+                <span className="text-gray-900 dark:text-gray-100">Total parcial</span>
                 <span className="font-semibold">{brl(order.totals.total)}</span>
               </div>
             </Card>

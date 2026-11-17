@@ -28,13 +28,12 @@ export default function Reports() {
     <div>
       <PageHeader
         title="Relatórios"
-        subtitle="Análise de vendas e desempenho"
         action={<button className="btn-secondary" onClick={exportCsv}>Exportar CSV</button>}
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card><div className="text-sm text-gray-500">Faturamento Diário</div><div className="mt-1 text-2xl font-semibold text-green-600">{brl(data.revenue.daily)}</div></Card>
-        <Card><div className="text-sm text-gray-500">Faturamento Semanal</div><div className="mt-1 text-2xl font-semibold">{brl(data.revenue.weekly)}</div></Card>
-        <Card><div className="text-sm text-gray-500">Faturamento Mensal</div><div className="mt-1 text-2xl font-semibold">{brl(data.revenue.monthly)}</div></Card>
+        <Card><div className="text-sm text-gray-900 dark:text-gray-100">Faturamento Diário</div><div className="mt-1 text-2xl font-semibold text-green-600">{brl(data.revenue.daily)}</div></Card>
+        <Card><div className="text-sm text-gray-900 dark:text-gray-100">Faturamento Semanal</div><div className="mt-1 text-2xl font-semibold">{brl(data.revenue.weekly)}</div></Card>
+        <Card><div className="text-sm text-gray-900 dark:text-gray-100">Faturamento Mensal</div><div className="mt-1 text-2xl font-semibold">{brl(data.revenue.monthly)}</div></Card>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">

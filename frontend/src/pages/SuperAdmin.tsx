@@ -15,7 +15,7 @@ export default function SuperAdmin() {
     // Logado, mas não é superadmin.
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
-        <p className="text-gray-600">Esta área é exclusiva do super administrador.</p>
+        <p className="text-gray-900 dark:text-gray-100">Esta área é exclusiva do super administrador.</p>
         <a href="/" className="btn-primary">Ir para o sistema</a>
       </div>
     );
@@ -50,7 +50,7 @@ function SuperLogin({ login }: { login: (e: string, p: string) => Promise<void> 
             GR
           </div>
           <h1 className="text-xl font-semibold">Painel da Plataforma</h1>
-          <p className="text-sm text-gray-500">Super administrador · GestRest</p>
+          <p className="text-sm text-gray-900 dark:text-gray-100">Super administrador · GestRest</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div>
@@ -108,7 +108,7 @@ function Console({ onLogout, name }: { onLogout: () => void; name: string }) {
           <span className="font-semibold">GestRest · Plataforma</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">{name}</span>
+          <span className="text-sm text-gray-900 dark:text-gray-100">{name}</span>
           <button className="btn-secondary" onClick={onLogout} title="Sair"><LogOut size={16} /></button>
         </div>
       </header>
@@ -117,7 +117,6 @@ function Console({ onLogout, name }: { onLogout: () => void; name: string }) {
         <div className="mb-6 flex items-end justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Restaurantes</h1>
-            <p className="mt-1 text-sm text-gray-500">Cada restaurante tem seu próprio link, equipe e cardápio.</p>
           </div>
           <button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Novo Restaurante</button>
         </div>
@@ -141,12 +140,12 @@ function Console({ onLogout, name }: { onLogout: () => void; name: string }) {
                     </a>
                   </div>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${r.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${r.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-900 dark:text-gray-100'}`}
                   >
                     {r.active ? 'Ativo' : 'Inativo'}
                   </span>
                 </div>
-                <div className="mt-3 flex gap-4 text-xs text-gray-500">
+                <div className="mt-3 flex gap-4 text-xs text-gray-900 dark:text-gray-100">
                   <span>{r.counts.users} usuários</span>
                   <span>{r.counts.products} produtos</span>
                   <span>{r.counts.orders} pedidos</span>
@@ -251,10 +250,6 @@ function EditBranding({ restaurant, onClose }: { restaurant: RestaurantSummary; 
         <div className="space-y-5">
           <div>
             <h3 className="mb-2 text-sm font-semibold">Cor da marca</h3>
-            <p className="mb-3 text-xs text-gray-500">
-              Os tons claros/escuros usados no site (fundo de painel, gradiente de botão) são calculados
-              automaticamente a partir dessa cor só.
-            </p>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="color"
@@ -278,10 +273,6 @@ function EditBranding({ restaurant, onClose }: { restaurant: RestaurantSummary; 
 
           <div>
             <h3 className="mb-2 text-sm font-semibold">Logo</h3>
-            <p className="mb-3 text-xs text-gray-500">
-              Sem logo enviada, o site mostra as iniciais do restaurante num distintivo na cor da marca. PNG,
-              JPEG ou WebP, até 3 MB.
-            </p>
             <div className="flex items-center gap-3">
               {settings.logoUrl ? (
                 <img src={settings.logoUrl} alt="Logo atual" className="h-16 w-16 rounded-full object-cover" />
@@ -370,7 +361,7 @@ function CreateRestaurant({
           <div className="rounded-md bg-gray-100 p-3 font-mono text-brand dark:bg-gray-800">
             {origin}/r/{created.slug}
           </div>
-          <p className="text-gray-500">O administrador já pode entrar com o e-mail e senha que você definiu e montar o cardápio.</p>
+          <p className="text-gray-900 dark:text-gray-100">O administrador já pode entrar com o e-mail e senha que você definiu e montar o cardápio.</p>
           <div className="flex justify-end">
             <button className="btn-primary" onClick={onSaved}>Concluir</button>
           </div>
@@ -389,10 +380,10 @@ function CreateRestaurant({
         <div>
           <label className="label">Link (slug) — opcional</label>
           <input className="input" placeholder="gerado do nome" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-          {slugPreview && <p className="mt-1 text-xs text-gray-500">{origin}/r/{slugPreview}</p>}
+          {slugPreview && <p className="mt-1 text-xs text-gray-900 dark:text-gray-100">{origin}/r/{slugPreview}</p>}
         </div>
         <hr className="border-gray-100 dark:border-gray-800" />
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Administrador do restaurante</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-900 dark:text-gray-100">Administrador do restaurante</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Nome</label>

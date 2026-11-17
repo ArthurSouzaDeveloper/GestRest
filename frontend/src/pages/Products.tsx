@@ -5,7 +5,8 @@ import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
 import { IngredientsPanel } from '../components/IngredientsPanel';
-import type { Additional, Category, Product } from '../types';
+import { ProductIngredientsField, type ProductIngredient } from '../components/ProductIngredientsField';
+import type { Additional, Category, Ingredient, Product } from '../types';
 
 export default function Products() {
   const qc = useQueryClient();
@@ -38,6 +39,7 @@ export default function Products() {
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['products'] });
     qc.invalidateQueries({ queryKey: ['products', 'admin'] });
+    qc.invalidateQueries({ queryKey: ['ingredients'] });
   };
 
   const toggleAvailable = useMutation({
@@ -64,7 +66,6 @@ export default function Products() {
     <div>
       <PageHeader
         title="Produtos"
-        subtitle="Catálogo do restaurante"
         action={<button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Novo Produto</button>}
       />
 
@@ -75,7 +76,7 @@ export default function Products() {
       <Card className="!p-0">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
+          <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-900 dark:text-gray-100 dark:border-gray-800">
             <tr>
               <th className="p-3">Nome</th>
               <th className="p-3">Categoria</th>
@@ -89,15 +90,15 @@ export default function Products() {
             {filtered.map((p) => (
               <tr key={p.id} className="border-b border-gray-50 dark:border-gray-800">
                 <td className="p-3 font-medium">{p.name}</td>
-                <td className="p-3 text-gray-500">{p.category?.name}</td>
+                <td className="p-3 text-gray-900 dark:text-gray-100">{p.category?.name}</td>
                 <td className="p-3 text-right">{brl(p.price)}</td>
-                <td className="p-3 text-center text-gray-500">{p.avgPrepMin} min</td>
+                <td className="p-3 text-center text-gray-900 dark:text-gray-100">{p.avgPrepMin} min</td>
                 <td className="p-3 text-center">
                   <button
                     className={`rounded-full px-2 py-0.5 text-xs font-medium transition ${
                       p.available
                         ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
-                        : 'bg-gray-200 text-gray-600 hover:bg-green-100 hover:text-green-700'
+                        : 'bg-gray-200 text-gray-900 dark:text-gray-100 hover:bg-green-100 hover:text-green-700'
                     }`}
                     disabled={toggleAvailable.isPending}
                     title={p.available ? 'Marcar como esgotado' : 'Marcar como disponível'}
@@ -122,14 +123,11 @@ export default function Products() {
         </div>
       </Card>
 
-      <h2 className="mb-1 mt-8 text-lg font-semibold">Sabores e adicionais</h2>
-      <p className="mb-3 text-sm text-gray-500">
-        Sabores do "Monte o Seu" e adicionais. Marcado como esgotado, some do site e do pedido até ser reativado.
-      </p>
+      <h2 className="mb-3 mt-8 text-lg font-semibold">Sabores e adicionais</h2>
       <Card className="!p-0">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
+          <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-900 dark:text-gray-100 dark:border-gray-800">
             <tr>
               <th className="p-3">Nome</th>
               <th className="p-3">Categoria</th>
@@ -142,15 +140,15 @@ export default function Products() {
             {filteredAdditionals.map((a) => (
               <tr key={a.id} className="border-b border-gray-50 dark:border-gray-800">
                 <td className="p-3 font-medium">{a.name}</td>
-                <td className="p-3 text-gray-500">{categoryName(a.categoryId)}</td>
-                <td className="p-3 text-gray-500">{a.kind === 'BASE' ? 'Sabor' : 'Adicional'}</td>
+                <td className="p-3 text-gray-900 dark:text-gray-100">{categoryName(a.categoryId)}</td>
+                <td className="p-3 text-gray-900 dark:text-gray-100">{a.kind === 'BASE' ? 'Sabor' : 'Adicional'}</td>
                 <td className="p-3 text-right">{brl(a.price)}</td>
                 <td className="p-3 text-center">
                   <button
                     className={`rounded-full px-2 py-0.5 text-xs font-medium transition ${
                       a.active
                         ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
-                        : 'bg-gray-200 text-gray-600 hover:bg-green-100 hover:text-green-700'
+                        : 'bg-gray-200 text-gray-900 dark:text-gray-100 hover:bg-green-100 hover:text-green-700'
                     }`}
                     disabled={toggleAdditional.isPending}
                     title={a.active ? 'Marcar como esgotado' : 'Marcar como disponível'}
@@ -211,9 +209,29 @@ function ProductForm({
   });
   const [error, setError] = useState('');
 
+  // Ingredientes: vêm dos insumos já ligados a este produto. `null` = o admin não mexeu,
+  // então não mandamos nada (não apaga vínculo por engano).
+  const { data: allIngredients = [], isSuccess: ingredientsLoaded } = useQuery({
+    queryKey: ['ingredients'],
+    queryFn: async () => (await api.get<Ingredient[]>('/catalog/ingredients')).data,
+  });
+  const [edited, setEdited] = useState<ProductIngredient[] | null>(null);
+  const ingredients: ProductIngredient[] =
+    edited ??
+    (product
+      ? allIngredients
+          .filter((i) => i.productIds.includes(product.id) || i.optionalProductIds.includes(product.id))
+          .map((i) => ({ name: i.name, optional: i.optionalProductIds.includes(product.id) }))
+      : []);
+
   const save = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, price: Number(form.price), avgPrepMin: Number(form.avgPrepMin) };
+      const payload = {
+        ...form,
+        price: Number(form.price),
+        avgPrepMin: Number(form.avgPrepMin),
+        ...(edited && !form.isCustom ? { ingredients: edited } : {}),
+      };
       if (product) return api.patch(`/catalog/products/${product.id}`, payload);
       return api.post('/catalog/products', payload);
     },
@@ -248,6 +266,16 @@ function ProductForm({
           <label className="label">Descrição</label>
           <textarea className="input" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </div>
+        {!form.isCustom && (
+          <div className={ingredientsLoaded ? '' : 'pointer-events-none opacity-60'}>
+            <ProductIngredientsField
+              value={ingredients}
+              onChange={setEdited}
+              description={form.description}
+              knownNames={allIngredients.map((i) => i.name)}
+            />
+          </div>
+        )}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.available} onChange={(e) => setForm({ ...form, available: e.target.checked })} />
           Disponível
@@ -261,9 +289,6 @@ function ProductForm({
           />
           <span>
             Produto montável (cliente escolhe a base)
-            <span className="block text-xs text-gray-500">
-              Exige um adicional do tipo "base" na categoria — a base dá o preço; deixe o preço do produto em R$ 0.
-            </span>
           </span>
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}
