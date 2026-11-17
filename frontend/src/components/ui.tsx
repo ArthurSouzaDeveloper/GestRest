@@ -19,7 +19,7 @@ export function PageHeader({ title, action }: { title: string; action?: ReactNod
 
 export function Spinner() {
   return (
-    <div className="flex items-center justify-center p-10 text-gray-400">
+    <div className="flex items-center justify-center p-10 text-gray-900 dark:text-gray-100">
       <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand" />
     </div>
   );
@@ -74,11 +74,11 @@ export function ProductionBadge({ status }: { status: ProductionStatus }) {
 }
 
 const tableStyles: Record<TableStatus, string> = {
-  FREE: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
+  FREE: 'bg-gray-100 text-gray-900 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
   OCCUPIED: 'bg-brand-50 text-brand-700 border-brand-100 dark:bg-brand/20 dark:text-blue-200',
   IN_PRODUCTION: 'bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-200',
   READY_FOR_PAYMENT: 'bg-green-50 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200',
-  CLOSED: 'bg-gray-200 text-gray-500 border-gray-300',
+  CLOSED: 'bg-gray-200 text-gray-900 dark:text-gray-100 border-gray-300',
 };
 export const tableLabels: Record<TableStatus, string> = {
   FREE: 'Livre',
@@ -106,7 +106,7 @@ export const orderTypeLabels: Record<OrderType, string> = {
   PICKUP: 'Retirada',
 };
 const orderTypeStyles: Record<OrderType, string> = {
-  DINE_IN: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+  DINE_IN: 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-300',
   DELIVERY: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   PICKUP: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
 };

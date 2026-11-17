@@ -44,7 +44,7 @@ export default function DeliveryZones() {
       <div className="mb-6 flex gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
         <button
           className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-            activeTab === 'ZONE' ? 'bg-brand text-white' : 'text-gray-500 hover:text-gray-700'
+            activeTab === 'ZONE' ? 'bg-brand text-white' : 'text-gray-900 dark:text-gray-100 hover:text-black'
           }`}
           onClick={() => setTab('ZONE')}
         >
@@ -52,7 +52,7 @@ export default function DeliveryZones() {
         </button>
         <button
           className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-            activeTab === 'DISTANCE_BANDS' ? 'bg-brand text-white' : 'text-gray-500 hover:text-gray-700'
+            activeTab === 'DISTANCE_BANDS' ? 'bg-brand text-white' : 'text-gray-900 dark:text-gray-100 hover:text-black'
           }`}
           onClick={() => setTab('DISTANCE_BANDS')}
         >
@@ -126,7 +126,7 @@ function EtaSettingsCard() {
       </div>
 
       {!isAdmin ? (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-900 dark:text-gray-100">
           {settings.mode === 'MANUAL'
             ? `Fixado por um administrador: ${settings.pickupMinutes} min (retirada) / ${settings.deliveryMinutes} min (entrega). Só administradores podem alterar.`
             : 'Calculado automaticamente conforme o fluxo de pedidos da cozinha. Só administradores podem alterar.'}
@@ -136,7 +136,7 @@ function EtaSettingsCard() {
           <div className="mb-3 flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-950">
             <button
               className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                mode === 'AUTO' ? 'bg-brand text-white' : 'text-gray-500 hover:text-gray-700'
+                mode === 'AUTO' ? 'bg-brand text-white' : 'text-gray-900 dark:text-gray-100 hover:text-black'
               }`}
               onClick={() => setMode('AUTO')}
             >
@@ -144,7 +144,7 @@ function EtaSettingsCard() {
             </button>
             <button
               className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                mode === 'MANUAL' ? 'bg-brand text-white' : 'text-gray-500 hover:text-gray-700'
+                mode === 'MANUAL' ? 'bg-brand text-white' : 'text-gray-900 dark:text-gray-100 hover:text-black'
               }`}
               onClick={() => setMode('MANUAL')}
             >
@@ -237,7 +237,7 @@ function AutoCompleteCard() {
         <h3 className="text-sm font-semibold">Conclusão automática pelo tempo estimado</h3>
         <span
           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-            on ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            on ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-900 dark:text-gray-100'
           }`}
         >
           {on ? `Ligado — previsto + ${settings.marginMinutes} min` : 'Desligado'}
@@ -245,7 +245,7 @@ function AutoCompleteCard() {
       </div>
 
       {!isAdmin ? (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-900 dark:text-gray-100">
           {on
             ? `Pedidos de retirada e entrega são marcados como prontos e entregues sozinhos ${settings.marginMinutes} min depois do horário previsto. Só administradores podem alterar.`
             : 'Desligado: a equipe conclui cada pedido manualmente. Só administradores podem alterar.'}
@@ -326,7 +326,7 @@ function AutoDeliverPickupCard() {
         <h3 className="text-sm font-semibold">Entrega automática de retirada</h3>
         <span
           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-            settings.minutes !== null ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            settings.minutes !== null ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-900 dark:text-gray-100'
           }`}
         >
           {settings.minutes !== null ? `Ligado — ${settings.minutes} min` : 'Desligado'}
@@ -334,7 +334,7 @@ function AutoDeliverPickupCard() {
       </div>
 
       {!isAdmin ? (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-900 dark:text-gray-100">
           {settings.minutes !== null
             ? `Um pedido de retirada "Pronto" é marcado como entregue sozinho depois de ${settings.minutes} min sem clique. Só administradores podem alterar.`
             : 'Desligado: a equipe precisa clicar em "Marcar Entregue" pra cada retirada. Só administradores podem alterar.'}
@@ -377,7 +377,7 @@ function ActiveBadge({ active }: { active: boolean }) {
   return (
     <span
       className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-        active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+        active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-900 dark:text-gray-100'
       }`}
     >
       {active ? 'Modo ativo — em uso no site' : 'Não ativo'}
@@ -430,7 +430,7 @@ function ZonesPanel({ active }: { active: boolean }) {
       </div>
 
       {zones.length === 0 && (
-        <div className="card mb-4 p-6 text-center text-sm text-gray-400">
+        <div className="card mb-4 p-6 text-center text-sm text-gray-900 dark:text-gray-100">
           Nenhum bairro cadastrado ainda. Sem bairros, o cliente não consegue escolher entrega no site.
         </div>
       )}
@@ -438,7 +438,7 @@ function ZonesPanel({ active }: { active: boolean }) {
       <Card className="!p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px] text-sm">
-            <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
+            <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-900 dark:text-gray-100 dark:border-gray-800">
               <tr>
                 <th className="p-3">Bairro</th>
                 <th className="p-3 text-right">Taxa</th>
@@ -456,7 +456,7 @@ function ZonesPanel({ active }: { active: boolean }) {
                       className={`rounded-full px-2 py-0.5 text-xs font-medium transition ${
                         z.active
                           ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
-                          : 'bg-gray-200 text-gray-600 hover:bg-green-100 hover:text-green-700'
+                          : 'bg-gray-200 text-gray-900 dark:text-gray-100 hover:bg-green-100 hover:text-green-700'
                       }`}
                       disabled={toggleActive.isPending}
                       title={z.active ? 'Desativar (some do site)' : 'Ativar (volta a aparecer no site)'}
@@ -649,14 +649,14 @@ function DistanceBandsPanel({ settings }: { settings: DeliveryPricingSettings })
       {isLoading ? (
         <Spinner />
       ) : bands.length === 0 ? (
-        <div className="card mb-4 p-6 text-center text-sm text-gray-400">
+        <div className="card mb-4 p-6 text-center text-sm text-gray-900 dark:text-gray-100">
           Nenhuma faixa cadastrada ainda. Sem faixas, nenhum endereço consegue pedir entrega nesse modo.
         </div>
       ) : (
         <Card className="!p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-sm">
-              <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
+              <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-900 dark:text-gray-100 dark:border-gray-800">
                 <tr>
                   <th className="p-3">Até (km)</th>
                   <th className="p-3 text-right">Taxa</th>
@@ -676,7 +676,7 @@ function DistanceBandsPanel({ settings }: { settings: DeliveryPricingSettings })
                           className={`rounded-full px-2 py-0.5 text-xs font-medium transition ${
                             b.active
                               ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
-                              : 'bg-gray-200 text-gray-600 hover:bg-green-100 hover:text-green-700'
+                              : 'bg-gray-200 text-gray-900 dark:text-gray-100 hover:bg-green-100 hover:text-green-700'
                           }`}
                           disabled={toggleActive.isPending}
                           title={b.active ? 'Desativar' : 'Ativar'}

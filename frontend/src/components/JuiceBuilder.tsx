@@ -175,14 +175,14 @@ export function JuiceBuilder({
   if (addingFruit) {
     return (
       <div className="space-y-4">
-        <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700" onClick={() => setAddingFruit(false)}>
+        <button className="flex items-center gap-1 text-sm text-gray-900 dark:text-gray-100 hover:text-black" onClick={() => setAddingFruit(false)}>
           <ChevronLeft size={16} /> Voltar
         </button>
-        <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
+        <div className="text-sm font-medium text-gray-900 dark:text-gray-300">
           Adicionar fruta ({base}) — soma {brl(EXTRA_FRUIT_PRICE)}
         </div>
         {candidatesToAdd.length === 0 ? (
-          <p className="text-sm text-gray-500">Nenhuma outra fruta disponível nessa base.</p>
+          <p className="text-sm text-gray-900 dark:text-gray-100">Nenhuma outra fruta disponível nessa base.</p>
         ) : (
           <div className="space-y-2">
             {candidatesToAdd.map((f) => (
@@ -359,19 +359,19 @@ export function JuiceBuilder({
     return (
       <div className="space-y-4">
         <button
-          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+          className="flex items-center gap-1 text-sm text-gray-900 dark:text-gray-100 hover:text-black"
           onClick={() => (standaloneChosen ? setStandaloneChosen(null) : setBase(null))}
         >
           <ChevronLeft size={16} /> {standaloneChosen ? 'Voltar' : 'Trocar base'}
         </button>
         <div className="border-b border-gray-200 pb-3.5 dark:border-gray-800">
-          <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Seu suco</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-900 dark:text-gray-100">Seu suco</div>
           {isCombo ? (
             <>
               <div className="mt-0.5 text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                {selectedFruits.map((f) => f.fruit).join(' + ')} <span className="font-normal text-gray-400">({base})</span>
+                {selectedFruits.map((f) => f.fruit).join(' + ')} <span className="font-normal text-gray-900 dark:text-gray-100">({base})</span>
               </div>
-              <ul className="mt-1.5 space-y-0.5 text-xs text-gray-500">
+              <ul className="mt-1.5 space-y-0.5 text-xs text-gray-900 dark:text-gray-100">
                 {effectiveProducts.map((p) => {
                   const fruitName = p.name.match(FRUIT_BASE_RE)?.[1] ?? p.name;
                   return (
@@ -380,7 +380,7 @@ export function JuiceBuilder({
                         {fruitName} — {brl(p.price)}
                         {p.id === primary.id && <span className="text-brand"> (preço base)</span>}
                       </span>
-                      <button onClick={() => removeFruit(fruitName)} className="-m-1.5 p-1.5 text-gray-400 hover:text-red-500" title="Remover fruta">
+                      <button onClick={() => removeFruit(fruitName)} className="-m-1.5 p-1.5 text-gray-900 dark:text-gray-100 hover:text-red-500" title="Remover fruta">
                         <X size={12} />
                       </button>
                     </li>
@@ -438,7 +438,7 @@ export function JuiceBuilder({
               className={`flex w-full items-center justify-between rounded-2xl border px-3.5 py-3 text-left text-[13.5px] font-semibold transition ${
                 showAdditionals
                   ? 'border-brand text-brand'
-                  : 'border-gray-200 text-gray-600 hover:border-brand hover:text-brand dark:border-gray-700 dark:text-gray-300'
+                  : 'border-gray-200 text-gray-900 hover:border-brand hover:text-brand dark:border-gray-700 dark:text-gray-300'
               }`}
             >
               {showAdditionals ? 'Adicionais' : 'Adicionais (opcional)'}
@@ -458,7 +458,7 @@ export function JuiceBuilder({
                     >
                       <span className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
                       <span className="flex items-center gap-3">
-                        <span className="text-xs text-gray-400">+{brl(a.price)}</span>
+                        <span className="text-xs text-gray-900 dark:text-gray-100">+{brl(a.price)}</span>
                         <span
                           className={`flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border ${on ? 'border-brand bg-brand' : 'border-gray-300 dark:border-gray-600'}`}
                         >
@@ -497,14 +497,14 @@ export function JuiceBuilder({
   if (selectedFruits.length > 0) {
     return (
       <div className="space-y-4">
-        <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700" onClick={() => setSelectedFruits([])}>
+        <button className="flex items-center gap-1 text-sm text-gray-900 dark:text-gray-100 hover:text-black" onClick={() => setSelectedFruits([])}>
           <ChevronLeft size={16} /> Trocar fruta
         </button>
-        <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <div className="text-xs font-semibold uppercase tracking-wide text-gray-900 dark:text-gray-100">
           {selectedFruits.map((f) => f.fruit).join(' + ')} — escolha a base
         </div>
         {commonBases.length === 0 ? (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-900 dark:text-gray-100">
             Essas frutas não têm nenhuma base em comum. Volte e escolha outra combinação.
           </p>
         ) : (
@@ -524,7 +524,7 @@ export function JuiceBuilder({
                 >
                   <span className={isPublic ? PUBLIC_ITEM_TEXT : 'text-[15px] font-medium text-gray-900 dark:text-gray-100'}>{baseName}</span>
                   <span className="flex items-center gap-2.5">
-                    <span className={isPublic ? PUBLIC_ITEM_TEXT : 'text-sm text-gray-400'}>{brl(previewPrice)}</span>
+                    <span className={isPublic ? PUBLIC_ITEM_TEXT : 'text-sm text-gray-900 dark:text-gray-100'}>{brl(previewPrice)}</span>
                     <ChevronRight size={18} className={isPublic ? 'text-[#C9A9D6]' : 'text-gray-300'} />
                   </span>
                 </button>
@@ -541,7 +541,7 @@ export function JuiceBuilder({
   return (
     <div className="space-y-4">
       <div>
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Escolha a fruta</div>
+        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-900 dark:text-gray-100">Escolha a fruta</div>
         {/* Sem scroll próprio aqui de propósito — pedido explícito do cliente: isso criava
             uma "caixa" branca de altura fixa (38vh) dentro do scroll já existente do
             catálogo (ver OrderComposer.tsx), cortando a visualização dos sabores mesmo
@@ -567,7 +567,7 @@ export function JuiceBuilder({
 
       {standalone.length > 0 && (
         <div>
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Sabores especiais</div>
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-900 dark:text-gray-100">Sabores especiais</div>
           <div className="space-y-2">
             {standalone.map((p) => (
               <button
@@ -581,7 +581,7 @@ export function JuiceBuilder({
               >
                 <span>
                   <span className={isPublic ? `block ${PUBLIC_ITEM_TEXT}` : 'block text-[15px] font-medium text-gray-900 dark:text-gray-100'}>{p.name}</span>
-                  <span className={isPublic ? `mt-0.5 block ${PUBLIC_ITEM_TEXT}` : 'mt-0.5 block text-xs text-gray-400'}>{brl(p.price)}</span>
+                  <span className={isPublic ? `mt-0.5 block ${PUBLIC_ITEM_TEXT}` : 'mt-0.5 block text-xs text-gray-900 dark:text-gray-100'}>{brl(p.price)}</span>
                 </span>
                 <ChevronRight size={18} className={isPublic ? 'text-[#C9A9D6]' : 'text-gray-300'} />
               </button>

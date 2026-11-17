@@ -152,38 +152,38 @@ export function OnlineOrdersPanel({
   // mostra emptyMessage) quando não há absolutamente nada, nem ao vivo nem arquivado.
   if (orders.length === 0 && history.length === 0 && done.length === 0) {
     if (!emptyMessage) return null;
-    return <p className="py-10 text-center text-sm text-gray-400">{emptyMessage}</p>;
+    return <p className="py-10 text-center text-sm text-gray-900 dark:text-gray-100">{emptyMessage}</p>;
   }
 
   const preparingCount = pending.length + preparing.length;
 
   return (
     <div className="mb-6">
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">{title}</h2>
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-gray-100">{title}</h2>
 
       <div className="mb-3 flex gap-2">
         <button
-          className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'preparing' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+          className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'preparing' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-300'}`}
           onClick={() => setTab('preparing')}
         >
           Em preparo{preparingCount > 0 ? ` (${preparingCount})` : ''}
         </button>
         <button
-          className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'ready' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+          className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'ready' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-300'}`}
           onClick={() => setTab('ready')}
         >
           Prontos{ready.length > 0 ? ` (${ready.length})` : ''}
         </button>
         {canReprint && (
           <button
-            className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'done' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+            className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'done' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-300'}`}
             onClick={() => setTab('done')}
           >
             Concluídos
           </button>
         )}
         <button
-          className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'history' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+          className={`h-8 rounded-full px-3.5 text-[12.5px] font-semibold transition ${tab === 'history' ? 'bg-brand text-white' : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-300'}`}
           onClick={() => setTab('history')}
         >
           Histórico{history.length > 0 ? ` (${history.length})` : ''}
@@ -194,16 +194,16 @@ export function OnlineOrdersPanel({
       {notice && <p className="mb-2 text-sm text-green-600">{notice}</p>}
 
       {tab === 'preparing' && preparingCount === 0 && (
-        <p className="py-6 text-center text-sm text-gray-400">Nenhum pedido em preparo no momento.</p>
+        <p className="py-6 text-center text-sm text-gray-900 dark:text-gray-100">Nenhum pedido em preparo no momento.</p>
       )}
       {tab === 'ready' && ready.length === 0 && (
-        <p className="py-6 text-center text-sm text-gray-400">Nenhum pedido pronto no momento.</p>
+        <p className="py-6 text-center text-sm text-gray-900 dark:text-gray-100">Nenhum pedido pronto no momento.</p>
       )}
       {tab === 'done' && done.length === 0 && (
-        <p className="py-6 text-center text-sm text-gray-400">Nenhum pedido concluído ainda.</p>
+        <p className="py-6 text-center text-sm text-gray-900 dark:text-gray-100">Nenhum pedido concluído ainda.</p>
       )}
       {tab === 'history' && history.length === 0 && (
-        <p className="py-6 text-center text-sm text-gray-400">
+        <p className="py-6 text-center text-sm text-gray-900 dark:text-gray-100">
           Nenhum pedido arquivado. Todo dia às 2h da manhã, pedidos online esquecidos do dia anterior caem aqui automaticamente.
         </p>
       )}
@@ -268,9 +268,9 @@ function OnlineOrderCard({
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-sm font-bold">
           <Icon size={16} className="text-brand" /> {orderTypeLabels[order.orderType]}
-          <span className="font-normal text-gray-400">· #{order.number}</span>
+          <span className="font-normal text-gray-900 dark:text-gray-100">· #{order.number}</span>
         </span>
-        <span className="text-xs text-gray-400">{order.archivedAt ? dateTime(order.openedAt) : time(order.openedAt)}</span>
+        <span className="text-xs text-gray-900 dark:text-gray-100">{order.archivedAt ? dateTime(order.openedAt) : time(order.openedAt)}</span>
       </div>
       {order.archivedAt && (
         <div className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
@@ -281,12 +281,12 @@ function OnlineOrderCard({
       <div className="mt-1.5 text-sm">
         <div className="font-medium">{order.customer?.name ?? '—'}</div>
         {order.customer?.phone && (
-          <div className="flex items-center gap-1 text-xs text-gray-500">
+          <div className="flex items-center gap-1 text-xs text-gray-900 dark:text-gray-100">
             <Phone size={11} /> {order.customer.phone}
           </div>
         )}
         {order.orderType === 'DELIVERY' && (
-          <div className="mt-0.5 text-xs text-gray-500">
+          <div className="mt-0.5 text-xs text-gray-900 dark:text-gray-100">
             {order.deliveryStreet}, {order.deliveryNumber}
             {order.deliveryComplement ? ` — ${order.deliveryComplement}` : ''} · {order.deliveryZone?.name}
             {order.deliveryCep ? ` · CEP ${order.deliveryCep}` : ''}
@@ -314,14 +314,14 @@ function OnlineOrderCard({
       </div>
 
       <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2 text-xs dark:border-gray-800">
-        <span className="text-gray-500">
+        <span className="text-gray-900 dark:text-gray-100">
           {order.declaredPaymentMethod ? paymentMethodLabels[order.declaredPaymentMethod] : '—'}
         </span>
         <span className="font-semibold text-brand">{brl(order.totals.total)}</span>
       </div>
 
       {order.estimatedReadyAt && (
-        <div className="mt-1 text-xs text-gray-500">
+        <div className="mt-1 text-xs text-gray-900 dark:text-gray-100">
           Prometido ao cliente: até <span className="font-medium text-gray-700 dark:text-gray-300">{time(order.estimatedReadyAt)}</span>
         </div>
       )}

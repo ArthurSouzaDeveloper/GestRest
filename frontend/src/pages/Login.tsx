@@ -57,17 +57,17 @@ export default function Login() {
             {slug && restaurant ? (
               <>
                 <h1 className="mt-4 text-xl font-semibold">{restaurant.name}</h1>
-                <p className="text-sm text-gray-500">Acesso da equipe · GestRest</p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">Acesso da equipe · GestRest</p>
               </>
             ) : slug && notFound ? (
               <>
                 <h1 className="mt-4 text-xl font-semibold">Restaurante não encontrado</h1>
-                <p className="text-sm text-gray-500">Verifique o link de acesso.</p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">Verifique o link de acesso.</p>
               </>
             ) : (
               <>
                 <h1 className="mt-4 text-xl font-semibold">GestRest</h1>
-                <p className="text-sm text-gray-500">Sistema de Gestão de Restaurante</p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">Sistema de Gestão de Restaurante</p>
               </>
             )}
           </div>

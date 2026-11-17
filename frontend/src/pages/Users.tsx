@@ -65,7 +65,7 @@ export default function Users() {
       <Card className="!p-0">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[620px] text-sm">
-          <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400 dark:border-gray-800">
+          <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-900 dark:text-gray-100 dark:border-gray-800">
             <tr>
               <th className="p-3">Nome</th>
               <th className="p-3">E-mail</th>
@@ -78,12 +78,12 @@ export default function Users() {
             {users.map((u) => (
               <tr key={u.id} className="border-b border-gray-50 dark:border-gray-800">
                 <td className="p-3 font-medium">{u.name}</td>
-                <td className="p-3 text-gray-500">{u.email}</td>
+                <td className="p-3 text-gray-900 dark:text-gray-100">{u.email}</td>
                 <td className="p-3">{ROLE_LABELS[u.role]}</td>
                 <td className="p-3 text-center">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      u.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+                      u.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-900 dark:text-gray-100'
                     }`}
                   >
                     {u.active ? 'Ativo' : 'Inativo'}
@@ -92,7 +92,7 @@ export default function Users() {
                 <td className="p-3 text-right">
                   {u.id !== me?.id && (
                     <button
-                      className="text-gray-400 hover:text-red-600"
+                      className="text-gray-900 dark:text-gray-100 hover:text-red-600"
                       title="Remover"
                       onClick={() => handleRemove(u)}
                     >

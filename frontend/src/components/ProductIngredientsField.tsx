@@ -56,7 +56,7 @@ export function ProductIngredientsField({
                 <option value="essential">Some do cardápio</option>
                 <option value="optional">Dá pra tirar</option>
               </select>
-              <button type="button" className="text-gray-400 hover:text-red-600" title="Tirar da lista" onClick={() => onChange(value.filter((x) => x.name !== i.name))}>
+              <button type="button" className="text-gray-900 dark:text-gray-100 hover:text-red-600" title="Tirar da lista" onClick={() => onChange(value.filter((x) => x.name !== i.name))}>
                 <X size={14} />
               </button>
             </li>

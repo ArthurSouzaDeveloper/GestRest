@@ -49,7 +49,7 @@ export function IngredientsPanel({
         </button>
       </div>
       {ingredients.length === 0 ? (
-        <Card className="text-sm text-gray-500">Nenhum insumo cadastrado ainda.</Card>
+        <Card className="text-sm text-gray-900 dark:text-gray-100">Nenhum insumo cadastrado ainda.</Card>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {ingredients.map((i) => {
@@ -58,7 +58,7 @@ export function IngredientsPanel({
               <Card key={i.id} className="flex items-center justify-between gap-3 !p-3">
                 <div className="min-w-0">
                   <p className="truncate font-medium">{i.name}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-900 dark:text-gray-100">
                     {count} {count === 1 ? 'item ligado' : 'itens ligados'}
                   </p>
                 </div>
@@ -133,7 +133,6 @@ function IngredientForm({
   const [additionalIds, setAdditionalIds] = useState<Set<string>>(new Set(ingredient?.additionalIds ?? []));
   // Onde o "Marcar pelo nome" achou cada produto, pra mostrar o porquê na lista.
   const [matchedBy, setMatchedBy] = useState<Map<string, MatchSource>>(new Map());
-  const [summary, setSummary] = useState('');
   const [filter, setFilter] = useState('');
   const [onlyLinked, setOnlyLinked] = useState(!!ingredient);
   const [error, setError] = useState('');
@@ -151,32 +150,16 @@ function IngredientForm({
   const autoMark = (rawName: string) => {
     const m = matchIngredient(rawName, products, additionals);
     const newOptional = new Set(optionalIds);
-    let byName = 0;
-    let byDescription = 0;
     for (const [id, source] of m.products) {
       if (productIds.has(id)) continue;
-      if (source === 'description') {
-        newOptional.add(id);
-        byDescription++;
-      } else byName++;
+      if (source === 'description') newOptional.add(id);
     }
-    const newAdditionals = [...m.additionalIds].filter((id) => !additionalIds.has(id)).length;
     setProductIds(new Set([...productIds, ...m.products.keys()]));
     setOptionalIds(newOptional);
     setAdditionalIds(new Set([...additionalIds, ...m.additionalIds]));
     setMatchedBy(new Map([...matchedBy, ...m.products]));
     setOnlyLinked(true);
     setFilter('');
-    const parts = [
-      byName && `${byName} pelo nome (somem do cardápio)`,
-      byDescription && `${byDescription} pela receita (dá pra tirar)`,
-      newAdditionals && `${newAdditionals} ${newAdditionals === 1 ? 'sabor/adicional' : 'sabores/adicionais'}`,
-    ].filter(Boolean);
-    setSummary(
-      parts.length
-        ? `Marcamos ${parts.join(', ')}. Confira a lista abaixo e desmarque o que não leva de verdade.`
-        : 'Nada novo com esse nome. Desmarque "Só os marcados" e marque na mão o que leva.',
-    );
   };
 
   const term = norm(filter);
@@ -286,14 +269,11 @@ function IngredientForm({
                       autoMark(s.name);
                     }}
                   >
-                    {s.name} <span className="text-gray-400">· {s.count}</span>
+                    {s.name} <span className="text-gray-900 dark:text-gray-100">· {s.count}</span>
                   </button>
                 ))}
               </div>
             </div>
-          )}
-          {summary && (
-            <p className="mt-2 rounded-md bg-blue-50 px-2 py-1.5 text-xs text-blue-800 dark:bg-blue-950 dark:text-blue-200">{summary}</p>
           )}
         </div>
 
@@ -307,9 +287,9 @@ function IngredientForm({
 
         <div className="max-h-[50vh] space-y-4 overflow-y-auto rounded-lg border border-gray-100 p-3 dark:border-gray-800">
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase text-gray-400">Produtos ({productIds.size})</p>
+            <p className="mb-1 text-xs font-semibold uppercase text-gray-900 dark:text-gray-100">Produtos ({productIds.size})</p>
             {groups.length === 0 && (
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-900 dark:text-gray-100">
                 {onlyLinked ? 'Nada marcado. Use "Marcar pelo nome" ou desmarque "Só os marcados".' : 'Nada aqui.'}
               </p>
             )}
@@ -319,7 +299,7 @@ function IngredientForm({
                 <div key={g.name} className="mb-3">
                   <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-gray-100 pb-1 dark:border-gray-800">
                     <span className="text-sm font-semibold">
-                      {g.name} <span className="font-normal text-gray-400">({marked}/{g.items.length})</span>
+                      {g.name} <span className="font-normal text-gray-900 dark:text-gray-100">({marked}/{g.items.length})</span>
                     </span>
                     <button type="button" className="text-xs text-brand-600 hover:underline" onClick={() => setGroup(g.items, marked < g.items.length)}>
                       {marked < g.items.length ? 'Marcar todos' : 'Desmarcar todos'}
@@ -341,7 +321,7 @@ function IngredientForm({
                         <input type="checkbox" checked={productIds.has(p.id)} onChange={() => flip(productIds, setProductIds, p.id)} />
                         <span>{p.name}</span>
                         {productIds.has(p.id) && matchedBy.get(p.id) && (
-                          <span className="rounded bg-gray-100 px-1 text-[10px] uppercase text-gray-500 dark:bg-gray-800" title={p.description}>
+                          <span className="rounded bg-gray-100 px-1 text-[10px] uppercase text-gray-900 dark:text-gray-100 dark:bg-gray-800" title={p.description}>
                             {matchedBy.get(p.id) === 'name' ? 'no nome' : 'na receita'}
                           </span>
                         )}
@@ -368,13 +348,13 @@ function IngredientForm({
             })}
           </div>
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase text-gray-400">Sabores e adicionais ({additionalIds.size})</p>
-            {visibleAdditionals.length === 0 && <p className="text-sm text-gray-400">Nada aqui.</p>}
+            <p className="mb-1 text-xs font-semibold uppercase text-gray-900 dark:text-gray-100">Sabores e adicionais ({additionalIds.size})</p>
+            {visibleAdditionals.length === 0 && <p className="text-sm text-gray-900 dark:text-gray-100">Nada aqui.</p>}
             {visibleAdditionals.map((a) => (
               <label key={a.id} className="flex items-center gap-2 py-0.5 text-sm">
                 <input type="checkbox" checked={additionalIds.has(a.id)} onChange={() => flip(additionalIds, setAdditionalIds, a.id)} />
                 <span>{a.name}</span>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-900 dark:text-gray-100">
                   {categoryName(a.categoryId)} · {a.kind === 'BASE' ? 'Sabor' : 'Adicional'}
                 </span>
               </label>

@@ -71,7 +71,7 @@ function PauseDialog({
   const [reason, setReason] = useState('');
   return (
     <Modal open={open} onClose={onClose} title="Pausar pedidos online?">
-      <p className="text-sm text-gray-600 dark:text-gray-300">
+      <p className="text-sm text-gray-900 dark:text-gray-300">
         O site para de aceitar pedidos de entrega e retirada na hora. Mesas, caixa, cozinha e o login da equipe
         continuam funcionando normalmente. Pedidos que já chegaram não são afetados.
       </p>
@@ -198,7 +198,7 @@ export function OnlineOrdersCard() {
               {data.paused ? 'Pausados' : 'Ativos'}
             </span>
           </div>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
             {data.paused
               ? data.pausedAutomatically
                 ? `Pausados automaticamente no fechamento${since ? ` (${since})` : ''}. Ao retomar, o site aceita pedidos no horário normal, a partir das 18h.`
@@ -239,7 +239,7 @@ export function OnlineOrdersCard() {
         />
         <span>
           <span className="font-semibold">Pausar sozinho às 23:20 e só voltar quando alguém retomar</span>
-          <span className="block text-gray-500">
+          <span className="block text-gray-900 dark:text-gray-100">
             Se o restaurante ficar sem energia ou sem acesso, o site não abre sozinho no dia seguinte. Atenção: se
             ninguém clicar em Retomar, o site fica fechado o dia todo.
           </span>
