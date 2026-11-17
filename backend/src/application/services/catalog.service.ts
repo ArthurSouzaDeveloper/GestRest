@@ -83,6 +83,35 @@ export const categoryService = {
   },
 };
 
+export type ProductIngredientInput = { name: string; optional?: boolean };
+
+/**
+ * Liga o produto aos insumos pelo NOME: acha o insumo do restaurante (sem diferenciar
+ * maiúsculas) ou cria um novo em estoque. Repetido na lista vale o mais seguro (essencial).
+ * Só mexe nos vínculos do produto; nunca no estoque de insumo que já existe.
+ */
+async function ingredientLinksByName(tenantId: string, list: ProductIngredientInput[]) {
+  const byKey = new Map<string, { name: string; optional: boolean }>();
+  for (const item of list) {
+    const name = item.name.trim();
+    if (!name) continue;
+    const key = name.toLocaleLowerCase('pt-BR');
+    const optional = !!item.optional;
+    const prev = byKey.get(key);
+    byKey.set(key, { name: prev?.name ?? name, optional: prev ? prev.optional && optional : optional });
+  }
+  const essential: { id: string }[] = [];
+  const optional: { id: string }[] = [];
+  for (const { name, optional: opt } of byKey.values()) {
+    let row = await prisma.ingredient.findFirst({
+      where: { restaurantId: tenantId, name: { equals: name, mode: 'insensitive' } },
+    });
+    if (!row) row = await prisma.ingredient.create({ data: { restaurantId: tenantId, name } });
+    (opt ? optional : essential).push({ id: row.id });
+  }
+  return { essential, optional };
+}
+
 export const productService = {
   async list(
     tenantId: string,
@@ -122,11 +151,23 @@ export const productService = {
       imageUrl?: string;
       available?: boolean;
       isCustom?: boolean;
+      ingredients?: ProductIngredientInput[];
     },
   ) {
     // Garante que a categoria pertence ao mesmo restaurante.
     await categoryService.ensure(tenantId, data.categoryId);
-    const p = await prisma.product.create({ data: { ...data, restaurantId: tenantId } });
+    const { ingredients, ...fields } = data;
+    const links = ingredients?.length ? await ingredientLinksByName(tenantId, ingredients) : null;
+    const p = await prisma.product.create({
+      data: {
+        ...fields,
+        restaurantId: tenantId,
+        ...(links && {
+          ingredients: { connect: links.essential },
+          optionalIngredients: { connect: links.optional },
+        }),
+      },
+    });
     return serializeProduct(p);
   },
   async update(
@@ -141,12 +182,25 @@ export const productService = {
       imageUrl: string;
       available: boolean;
       isCustom: boolean;
+      ingredients: ProductIngredientInput[];
     }>,
   ) {
     await productService.get(tenantId, id);
     // Reassigning to a category must stay inside the same tenant, same as on create.
     if (data.categoryId) await categoryService.ensure(tenantId, data.categoryId);
-    const p = await prisma.product.update({ where: { id }, data });
+    const { ingredients, ...fields } = data;
+    // `ingredients` ausente = não mexe nos vínculos; lista (mesmo vazia) substitui todos.
+    const links = ingredients ? await ingredientLinksByName(tenantId, ingredients) : null;
+    const p = await prisma.product.update({
+      where: { id },
+      data: {
+        ...fields,
+        ...(links && {
+          ingredients: { set: links.essential },
+          optionalIngredients: { set: links.optional },
+        }),
+      },
+    });
     return serializeProduct(p);
   },
   async remove(tenantId: string, id: string) {

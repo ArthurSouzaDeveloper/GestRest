@@ -5,7 +5,8 @@ import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
 import { IngredientsPanel } from '../components/IngredientsPanel';
-import type { Additional, Category, Product } from '../types';
+import { ProductIngredientsField, type ProductIngredient } from '../components/ProductIngredientsField';
+import type { Additional, Category, Ingredient, Product } from '../types';
 
 export default function Products() {
   const qc = useQueryClient();
@@ -38,6 +39,7 @@ export default function Products() {
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['products'] });
     qc.invalidateQueries({ queryKey: ['products', 'admin'] });
+    qc.invalidateQueries({ queryKey: ['ingredients'] });
   };
 
   const toggleAvailable = useMutation({
@@ -211,9 +213,29 @@ function ProductForm({
   });
   const [error, setError] = useState('');
 
+  // Ingredientes: vêm dos insumos já ligados a este produto. `null` = o admin não mexeu,
+  // então não mandamos nada (não apaga vínculo por engano).
+  const { data: allIngredients = [], isSuccess: ingredientsLoaded } = useQuery({
+    queryKey: ['ingredients'],
+    queryFn: async () => (await api.get<Ingredient[]>('/catalog/ingredients')).data,
+  });
+  const [edited, setEdited] = useState<ProductIngredient[] | null>(null);
+  const ingredients: ProductIngredient[] =
+    edited ??
+    (product
+      ? allIngredients
+          .filter((i) => i.productIds.includes(product.id) || i.optionalProductIds.includes(product.id))
+          .map((i) => ({ name: i.name, optional: i.optionalProductIds.includes(product.id) }))
+      : []);
+
   const save = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, price: Number(form.price), avgPrepMin: Number(form.avgPrepMin) };
+      const payload = {
+        ...form,
+        price: Number(form.price),
+        avgPrepMin: Number(form.avgPrepMin),
+        ...(edited && !form.isCustom ? { ingredients: edited } : {}),
+      };
       if (product) return api.patch(`/catalog/products/${product.id}`, payload);
       return api.post('/catalog/products', payload);
     },
@@ -248,6 +270,16 @@ function ProductForm({
           <label className="label">Descrição</label>
           <textarea className="input" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </div>
+        {!form.isCustom && (
+          <div className={ingredientsLoaded ? '' : 'pointer-events-none opacity-60'}>
+            <ProductIngredientsField
+              value={ingredients}
+              onChange={setEdited}
+              description={form.description}
+              knownNames={allIngredients.map((i) => i.name)}
+            />
+          </div>
+        )}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.available} onChange={(e) => setForm({ ...form, available: e.target.checked })} />
           Disponível
