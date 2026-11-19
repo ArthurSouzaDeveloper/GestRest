@@ -27,9 +27,18 @@ const ASSIGNABLE_ROLES: Role[] = [
 export const userService = {
   list(tenantId: string) {
     return prisma.user.findMany({
-      where: { restaurantId: tenantId },
+      where: { restaurantId: tenantId, deletedAt: null },
       select: publicSelect,
       orderBy: { name: 'asc' },
+    });
+  },
+
+  /** Usuários arquivados (excluídos da equipe), disponíveis para reativação. */
+  listDeleted(tenantId: string) {
+    return prisma.user.findMany({
+      where: { restaurantId: tenantId, deletedAt: { not: null } },
+      select: { ...publicSelect, deletedAt: true },
+      orderBy: { deletedAt: 'desc' },
     });
   },
 
@@ -48,7 +57,16 @@ export const userService = {
     }
 
     const exists = await prisma.user.findUnique({ where: { email: data.email } });
-    if (exists) throw new ConflictError('E-mail já cadastrado');
+    if (exists) {
+      // O cadastro arquivado continua ocupando o e-mail: avisar onde reativá-lo, em vez
+      // de deixar o admin travado num "e-mail já cadastrado" sem usuário visível na lista.
+      if (exists.deletedAt && exists.restaurantId === tenantId) {
+        throw new ConflictError(
+          'Este e-mail pertence a um usuário excluído. Reative-o em "Usuários excluídos".',
+        );
+      }
+      throw new ConflictError('E-mail já cadastrado');
+    }
 
     const user = await prisma.user.create({
       data: {
@@ -78,7 +96,7 @@ export const userService = {
     data: Partial<{ name: string; role: Role; active: boolean; password: string }>,
     requester: { userId: string; role: Role; ip?: string },
   ) {
-    const user = await prisma.user.findFirst({ where: { id, restaurantId: tenantId } });
+    const user = await prisma.user.findFirst({ where: { id, restaurantId: tenantId, deletedAt: null } });
     if (!user) throw new NotFoundError('Usuário');
     if (data.role && !ASSIGNABLE_ROLES.includes(data.role)) {
       throw new ForbiddenError('Perfil inválido');
@@ -104,7 +122,7 @@ export const userService = {
       user.role === Role.ADMIN && (data.active === false || (data.role !== undefined && data.role !== Role.ADMIN));
     if (losesAdminStatus) {
       const otherActiveAdmins = await prisma.user.count({
-        where: { restaurantId: tenantId, role: Role.ADMIN, active: true, id: { not: id } },
+        where: { restaurantId: tenantId, role: Role.ADMIN, active: true, deletedAt: null, id: { not: id } },
       });
       if (otherActiveAdmins === 0) {
         throw new ConflictError('Não é possível remover o último administrador ativo do restaurante');
@@ -121,6 +139,12 @@ export const userService = {
       },
       select: publicSelect,
     });
+
+    // Desativar precisa derrubar as sessões abertas, senão o refresh token continuaria
+    // renovando o acesso de alguém que já saiu da equipe.
+    if (data.active === false) {
+      await prisma.refreshToken.updateMany({ where: { userId: id, revoked: false }, data: { revoked: true } });
+    }
 
     await auditService.record({
       action: AuditAction.USER_UPDATED,
@@ -141,18 +165,17 @@ export const userService = {
   },
 
   /**
-   * Removes a user from the team. A user who already has orders/payments on
-   * record is deactivated instead of hard-deleted — this preserves the
-   * restaurant's order and financial history (deleting them would either
-   * fail on a foreign-key constraint or silently erase past sales tied to
-   * that person). Brand-new, never-used accounts are deleted outright.
+   * Arquiva um usuário (exclusão da equipe). O cadastro NUNCA é apagado do banco:
+   * ele sai da lista da equipe, perde o acesso, e fica guardado em "Usuários
+   * excluídos" para ser reativado depois — preservando o histórico de pedidos e
+   * pagamentos ligado a essa pessoa.
    */
   async remove(
     tenantId: string,
     id: string,
     requester: { userId: string; role: Role; ip?: string },
   ): Promise<{ deactivated: boolean }> {
-    const user = await prisma.user.findFirst({ where: { id, restaurantId: tenantId } });
+    const user = await prisma.user.findFirst({ where: { id, restaurantId: tenantId, deletedAt: null } });
     if (!user) throw new NotFoundError('Usuário');
     if (id === requester.userId) throw new ForbiddenError('Você não pode remover seu próprio usuário');
 
@@ -165,26 +188,16 @@ export const userService = {
 
     if (user.role === Role.ADMIN) {
       const otherAdmins = await prisma.user.count({
-        where: { restaurantId: tenantId, role: Role.ADMIN, active: true, id: { not: id } },
+        where: { restaurantId: tenantId, role: Role.ADMIN, active: true, deletedAt: null, id: { not: id } },
       });
       if (otherAdmins === 0) {
         throw new ConflictError('Não é possível remover o último administrador do restaurante');
       }
     }
 
-    const [orderCount, paymentCount] = await Promise.all([
-      prisma.order.count({ where: { waiterId: id } }),
-      prisma.payment.count({ where: { cashierId: id } }),
-    ]);
-
-    let result: { deactivated: boolean };
-    if (orderCount === 0 && paymentCount === 0) {
-      await prisma.user.delete({ where: { id } });
-      result = { deactivated: false };
-    } else {
-      await prisma.user.update({ where: { id }, data: { active: false } });
-      result = { deactivated: true };
-    }
+    await prisma.user.update({ where: { id }, data: { active: false, deletedAt: new Date() } });
+    // Sem isso, um refresh token válido seguiria renovando o acesso de quem saiu.
+    await prisma.refreshToken.updateMany({ where: { userId: id, revoked: false }, data: { revoked: true } });
 
     await auditService.record({
       action: AuditAction.USER_REMOVED,
@@ -193,9 +206,46 @@ export const userService = {
       entity: 'User',
       entityId: id,
       ip: requester.ip,
-      metadata: { deactivated: result.deactivated, role: user.role },
+      metadata: { archived: true, role: user.role },
     });
 
-    return result;
+    // deactivated: true — nenhum usuário é apagado de vez; o campo fica por
+    // compatibilidade com quem já consome esta resposta.
+    return { deactivated: true };
+  },
+
+  /** Traz um usuário arquivado de volta para a equipe, ativo. */
+  async restore(
+    tenantId: string,
+    id: string,
+    requester: { userId: string; role: Role; ip?: string },
+  ) {
+    const user = await prisma.user.findFirst({
+      where: { id, restaurantId: tenantId, deletedAt: { not: null } },
+    });
+    if (!user) throw new NotFoundError('Usuário excluído');
+
+    // Mesma regra do resto do serviço: conta de ADMIN só volta pela mão de um ADMIN.
+    if (user.role === Role.ADMIN && requester.role !== Role.ADMIN) {
+      throw new ForbiddenError('Só um administrador pode reativar outro administrador');
+    }
+
+    const restored = await prisma.user.update({
+      where: { id },
+      data: { active: true, deletedAt: null },
+      select: publicSelect,
+    });
+
+    await auditService.record({
+      action: AuditAction.USER_RESTORED,
+      userId: requester.userId,
+      restaurantId: tenantId,
+      entity: 'User',
+      entityId: id,
+      ip: requester.ip,
+      metadata: { role: user.role },
+    });
+
+    return restored;
   },
 };

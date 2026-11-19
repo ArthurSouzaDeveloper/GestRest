@@ -23,7 +23,7 @@ export const authService = {
       where: { email },
       include: { restaurant: true },
     });
-    if (!user || !user.active) {
+    if (!user || !user.active || user.deletedAt) {
       logger.warn('login_failed', {
         email: maskEmail(email),
         reason: user ? 'inactive_user' : 'user_not_found',
@@ -113,7 +113,7 @@ export const authService = {
     }
 
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user || !user.active) throw new UnauthorizedError('Usuário inválido');
+    if (!user || !user.active || user.deletedAt) throw new UnauthorizedError('Usuário inválido');
 
     // Rotate refresh token
     await prisma.refreshToken.update({ where: { token }, data: { revoked: true } });
