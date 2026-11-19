@@ -63,7 +63,9 @@ export const openApiDocument = {
     '/production/kitchen': { get: { summary: 'Fila da cozinha', responses: { 200: { description: 'OK' } } } },
     '/production/juice-bar': { get: { summary: 'Fila dos suqueiros', responses: { 200: { description: 'OK' } } } },
     '/dashboard': { get: { summary: 'Métricas (ADMIN/MANAGER)', responses: { 200: { description: 'OK' } } } },
-    '/users': { get: { summary: 'Lista usuários (ADMIN/MANAGER)', responses: { 200: { description: 'OK' } } } },
+    '/users': { get: { summary: 'Lista usuários ativos na equipe (ADMIN/MANAGER)', responses: { 200: { description: 'OK' } } } },
+    '/users/deleted': { get: { summary: 'Lista usuários excluídos/arquivados (ADMIN/MANAGER)', responses: { 200: { description: 'OK' } } } },
+    '/users/{id}/restore': { post: { summary: 'Reativa um usuário excluído (ADMIN/MANAGER)', responses: { 200: { description: 'OK' } } } },
     '/audit': { get: { summary: 'Logs de auditoria (ADMIN/MANAGER)', responses: { 200: { description: 'OK' } } } },
   },
 };

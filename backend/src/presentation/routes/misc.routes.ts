@@ -32,6 +32,10 @@ dashboardRouter.get(
 export const userRouter = Router();
 userRouter.use(authenticate, authorize(Role.ADMIN, Role.MANAGER));
 userRouter.get('/', asyncHandler(async (req, res) => res.json(await userService.list(ctx(req).tenantId))));
+userRouter.get(
+  '/deleted',
+  asyncHandler(async (req, res) => res.json(await userService.listDeleted(ctx(req).tenantId))),
+);
 userRouter.post(
   '/',
   validateBody(createUserSchema),
@@ -48,6 +52,13 @@ userRouter.patch(
   asyncHandler(async (req, res) => {
     const c = ctx(req);
     res.json(await userService.update(c.tenantId, req.params.id, req.body, { userId: c.userId, role: c.role, ip: c.ip }));
+  }),
+);
+userRouter.post(
+  '/:id/restore',
+  asyncHandler(async (req, res) => {
+    const c = ctx(req);
+    res.json(await userService.restore(c.tenantId, req.params.id, { userId: c.userId, role: c.role, ip: c.ip }));
   }),
 );
 userRouter.delete(
