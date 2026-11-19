@@ -47,15 +47,20 @@ export default function Dashboard() {
 
       <OnlineOrdersCard />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Faturamento hoje" value={brl(data.revenue.daily)} accent="text-green-600" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Stat label="Faturamento Diário" value={brl(data.revenue.daily)} accent="text-green-600" />
+        <Stat label="Faturamento Semanal" value={brl(data.revenue.weekly)} />
+        <Stat label="Faturamento Mensal" value={brl(data.revenue.monthly)} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Stat label="Mesas ocupadas" value={`${data.tables.occupied} de ${data.tables.free + data.tables.occupied}`} accent="text-brand" />
         <Stat label="Itens na cozinha" value={data.orders.waitingItems + data.orders.producingItems} accent="text-yellow-600" />
         <Stat label="Finalizados hoje" value={data.orders.finishedToday} />
       </div>
 
       <p className="mt-3 text-sm text-gray-900 dark:text-gray-100">
-        Semana {brl(data.revenue.weekly)} · Mês {brl(data.revenue.monthly)} · Tempo médio {data.avgPrepMin} min
+        Tempo médio de produção {data.avgPrepMin} min
         {data.orders.cancelledToday > 0 && <> · Cancelados hoje {data.orders.cancelledToday}</>}
       </p>
 
