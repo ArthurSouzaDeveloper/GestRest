@@ -29,7 +29,6 @@ export default function Users() {
   const { user: me } = useAuth();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
-  const [notice, setNotice] = useState('');
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
@@ -48,36 +47,19 @@ export default function Users() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => (await api.delete(`/users/${id}`)).data,
-    onSuccess: (_data, id) => {
-      refresh();
-      const u = users.find((x) => x.id === id);
-      setNotice(
-        `${u?.name ?? 'Usuário'} saiu da equipe e perdeu o acesso ao sistema. O cadastro ficou guardado em "Usuários excluídos" e pode ser reativado quando você quiser.`,
-      );
-    },
+    onSuccess: () => refresh(),
     onError: (e) => alert(apiError(e)),
   });
 
   const restore = useMutation({
     mutationFn: async (id: string) => (await api.post(`/users/${id}/restore`)).data,
-    onSuccess: (_data, id) => {
-      refresh();
-      const u = deleted.find((x) => x.id === id);
-      setNotice(`${u?.name ?? 'Usuário'} voltou para a equipe e já pode entrar no sistema.`);
-    },
+    onSuccess: () => refresh(),
     onError: (e) => alert(apiError(e)),
   });
 
   const toggleActive = useMutation({
     mutationFn: async (u: User) => (await api.patch(`/users/${u.id}`, { active: !u.active })).data,
-    onSuccess: (_data, u) => {
-      refresh();
-      setNotice(
-        u.active
-          ? `${u.name} foi desativado: continua na equipe, mas não consegue entrar no sistema até ser ativado de novo.`
-          : `${u.name} foi ativado e já pode entrar no sistema.`,
-      );
-    },
+    onSuccess: () => refresh(),
     onError: (e) => alert(apiError(e)),
   });
 
@@ -110,11 +92,6 @@ export default function Users() {
         title="Usuários"
         action={<button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Novo Usuário</button>}
       />
-      {notice && (
-        <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-900 dark:bg-yellow-900/20 dark:text-yellow-200">
-          {notice}
-        </div>
-      )}
       <Card className="!p-0">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[620px] text-sm">
