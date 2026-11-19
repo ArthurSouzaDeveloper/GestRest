@@ -120,28 +120,23 @@ export function OnlineOrdersPauseControl({ placement }: { placement: 'button' | 
     if (placement !== 'banner') return null;
     const since = pausedSince(data);
     return (
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-red-600 px-4 py-2 text-sm font-medium text-white">
-        <div className="flex items-center gap-2">
-          <PauseCircle size={18} className="shrink-0" />
-          {data.pausedAutomatically ? (
-            <span>
-              Pedidos online pausados automaticamente no fechamento{since ? ` (${since})` : ''}. Clique em Retomar
-              quando o restaurante estiver pronto: o site volta a aceitar pedidos no horário normal, a partir das 18h.
+      <div className="flex items-center justify-between gap-3 bg-red-600 px-4 py-1.5 text-sm font-medium text-white">
+        <div className="flex min-w-0 items-center gap-2">
+          <PauseCircle size={16} className="shrink-0" />
+          <span className="truncate">
+            Pedidos pausados{since ? ` desde ${since}` : ''}
+            <span className="hidden sm:inline">
+              {data.pausedAutomatically ? ' (automático)' : data.reason ? ` · "${data.reason}"` : ''}
             </span>
-          ) : (
-            <span>
-              Pedidos online PAUSADOS{since ? ` desde ${since}` : ''}. O site não está aceitando pedidos.
-              {data.reason ? ` Recado pro cliente: "${data.reason}"` : ''}
-            </span>
-          )}
+          </span>
         </div>
         <button
-          className="flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+          className="flex shrink-0 items-center gap-1.5 rounded-md bg-white px-3 py-1 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
           disabled={mutation.isPending}
           onClick={() => mutation.mutate({ paused: false })}
         >
           <PlayCircle size={16} />
-          {mutation.isPending ? 'Retomando...' : 'Retomar pedidos online'}
+          {mutation.isPending ? 'Retomando...' : 'Retomar'}
         </button>
         {error && <p className="w-full text-xs text-red-100">{error}</p>}
       </div>
