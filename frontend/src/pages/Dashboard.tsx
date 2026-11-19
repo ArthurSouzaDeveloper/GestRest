@@ -47,25 +47,22 @@ export default function Dashboard() {
 
       <OnlineOrdersCard />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Mesas Livres" value={data.tables.free} accent="text-gray-900 dark:text-gray-100" />
-        <Stat label="Mesas Ocupadas" value={data.tables.occupied} accent="text-brand" />
-        <Stat label="Em Produção" value={data.tables.inProduction} accent="text-yellow-600" />
-        <Stat label="Prontas p/ Pagamento" value={data.tables.readyForPayment} accent="text-green-600" />
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Itens Aguardando" value={data.orders.waitingItems} />
-        <Stat label="Itens Preparando" value={data.orders.producingItems} />
-        <Stat label="Finalizados Hoje" value={data.orders.finishedToday} accent="text-green-600" />
-        <Stat label="Cancelados Hoje" value={data.orders.cancelledToday} accent="text-red-600" />
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Stat label="Faturamento Diário" value={brl(data.revenue.daily)} accent="text-green-600" />
         <Stat label="Faturamento Semanal" value={brl(data.revenue.weekly)} />
         <Stat label="Faturamento Mensal" value={brl(data.revenue.monthly)} />
       </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Stat label="Mesas ocupadas" value={`${data.tables.occupied} de ${data.tables.free + data.tables.occupied}`} accent="text-brand" />
+        <Stat label="Itens na cozinha" value={data.orders.waitingItems + data.orders.producingItems} accent="text-yellow-600" />
+        <Stat label="Finalizados hoje" value={data.orders.finishedToday} />
+      </div>
+
+      <p className="mt-3 text-sm text-gray-900 dark:text-gray-100">
+        Tempo médio de produção {data.avgPrepMin} min
+        {data.orders.cancelledToday > 0 && <> · Cancelados hoje {data.orders.cancelledToday}</>}
+      </p>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
@@ -84,9 +81,6 @@ export default function Dashboard() {
             {data.topWaiters.map((w) => (
               <Bar key={w.name} label={w.name} value={w.orders} max={maxWaiter} />
             ))}
-          </div>
-          <div className="mt-4 border-t border-gray-100 pt-3 text-sm text-gray-900 dark:text-gray-100 dark:border-gray-800">
-            Tempo médio de produção: <span className="font-medium text-gray-800 dark:text-gray-200">{data.avgPrepMin} min</span>
           </div>
         </Card>
       </div>

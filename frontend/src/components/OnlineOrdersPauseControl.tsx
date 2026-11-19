@@ -187,24 +187,21 @@ export function OnlineOrdersCard() {
   return (
     <Card className="mb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">Pedidos online</h3>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                data.paused ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-              }`}
-            >
-              {data.paused ? 'Pausados' : 'Ativos'}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h3 className="text-sm font-semibold">Pedidos online</h3>
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+              data.paused ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+            }`}
+          >
+            {data.paused ? 'Pausados' : 'Ativos'}
+          </span>
+          {data.paused && (
+            <span className="text-sm text-gray-900 dark:text-gray-100">
+              {data.pausedAutomatically ? 'Pausa automática' : `Desde ${since ?? ''}`.trim()}
+              {data.reason ? ` · "${data.reason}"` : ''}
             </span>
-          </div>
-          <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-            {data.paused
-              ? data.pausedAutomatically
-                ? `Pausados automaticamente no fechamento${since ? ` (${since})` : ''}. Ao retomar, o site aceita pedidos no horário normal, a partir das 18h.`
-                : `Pausados${since ? ` desde ${since}` : ''}. O site não está aceitando pedidos.${data.reason ? ` Recado: "${data.reason}"` : ''}`
-              : 'O site aceita pedidos no horário normal (quarta a domingo, das 18h às 23:15).'}
-          </p>
+          )}
         </div>
         {data.paused ? (
           <button
@@ -213,7 +210,7 @@ export function OnlineOrdersCard() {
             onClick={() => mutation.mutate({ paused: false })}
           >
             <PlayCircle size={16} />
-            {mutation.isPending ? 'Retomando...' : 'Retomar pedidos online'}
+            {mutation.isPending ? 'Retomando...' : 'Retomar'}
           </button>
         ) : (
           <button
@@ -224,26 +221,22 @@ export function OnlineOrdersCard() {
             }}
           >
             <PauseCircle size={16} />
-            Pausar pedidos online
+            Pausar
           </button>
         )}
       </div>
 
-      <label className="mt-4 flex items-start gap-2 border-t border-gray-100 pt-4 text-sm dark:border-gray-800">
+      <label
+        className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3 text-sm dark:border-gray-800"
+        title="Se ninguém clicar em Retomar, o site fica fechado o dia todo."
+      >
         <input
           type="checkbox"
-          className="mt-0.5"
           checked={data.autoPauseAfterClose}
           disabled={mutation.isPending}
           onChange={(e) => mutation.mutate({ autoPauseAfterClose: e.target.checked })}
         />
-        <span>
-          <span className="font-semibold">Pausar sozinho às 23:20 e só voltar quando alguém retomar</span>
-          <span className="block text-gray-900 dark:text-gray-100">
-            Se o restaurante ficar sem energia ou sem acesso, o site não abre sozinho no dia seguinte. Atenção: se
-            ninguém clicar em Retomar, o site fica fechado o dia todo.
-          </span>
-        </span>
+        <span>Pausar sozinho às 23:20</span>
       </label>
       {error && !confirmOpen && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
