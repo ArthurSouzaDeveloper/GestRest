@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% from "clinical/_tooth.html" import tooth %}
+{% block title %}Odontograma de {{ p.name }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow"><a href="{{ url_for('patients.detail', id=p.id) }}" class="link">{{ p.name }}</a> · prontuário</p>
+    <h1>Odontograma</h1>
+  </div>
+  <div class="head-actions">
+    {% if can_edit %}
+    <form method="post" action="{{ url_for('clinical.new_plan', id=p.id) }}" style="display:inline">
+      {{ csrf() }}<input type="hidden" name="do_odontograma" value="1">
+      <button class="btn btn-primary" {{ 'disabled' if not suggestions }}>Gerar plano do odontograma ({{ suggestions|length }})</button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('clinical.plans') }}" class="btn btn-outline">Orçamentos</a>
+  </div>
+</header>
+
+<section class="card odo-card">
+    <div class="card-head"><h2>Arcada</h2><span class="muted small">Numeração FDI · clique no dente para marcar</span></div>
+    <div class="arch">
+      <div class="arch-row">{% for n in upper %}{{ tooth(n, chart[n], n == selected, url_for('clinical.odontogram', id=p.id, dente=n)) }}{% endfor %}</div>
+      <div class="arch-mid"><span>direita do paciente</span><span>esquerda do paciente</span></div>
+      <div class="arch-row">{% for n in lower %}{{ tooth(n, chart[n], n == selected, url_for('clinical.odontogram', id=p.id, dente=n)) }}{% endfor %}</div>
+    </div>
+    <div class="legend odo-legend">
+      {% for key, c in conditions.items() %}
+      <span class="chip"><i class="dot" style="background: {{ c.color }}; border:1px solid #b9c0cf"></i>{{ c.label }}</span>
+      {% endfor %}
+    </div>
+</section>
+
+<div class="grid-2 odo-grid">
+  <div class="stack">
+    {% if selected and can_edit %}
+    <section class="card">
+      <div class="card-head"><h2>Dente {{ selected }}</h2></div>
+      <form method="post" action="{{ url_for('clinical.mark_tooth', id=p.id) }}" class="form">
+        {{ csrf() }}<input type="hidden" name="dente" value="{{ selected }}">
+        <label>Condição
+          <select name="condicao" required>
+            {% for key, c in conditions.items() %}<option value="{{ key }}">{{ c.label }}</option>{% endfor %}
+          </select>
+        </label>
+        <fieldset class="checks">
+          <legend class="face-legend">Faces · só para cárie e restauração</legend>
+          {% for f, label in faces.items() %}
+          <label class="check"><input type="checkbox" name="face" value="{{ f }}"> <span>{{ f }} · {{ label }}</span></label>
+          {% endfor %}
+        </fieldset>
+        <label>Observação <input type="text" name="obs" maxlength="200" placeholder="opcional"></label>
+        <div class="form-actions"><button class="btn btn-primary">Marcar</button>
+          <a href="{{ url_for('clinical.odontogram', id=p.id) }}" class="btn btn-outline">Limpar seleção</a></div>
+      </form>
+      <div class="dl odo-now">
+        <div><dt>Dente todo</dt><dd>{{ chart[selected].dente.label if chart[selected].dente else 'Sem marcação' }}</dd></div>
+        {% for f, st in chart[selected].faces.items() %}
+        <div><dt>{{ faces[f] }}</dt><dd>{{ st.label }}</dd></div>
+        {% endfor %}
+      </div>
+    </section>
+    {% elif can_edit %}
+    <section class="card"><p class="empty">Clique em um dente para marcar a condição.</p></section>
+    {% endif %}
+
+    {% if suggestions %}
+    <section class="card">
+      <div class="card-head"><h2>Pendências do odontograma</h2><span class="count">{{ suggestions|length }}</span></div>
+      {% for s in suggestions %}
+      <div class="split-row"><span><strong>Dente {{ s.tooth }}</strong>{% if s.faces %} <small class="muted">faces {{ s.faces }}</small>{% endif %}</span><span>{{ s.procedure }}</span></div>
+      {% endfor %}
+      <p class="muted small" style="padding:10px 16px">Estas marcações viram itens do plano de tratamento em um clique.</p>
+    </section>
+    {% endif %}
+
+  </div>
+
+  <div class="stack">
+    <section class="card table-card">
+      <div class="card-head"><h2>Histórico de marcações</h2></div>
+      {% if history %}
+      <table class="table">
+        <thead><tr><th>Quando</th><th>Dente</th><th>Condição</th><th class="hide-sm">Quem</th></tr></thead>
+        <tbody>
+        {% for h in history %}
+        <tr><td>{{ h.created_at|data }}</td><td>{{ h.tooth }}<small class="muted"> {{ h.face or '' }}</small></td>
+            <td><i class="dot" style="background: {{ h.color }}; border:1px solid #b9c0cf"></i> {{ h.label }}</td>
+            <td class="hide-sm">{{ h.author.name if h.author else '—' }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="empty">Nenhuma marcação ainda.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

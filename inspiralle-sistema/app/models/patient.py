@@ -24,6 +24,9 @@ class Patient(TimestampMixin, db.Model):
     allergies = db.Column(db.String(255))
     medications = db.Column(db.String(255))
     health_notes = db.Column(db.Text)
+    # Anamnese respondida pelo próprio paciente no portal
+    anamnesis_json = db.Column(db.Text)
+    anamnesis_at = db.Column(db.DateTime)
     notes = db.Column(db.Text)
     origin = db.Column(db.String(20), nullable=False, default="recepcao")  # site | recepcao
     deleted_at = db.Column(db.DateTime)  # exclusão lógica (prontuário deve ser mantido)
@@ -40,6 +43,35 @@ class Patient(TimestampMixin, db.Model):
         "ClinicalNote", back_populates="patient", cascade="all, delete-orphan",
         order_by="desc(ClinicalNote.created_at)",
     )
+    tooth_states = db.relationship(
+        "ToothState", back_populates="patient", cascade="all, delete-orphan",
+    )
+    plans = db.relationship(
+        "TreatmentPlan", back_populates="patient", cascade="all, delete-orphan",
+        order_by="desc(TreatmentPlan.created_at)",
+    )
+    receivables = db.relationship(
+        "Receivable", back_populates="patient", cascade="all, delete-orphan",
+        order_by="Receivable.due_date",
+    )
+
+    @property
+    def anamnesis(self) -> dict:
+        import json
+        try:
+            return json.loads(self.anamnesis_json or "{}")
+        except ValueError:
+            return {}
+
+    @property
+    def open_debt(self):
+        """Soma das parcelas em aberto (vencidas ou a vencer)."""
+        from decimal import Decimal
+        return sum((r.amount for r in self.receivables if not r.paid), Decimal("0"))
+
+    @property
+    def overdue_count(self) -> int:
+        return sum(1 for r in self.receivables if r.state == "atrasado")
 
     @property
     def portal_enabled(self) -> bool:

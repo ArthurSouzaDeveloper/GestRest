@@ -169,6 +169,10 @@ def seed_demo(rng_seed: int = 42) -> None:
     # Financeiro: toda consulta concluída gera o lançamento com o preço do dentista
     for a in Appointment.query.filter_by(status="concluido").all():
         sync_appointment_entry(a)
+    db.session.flush()
+
+    from app.seed_modules import seed_modules
+    seed_modules()
     db.session.commit()
 
 

@@ -18,6 +18,9 @@ class Dentist(TimestampMixin, db.Model):
     # Dias em que atende, ex.: "0,1,2,3,4" (0 = segunda)
     weekdays = db.Column(db.String(20), nullable=False, default="0,1,2,3,4,5")
     active = db.Column(db.Boolean, nullable=False, default=True)
+    # Repasse: % da produção do profissional. "liquido" desconta material, laboratório e taxa de cartão.
+    commission_pct = db.Column(db.Numeric(5, 2), nullable=False, default=0)
+    commission_base = db.Column(db.String(10), nullable=False, default="liquido")  # bruto | liquido
 
     services = db.relationship("Service", secondary=service_dentists, back_populates="dentists")
     prices = db.relationship("DentistPrice", back_populates="dentist", cascade="all, delete-orphan")
@@ -28,6 +31,10 @@ class Dentist(TimestampMixin, db.Model):
             if p.service_id == service.id:
                 return p.price
         return service.price
+
+    @property
+    def commission_base_label(self) -> str:
+        return "sobre o líquido" if self.commission_base == "liquido" else "sobre o bruto"
 
     @property
     def weekday_set(self) -> set[int]:

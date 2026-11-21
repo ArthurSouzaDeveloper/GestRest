@@ -1,0 +1,21 @@
+{# Desenho de um dente: centro = oclusal, e as quatro faces em volta. #}
+{% macro tooth(n, cell, selected=false, href=none) -%}
+{% set whole = cell.dente %}
+{% set base = whole.color if whole and whole.condition != 'hígido' else '#fff' %}
+{% set gone = whole and whole.condition in ('extraido',) %}
+<a class="tooth {{ 'on' if selected }} {{ 'gone' if gone }}" href="{{ href or '#' }}" title="Dente {{ n }}{% if whole %} · {{ whole.label }}{% endif %}">
+  <svg viewBox="0 0 40 40" aria-hidden="true">
+    <rect x="1" y="1" width="38" height="38" rx="6" fill="{{ base }}" stroke="#b9c0cf"/>
+    {% for face, pts in [('V','2,2 38,2 29,11 11,11'), ('D','38,2 38,38 29,29 29,11'),
+                         ('L','2,38 11,29 29,29 38,38'), ('M','2,2 11,11 11,29 2,38')] %}
+      {% set st = cell.faces.get(face) %}
+      <polygon points="{{ pts }}" fill="{{ st.color if st and st.condition != 'hígido' else 'transparent' }}"
+               stroke="#cfd5e0" stroke-width="0.6"/>
+    {% endfor %}
+    {% set o = cell.faces.get('O') %}
+    <rect x="11" y="11" width="18" height="18" fill="{{ o.color if o and o.condition != 'hígido' else 'transparent' }}" stroke="#cfd5e0" stroke-width="0.6"/>
+    {% if gone %}<path d="M6 6 L34 34 M34 6 L6 34" stroke="#64697a" stroke-width="2.5" fill="none"/>{% endif %}
+  </svg>
+  <span>{{ n }}</span>
+</a>
+{%- endmacro %}

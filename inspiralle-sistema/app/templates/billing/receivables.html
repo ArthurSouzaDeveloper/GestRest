@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Contas a receber{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">Contas</p><h1>Contas a receber</h1></div>
+  <div class="head-actions">
+    {% if current_user.role == 'admin' %}<a href="{{ url_for('billing.payables') }}" class="btn btn-outline">Contas a pagar</a>{% endif %}
+    <form method="post" action="{{ url_for('billing.dunning') }}" style="display:inline">{{ csrf() }}<button class="btn btn-outline">Gerar régua de cobrança</button></form>
+    {% if can_see_totals %}<a href="{{ url_for('billing.export_receivables') }}" class="btn btn-outline">Exportar planilha</a>{% endif %}
+  </div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><span>Em atraso</span><strong>{{ s.overdue_total|moeda }}</strong><em class="trend down">{{ s.overdue|length }} parcela(s)</em></div>
+  <div class="kpi"><span>Recebido no mês</span><strong>{{ s.paid_month|moeda }}</strong><em class="trend">de {{ s.expected_month|moeda }} previstos</em></div>
+  <div class="kpi"><span>Total em aberto</span><strong>{{ s.open_total|moeda }}</strong><em class="trend">próximos 60 dias</em></div>
+  <div class="kpi"><span>Inadimplência</span><strong>{{ s.default_rate }}%</strong>
+    <em class="trend {{ 'down' if s.default_rate > 6.7 else 'up' }}">do que já venceu · média do setor 6,7%</em></div>
+</section>
+
+{% if s.overdue %}
+<section class="card table-card">
+  <div class="card-head"><h2>Em atraso</h2><span class="count">{{ s.overdue|length }}</span></div>
+  <div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Paciente</th><th class="hide-sm">Descrição</th><th>Vencimento</th><th>Atraso</th><th class="num">Valor</th><th>Baixa</th></tr></thead>
+    <tbody>
+    {% for r in s.overdue %}
+    <tr>
+      <td><strong>{{ r.patient.name }}</strong><br><a class="link small" href="{{ r.patient.whatsapp_link }}" target="_blank">{{ r.patient.phone_fmt }}</a></td>
+      <td class="hide-sm">{{ r.label }}</td>
+      <td>{{ r.due_date|data }}</td>
+      <td><span class="badge st-faltou">{{ r.overdue_days }} dias</span></td>
+      <td class="num">{{ r.amount|moeda }}</td>
+      <td>
+        <form method="post" action="{{ url_for('billing.receive', id=r.id) }}" class="adjust-form">{{ csrf() }}
+          <select name="forma" class="input-sm">{% for k, v in methods.items() %}<option value="{{ k }}" {{ 'selected' if r.method == k }}>{{ v }}</option>{% endfor %}</select>
+          <button class="btn btn-sm btn-primary">Recebi</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
+
+<div class="grid-2 fin-grid">
+  <section class="card table-card">
+    <div class="card-head"><h2>A vencer</h2><span class="count">{{ (s.today + s.upcoming)|length }}</span></div>
+    {% if s.today or s.upcoming %}
+    <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>Vencimento</th><th>Paciente</th><th class="hide-sm">Descrição</th><th class="num">Valor</th><th></th></tr></thead>
+      <tbody>
+      {% set proximas = (s.today + s.upcoming) %}
+      {% for r in proximas[:12] %}
+      <tr>
+        <td>{{ r.due_date|data }}{% if r.state == 'vence_hoje' %}<br><span class="badge st-confirmado">hoje</span>{% endif %}</td>
+        <td>{{ r.patient.name }}</td>
+        <td class="hide-sm">{{ r.label }}</td>
+        <td class="num">{{ r.amount|moeda }}</td>
+        <td class="num"><form method="post" action="{{ url_for('billing.receive', id=r.id) }}" style="display:inline">{{ csrf() }}<button class="btn btn-sm btn-outline">Recebi</button></form></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if proximas|length > 12 %}<p class="muted small" style="padding:12px 16px">Mostrando 12 de {{ proximas|length }}. Exporte a planilha para ver tudo.</p>{% endif %}
+    {% else %}<p class="empty">Nada a vencer nos próximos 60 dias.</p>{% endif %}
+  </section>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h2>Régua de cobrança</h2></div>
+      <div class="split-row"><span>1 dia de atraso</span><strong class="muted small">lembrete gentil + Pix</strong></div>
+      <div class="split-row"><span>7 dias</span><strong class="muted small">oferta de reparcelamento</strong></div>
+      <div class="split-row"><span>20 dias</span><strong class="muted small">chamada para negociar</strong></div>
+      <p class="muted small" style="padding:12px 16px">O sistema monta as mensagens; a clínica revisa e envia em
+        <a class="link" href="{{ url_for('messaging.index', tipo='cobranca') }}">Mensagens</a>.</p>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Maiores devedores</h2></div>
+      {% set devedores = {} %}
+      {% for r in s.overdue %}{% set _ = devedores.update({r.patient: devedores.get(r.patient, 0) + r.amount}) %}{% endfor %}
+      {% for pat, total in devedores.items()|sort(attribute='1', reverse=true) %}
+      <div class="split-row"><span>{{ pat.name }}</span><strong>{{ total|moeda }}</strong></div>
+      {% else %}<p class="empty">Ninguém em atraso. 🎉</p>{% endfor %}
+    </section>
+  </div>
+</div>
+{% endblock %}

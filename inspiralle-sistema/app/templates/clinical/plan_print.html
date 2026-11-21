@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orçamento · {{ plan.patient.name }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/painel.css') }}">
+<style>
+  body { background: #fff; font-family: Manrope, system-ui, sans-serif; color: #13213c; margin: 0; }
+  .sheet { max-width: 760px; margin: 0 auto; padding: 40px 32px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #c9a468; padding-bottom: 18px; }
+  .head h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 2rem; margin: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 22px 0; font-size: .92rem; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #e6e9f0; }
+  th { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: #8a90a0; }
+  .num { text-align: right; }
+  tfoot th { border-top: 2px solid #13213c; border-bottom: none; font-size: 1rem; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin: 20px 0; font-size: .9rem; }
+  .meta b { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: #8a90a0; font-weight: 600; }
+  .sign { margin-top: 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+  .line { border-top: 1px solid #13213c; padding-top: 6px; font-size: .82rem; text-align: center; }
+  .foot { margin-top: 30px; font-size: .76rem; color: #6b7280; line-height: 1.6; }
+  @media print { .noprint { display: none; } .sheet { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="head">
+    <div>
+      <h1>Inspiralle Odontologia</h1>
+      <p style="margin:4px 0 0;font-size:.85rem;color:#6b7280">Orçamento de tratamento odontológico</p>
+    </div>
+    <div style="text-align:right;font-size:.8rem;color:#6b7280">
+      Nº {{ '%05d'|format(plan.id) }}<br>{{ today.strftime('%d/%m/%Y') }}
+    </div>
+  </div>
+
+  <div class="meta">
+    <div><b>Paciente</b>{{ plan.patient.name }}</div>
+    <div><b>Profissional</b>{{ plan.dentist.name }}{% if plan.dentist.cro %} · CRO {{ plan.dentist.cro }}{% endif %}</div>
+    <div><b>Telefone</b>{{ plan.patient.phone_fmt }}</div>
+    <div><b>Validade da proposta</b>{{ plan.valid_until.strftime('%d/%m/%Y') if plan.valid_until else '30 dias' }}</div>
+  </div>
+
+  <table>
+    <thead><tr><th>Etapa</th><th>Procedimento</th><th>Local</th><th class="num">Valor</th></tr></thead>
+    <tbody>
+    {% for it in plan.live_items %}
+    <tr><td>{{ it.phase }}ª</td><td>{{ it.service.name }}</td><td>{{ it.where }}</td><td class="num">{{ it.total|moeda }}</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th colspan="3">Total</th><th class="num">{{ plan.total|moeda }}</th></tr></tfoot>
+  </table>
+
+  {% if plan.receivables %}
+  <p style="font-size:.85rem"><strong>Condição de pagamento:</strong>
+    {% for r in plan.receivables %}{{ r.amount|moeda }} em {{ r.due_date.strftime('%d/%m/%Y') }}{{ '; ' if not loop.last }}{% endfor %}</p>
+  {% endif %}
+
+  <div class="sign">
+    <div class="line">{{ plan.patient.name }}<br><span style="color:#8a90a0">Paciente</span></div>
+    <div class="line">{{ plan.dentist.name }}<br><span style="color:#8a90a0">Cirurgião-dentista</span></div>
+  </div>
+
+  <p class="foot">Orçamento sujeito a reavaliação clínica. O prontuário é guardado por 20 anos
+    (Lei 13.787/2018). O paciente pode solicitar cópia da sua ficha a qualquer momento.</p>
+  <p class="noprint"><button onclick="window.print()" class="btn btn-primary">Imprimir</button></p>
+</div>
+</body>
+</html>

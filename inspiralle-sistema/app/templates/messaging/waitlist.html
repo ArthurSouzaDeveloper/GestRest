@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Lista de espera{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">WhatsApp</p><h1>Lista de espera e encaixes</h1></div>
+  <div class="head-actions"><a href="{{ url_for('messaging.index') }}" class="btn btn-outline">Mensagens</a></div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><span>Na lista</span><strong>{{ rows|length }}</strong></div>
+  <div class="kpi"><span>Horários vagos em {{ day.strftime('%d/%m') }}</span><strong>{{ openings|length }}</strong></div>
+  <div class="kpi"><span>Encaixes possíveis hoje</span><strong>{{ matches|length }}</strong><em class="trend up">cadeira que não fica vazia</em></div>
+  <div class="kpi"><span>Espera média</span><strong>{{ ((rows|sum(attribute='waiting_days') / rows|length)|round|int) if rows else 0 }} dias</strong></div>
+</section>
+
+<div class="grid-2 fin-grid">
+  <section class="card table-card">
+    <div class="card-head"><h2>Encaixes sugeridos</h2><span class="muted small">{{ day.strftime('%d/%m/%Y') }}</span></div>
+    {% if matches %}
+    <table class="table">
+      <thead><tr><th>Horário</th><th>Paciente</th><th>Mensagem</th><th></th></tr></thead>
+      <tbody>
+      {% for w, slot in matches %}
+      <tr>
+        <td><strong>{{ slot|hora }}</strong></td>
+        <td>{{ w.patient.name }}<br><small class="muted">{{ w.preference_label }}</small></td>
+        <td class="msg-cell">{{ texts[w.id] }}</td>
+        <td class="num">
+          <form method="post" action="{{ url_for('messaging.call_waitlist', id=w.id) }}">{{ csrf() }}
+            <input type="hidden" name="texto" value="{{ texts[w.id] }}">
+            <button class="btn btn-sm btn-primary">Chamar</button></form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="empty">Sem horário vago para encaixar neste dia.</p>{% endif %}
+  </section>
+
+  <section class="card table-card">
+    <div class="card-head"><h2>Quem está esperando</h2><span class="count">{{ rows|length }}</span></div>
+    {% if rows %}
+    <table class="table">
+      <thead><tr><th>Paciente</th><th class="hide-sm">Procedimento</th><th>Preferência</th><th>Espera</th><th></th></tr></thead>
+      <tbody>
+      {% for w in rows %}
+      <tr>
+        <td><strong>{{ w.patient.name }}</strong>{% if w.called_at %}<br><small class="muted">chamado em {{ w.called_at|data }}</small>{% endif %}</td>
+        <td class="hide-sm">{{ w.service.name if w.service else 'qualquer' }}</td>
+        <td>{{ w.preference_label }}</td>
+        <td>{{ w.waiting_days }} d</td>
+        <td class="num"><form method="post" action="{{ url_for('messaging.leave_waitlist', id=w.id) }}">{{ csrf() }}<button class="btn btn-sm btn-link-danger">Sair</button></form></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="empty">Lista vazia.</p>{% endif %}
+
+    <form method="post" class="form row-2 price-form">{{ csrf() }}
+      <label>Paciente <select name="paciente" required>{% for p in patients %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label>
+      <label>Procedimento <select name="servico"><option value="">Qualquer</option>{% for s in services %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></label>
+      <label>Profissional <select name="dentista"><option value="">Qualquer</option>{% for d in dentists %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></label>
+      <label>Preferência <select name="preferencia"><option value="qualquer">Qualquer horário</option><option value="manha">Manhã</option><option value="tarde">Tarde</option></select></label>
+      <div class="form-actions"><button class="btn btn-primary">Entrar na lista</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

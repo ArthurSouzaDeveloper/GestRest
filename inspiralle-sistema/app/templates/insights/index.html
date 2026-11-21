@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Indicadores{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">Gestão</p><h1 class="cap">{{ i.label }}</h1></div>
+</header>
+
+<form class="card filters" method="get">
+  <div class="seg">
+    {% for rkey, label in ranges.items() %}
+    <a href="{{ url_for('insights.index', faixa=rkey, data=ref.isoformat(), dentista=dentist_id) }}" class="{{ 'on' if rkey == key }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <input type="hidden" name="faixa" value="{{ key }}">
+  <input type="date" name="data" value="{{ ref.isoformat() }}" class="input-sm" onchange="this.form.submit()">
+  <select name="dentista" class="input-sm" onchange="this.form.submit()">
+    <option value="">Todos os profissionais</option>
+    {% for d in dentists %}<option value="{{ d.id }}" {{ 'selected' if d.id == dentist_id }}>{{ d.name }}</option>{% endfor %}
+  </select>
+</form>
+
+<section class="kpis">
+  <div class="kpi"><span>Ocupação da agenda</span><strong>{{ i.occupancy }}%</strong>
+    <em class="trend {{ 'up' if i.occupancy >= targets.occupancy else 'down' }}">meta de mercado {{ targets.occupancy }}%</em></div>
+  <div class="kpi"><span>Faltas</span><strong>{{ i.noshow_rate }}%</strong>
+    <em class="trend {{ 'up' if i.noshow_rate <= targets.noshow else 'down' }}">{{ i.noshow }} falta(s) · meta {{ targets.noshow }}%</em></div>
+  <div class="kpi"><span>Conversão de orçamentos</span><strong>{{ i.conversion }}%</strong>
+    <em class="trend {{ 'up' if i.conversion >= targets.conversion else 'down' }}">meta {{ targets.conversion }}%</em></div>
+  <div class="kpi"><span>Cadeira vazia</span><strong>{{ (i.idle_min / 60)|round(1) }} h</strong>
+    <em class="trend down">{{ i.idle_cost|moeda }} que deixaram de entrar</em></div>
+</section>
+
+<div class="grid-2 fin-grid">
+  <section class="card">
+    <div class="card-head"><h2>Ocupação por profissional</h2><span class="muted small">horas ocupadas sobre horas disponíveis</span></div>
+    {% for row in i.by_dentist %}
+    <div class="split-row">
+      <span><i class="dot" style="background: {{ row.d.color }}"></i>{{ row.d.name }}
+        <small class="muted">· {{ (row.min / 60)|round(1) }}h de {{ (row.cap / 60)|round(1) }}h</small></span>
+      <strong>{{ row.occupancy }}%</strong>
+    </div>
+    <div class="split-bar"><span style="width: {{ row.occupancy if row.occupancy <= 100 else 100 }}%; background: {{ row.d.color }}"></span></div>
+    {% else %}<p class="empty">Sem agenda no período.</p>{% endfor %}
+    <p class="muted small" style="padding:10px 16px">A meta do setor é entre 75% e 85%. Abaixo disso sobra cadeira;
+      acima, a agenda fica sem folga para encaixe e urgência.</p>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Ocupação dia a dia</h2><span class="muted small">% da agenda preenchida</span></div>
+    <div class="bars {{ 'dense' if i.by_day|length > 20 }}">
+      {% for label, pct, iso in i.by_day %}
+      <div class="bar" title="{{ pct }}% em {{ iso }}">
+        <span class="bar-val">{{ pct if pct else '' }}</span>
+        <span class="bar-fill" style="height: {{ pct if pct <= 100 else 100 }}%; background: {{ '#3f8f6b' if pct >= targets.occupancy else ('#c9a468' if pct >= 50 else '#c0504d') }}"></span>
+        <span class="bar-lbl">{{ label|safe }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="muted small" style="padding:0 16px 14px"><i class="dot" style="background:#3f8f6b"></i> na meta &nbsp;
+      <i class="dot" style="background:#c9a468"></i> abaixo da meta &nbsp;
+      <i class="dot" style="background:#c0504d"></i> agenda vazia</p>
+  </section>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h2>Funil de orçamentos</h2></div>
+      <div class="split-row"><span>Apresentados</span><strong>{{ i.proposed_value|moeda }}</strong></div>
+      <div class="split-bar"><span style="width:100%"></span></div>
+      <div class="split-row"><span>Aprovados</span><strong>{{ i.approved_value|moeda }}</strong></div>
+      <div class="split-bar"><span style="width: {{ (i.approved_value / i.proposed_value * 100)|round if i.proposed_value else 0 }}%; background:#3f8f6b"></span></div>
+      <div class="split-row"><span>Esperando resposta</span><strong>{{ i.waiting_value|moeda }}</strong></div>
+      <div class="split-bar"><span style="width: {{ (i.waiting_value / i.proposed_value * 100)|round if i.proposed_value else 0 }}%; background:#e3a93c"></span></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Consultas no período</h2></div>
+      <div class="split-row"><span>Realizadas</span><strong>{{ i.done }}</strong></div>
+      <div class="split-row"><span>Faltas</span><strong>{{ i.noshow }}</strong></div>
+      <div class="split-row"><span>Cancelamentos</span><strong>{{ i.cancelled }} <small class="muted">({{ i.cancel_rate }}%)</small></strong></div>
+      <div class="split-row"><span>Tempo perdido com falta e cancelamento</span><strong>{{ (i.lost_min / 60)|round(1) }} h</strong></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>De onde vêm as consultas</h2></div>
+      {% set total = i.total_slots or 1 %}
+      {% for origin, n in i.by_origin.items() %}
+      <div class="split-row"><span>{{ 'Agendamento pelo site' if origin == 'site' else 'Recepção' }}</span><strong>{{ n }} <small class="muted">({{ (n * 100 // total) }}%)</small></strong></div>
+      <div class="split-bar"><span style="width: {{ n * 100 // total }}%; background: {{ '#c9a468' if origin == 'site' else '#4f7cac' }}"></span></div>
+      {% endfor %}
+      <div class="split-row"><span>Pacientes novos</span><strong>{{ i.new_patients }}</strong></div>
+    </section>
+  </div>
+</div>
+{% endblock %}

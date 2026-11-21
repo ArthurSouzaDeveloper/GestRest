@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Convênios{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">Convênios</p><h1>Convênios e guias TISS</h1></div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><span>Enviado aos convênios</span><strong>{{ totals.enviado|moeda }}</strong></div>
+  <div class="kpi"><span>Recebido</span><strong>{{ totals.pago|moeda }}</strong></div>
+  <div class="kpi"><span>Aguardando pagamento</span><strong>{{ totals.aberto|moeda }}</strong></div>
+  <div class="kpi"><span>Glosas</span><strong>{{ totals.glosa|moeda }}</strong>
+    <em class="trend down">valor recusado pela operadora</em></div>
+</section>
+
+<div class="grid-2 fin-grid">
+  <section class="card table-card">
+    <div class="card-head"><h2>Guias</h2><span class="count">{{ guides|length }}</span></div>
+    {% if guides %}
+    <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>Guia</th><th>Paciente</th><th class="hide-sm">Convênio</th><th class="num">Valor</th><th>Situação</th></tr></thead>
+      <tbody>
+      {% for g in guides %}
+      <tr>
+        <td><strong>{{ g.number }}</strong><br><small class="muted">{{ g.created_at|data }}</small></td>
+        <td>{{ g.patient.name }}<br><small class="muted">{{ g.dentist.name }}</small></td>
+        <td class="hide-sm">{{ g.insurance.name }}</td>
+        <td class="num">{{ g.amount|moeda }}{% if g.paid_amount is not none %}<br><small class="muted">pago {{ g.paid_amount|moeda }}</small>{% endif %}</td>
+        <td>
+          <span class="badge st-{{ {'gerada':'agendado','enviada':'confirmado','paga':'concluido','glosada':'faltou'}[g.status] }}">{{ g.status_label }}</span>
+          <form method="post" action="{{ url_for('insurance.guide_status', id=g.id) }}" class="status-actions">{{ csrf() }}
+            {% if g.status == 'gerada' %}<button class="btn btn-sm btn-outline" name="status" value="enviada">Enviar</button>{% endif %}
+            {% if g.status == 'enviada' %}<button class="btn btn-sm btn-outline" name="status" value="paga">Paga</button>
+            <button class="btn btn-sm btn-outline" name="status" value="glosada">Glosada</button>{% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<p class="empty">Nenhuma guia gerada.</p>{% endif %}
+
+    <form method="post" action="{{ url_for('insurance.new_guide') }}" class="form row-2 price-form">{{ csrf() }}
+      <label>Convênio <select name="convenio" required>{% for i in insurances %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}</select></label>
+      <label>Paciente <select name="paciente" required>{% for p in patients %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label>
+      <label>Profissional <select name="dentista" required>{% for d in dentists %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></label>
+      <label>Plano de tratamento <select name="plano"><option value="">Sem plano</option>{% for pl in plans %}<option value="{{ pl.id }}">{{ pl.patient.name }} · {{ pl.title }}</option>{% endfor %}</select></label>
+      <label>Valor <input type="text" name="valor" class="price-input" placeholder="usa a tabela do convênio"></label>
+      <div class="form-actions"><button class="btn btn-primary">Gerar guia</button></div>
+    </form>
+  </section>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h2>Convênios atendidos</h2></div>
+      {% for i in insurances %}
+      <div class="split-row">
+        <span><strong>{{ i.name }}</strong><br><small class="muted">{{ i.prices|length }} procedimento(s) na tabela · paga em {{ i.pay_days }} dias</small></span>
+        <a href="{{ url_for('insurance.prices', id=i.id) }}" class="btn btn-sm btn-outline">Tabela</a>
+      </div>
+      {% else %}<p class="empty">Nenhum convênio cadastrado.</p>{% endfor %}
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Cadastrar convênio</h2></div>
+      <form method="post" class="form">{{ csrf() }}
+        <label>Nome <input type="text" name="nome" required></label>
+        <label>Registro ANS <input type="text" name="ans" placeholder="opcional"></label>
+        <label>Prazo de pagamento (dias) <input type="number" name="prazo" value="30" min="1" max="180"></label>
+        <div class="form-actions"><button class="btn btn-primary">Cadastrar</button></div>
+      </form>
+      <p class="muted small" style="padding:0 16px 14px">Módulo só para clínicas que atendem convênio. Se a Inspiralle
+        é 100% particular, pode ficar desligado.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}

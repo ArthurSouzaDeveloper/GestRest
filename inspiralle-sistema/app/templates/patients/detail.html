@@ -13,6 +13,7 @@
   </div>
   <div class="head-actions">
     <a href="{{ p.whatsapp_link }}" target="_blank" rel="noopener" class="btn btn-whats">WhatsApp</a>
+    <a href="{{ url_for('clinical.odontogram', id=p.id) }}" class="btn btn-outline">Odontograma</a>
     {% if current_user.role in ('admin', 'recepcao') %}
     <a href="{{ url_for('scheduling.create', paciente=p.id) }}" class="btn btn-primary">+ Agendar</a>
     <a href="{{ url_for('patients.edit', id=p.id) }}" class="btn btn-outline">Editar</a>

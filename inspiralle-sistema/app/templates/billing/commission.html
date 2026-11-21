@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Repasse por dentista{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">Contas{% if current_user.role == 'dentista' %} · seu repasse{% endif %}</p><h1>Comissão e repasse</h1></div>
+</header>
+
+<form class="card filters" method="get">
+  <div class="seg">
+    {% for key, label in periods.items() %}
+    <a href="{{ url_for('billing.commission', periodo=key, data=ref.isoformat()) }}" class="{{ 'on' if key == period }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <input type="hidden" name="periodo" value="{{ period }}">
+  <input type="date" name="data" value="{{ ref.isoformat() }}" class="input-sm" onchange="this.form.submit()">
+</form>
+
+{% set gross = rows|sum(attribute='gross') %}
+{% set payout = rows|sum(attribute='amount') %}
+<section class="kpis">
+  <div class="kpi"><span>Produção no período</span><strong>{{ gross|moeda }}</strong></div>
+  <div class="kpi"><span>Repasse aos dentistas</span><strong>{{ payout|moeda }}</strong>
+    <em class="trend">{{ ((payout / gross * 100)|round) if gross else 0 }}% da produção</em></div>
+  <div class="kpi"><span>Descontos</span><strong>{{ rows|sum(attribute='deductions')|moeda }}</strong>
+    <em class="trend">material, laboratório e cartão</em></div>
+  <div class="kpi"><span>Fica na clínica</span><strong>{{ rows|sum(attribute='clinic_share')|moeda }}</strong></div>
+</section>
+
+{% for c in rows %}
+<section class="card">
+  <div class="card-head">
+    <h2><i class="dot" style="background: {{ c.dentist.color }}"></i> {{ c.dentist.name }}</h2>
+    <span class="muted small">{{ c.dentist.commission_pct|round|int }}% {{ c.dentist.commission_base_label }} · {{ c.count }} consulta(s)</span>
+  </div>
+  <table class="table">
+    <tbody>
+      <tr><td>Produção bruta</td><td class="num">{{ c.gross|moeda }}</td></tr>
+      <tr><td>Material (ficha técnica)</td><td class="num">− {{ c.supplies|moeda }}</td></tr>
+      <tr><td>Laboratório</td><td class="num">− {{ c.lab|moeda }}</td></tr>
+      <tr><td>Taxa de cartão nas parcelas recebidas</td><td class="num">− {{ c.card_fees|moeda }}</td></tr>
+      <tr><th>Base líquida</th><th class="num">{{ c.net|moeda }}</th></tr>
+      <tr><th>Repasse ({{ c.dentist.commission_pct|round|int }}% {{ c.dentist.commission_base_label }})</th><th class="num">{{ c.amount|moeda }}</th></tr>
+      <tr><td class="muted">Fica na clínica</td><td class="num muted">{{ c.clinic_share|moeda }}</td></tr>
+    </tbody>
+  </table>
+</section>
+{% else %}
+<section class="card"><p class="empty">Nenhuma produção neste período.</p></section>
+{% endfor %}
+<p class="muted small privacy-note">🔒 Visível apenas para a administração e para cada dentista (o próprio repasse).</p>
+{% endblock %}

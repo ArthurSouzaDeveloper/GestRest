@@ -1,0 +1,25 @@
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import logo %}
+{% block body %}
+<header class="pt-top">
+  <div class="pt-top-in">
+    <a href="{{ url_for('portal.timeline') }}" class="brand">{{ logo(28) }}<span>Inspiralle<small>Área do paciente</small></span></a>
+    <nav class="pt-menu">
+      <a href="{{ url_for('portal.plans') }}">Orçamentos</a>
+      <a href="{{ url_for('portal.anamnesis') }}">Ficha de saúde</a>
+      <a href="{{ url_for('portal.logout') }}">Sair</a>
+    </nav>
+  </div>
+  <div class="pt-hero">
+    <p class="eyebrow">{% block eyebrow %}{% endblock %}</p>
+    <h1>{% block heading %}{% endblock %}</h1>
+  </div>
+</header>
+<main class="pt-main">
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% if msgs %}<div class="flashes">{% for cat, m in msgs %}<div class="flash flash-{{ cat }}">{{ m }}</div>{% endfor %}</div>{% endif %}
+  {% endwith %}
+  {% block main %}{% endblock %}
+  <p class="pt-foot muted small"><a class="link" href="{{ url_for('portal.export_record') }}">Baixar uma cópia da minha ficha</a><br>Inspiralle Odontologia</p>
+</main>
+{% endblock %}

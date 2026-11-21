@@ -16,5 +16,6 @@
 <body class="portal {% block body_class %}{% endblock %}">
 {% block body %}{% endblock %}
 <script src="{{ url_for('static', filename='js/portal.js') }}" defer></script>
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Orçamentos{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">Tratamentos</p><h1>Orçamentos</h1></div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><span>Aguardando resposta</span><strong>{{ totals.proposto.total|moeda }}</strong><em class="trend">{{ totals.proposto.count }} orçamento(s)</em></div>
+  <div class="kpi"><span>Aprovados</span><strong>{{ (totals.aprovado.total + totals.em_andamento.total + totals.concluido.total)|moeda }}</strong><em class="trend up">{{ totals.aprovado.count + totals.em_andamento.count + totals.concluido.count }} orçamento(s)</em></div>
+  <div class="kpi"><span>Recusados</span><strong>{{ totals.recusado.total|moeda }}</strong><em class="trend down">{{ totals.recusado.count }} orçamento(s)</em></div>
+  <div class="kpi"><span>Conversão</span><strong>
+    {%- set decided = totals.aprovado.count + totals.em_andamento.count + totals.concluido.count + totals.recusado.count -%}
+    {{ ((totals.aprovado.count + totals.em_andamento.count + totals.concluido.count) * 100 // decided) if decided else 0 }}%</strong>
+    <em class="trend">de quem já respondeu</em></div>
+</section>
+
+<form class="card filters" method="get">
+  <div class="seg">
+    <a href="{{ url_for('clinical.plans') }}" class="{{ 'on' if not status }}">Todos</a>
+    {% for key, label in statuses.items() %}
+    <a href="{{ url_for('clinical.plans', status=key) }}" class="{{ 'on' if status == key }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+</form>
+
+<section class="card table-card">
+  <div class="card-head"><h2>Lista</h2><span class="count">{{ plans|length }}</span></div>
+  {% if plans %}
+  <div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Paciente</th><th class="hide-sm">Plano</th><th>Situação</th><th class="hide-sm">Itens</th><th class="num">Total</th><th class="hide-sm">Espera</th></tr></thead>
+    <tbody>
+    {% for pl in plans %}
+    <tr onclick="location.href='{{ url_for('clinical.plan_detail', id=pl.id) }}'">
+      <td><strong>{{ pl.patient.name }}</strong><br><small class="muted">{{ pl.dentist.name }}</small></td>
+      <td class="hide-sm">{{ pl.title }}{% if pl.signed_at %}<br><small class="muted">termo assinado</small>{% endif %}</td>
+      <td><span class="badge st-{{ 'concluido' if pl.status in ('aprovado','concluido') else ('cancelado' if pl.status == 'recusado' else 'agendado') }}">{{ pl.status_label }}</span>
+          {% if pl.expired %}<br><small class="muted">validade vencida</small>{% endif %}</td>
+      <td class="hide-sm">{{ pl.done_count }}/{{ pl.live_items|length }}</td>
+      <td class="num">{{ pl.total|moeda }}</td>
+      <td class="hide-sm">{{ pl.days_waiting }} d</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="empty">Nenhum orçamento nesta situação.</p>{% endif %}
+</section>
+{% endblock %}

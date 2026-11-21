@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Regras de retorno{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">WhatsApp</p><h1>Retorno por procedimento (recall)</h1></div>
+  <div class="head-actions"><a href="{{ url_for('messaging.index', tipo='recall') }}" class="btn btn-outline">Ver chamadas</a></div>
+</header>
+
+<div class="grid-2 fin-grid">
+  <section class="card">
+    <div class="card-head"><h2>Depois de quantos meses chamar de volta</h2></div>
+    <form method="post" class="form">{{ csrf() }}
+      <table class="table">
+        <thead><tr><th>Procedimento</th><th>Meses</th><th>Ativo</th></tr></thead>
+        <tbody>
+        {% for s in services %}
+        {% set r = rules.get(s.id) %}
+        <tr>
+          <td>{{ s.name }}</td>
+          <td><input type="number" name="meses_{{ s.id }}" value="{{ r.months if r else '' }}" min="0" max="60" class="input-sm" style="width:5rem"></td>
+          <td><label class="check"><input type="checkbox" name="ativo_{{ s.id }}" {{ 'checked' if r and r.active }}><span></span></label></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="form-actions"><button class="btn btn-primary">Salvar regras</button></div>
+    </form>
+    <p class="muted small" style="padding:0 16px 16px">Deixe os meses em branco para não chamar de volta naquele procedimento.
+      Quem já tem consulta marcada não recebe a mensagem.</p>
+  </section>
+
+  <section class="card table-card">
+    <div class="card-head"><h2>Chamadas de retorno recentes</h2><span class="count">{{ pending|length }}</span></div>
+    {% if pending %}
+    <table class="table">
+      <thead><tr><th>Paciente</th><th>Mensagem</th><th>Situação</th></tr></thead>
+      <tbody>
+      {% for m in pending %}
+      <tr><td>{{ m.patient.name }}</td><td class="msg-cell">{{ m.body }}</td><td><span class="badge">{{ m.status_label }}</span></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="empty">Nenhuma chamada de retorno gerada ainda.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}
