@@ -178,6 +178,13 @@ export interface TicketInput {
    * nas vias de produção). Ver printJob.service.ts, onde os `items` passados nesse modo já
    * vêm como contagem por família, não os itens reais do pedido. */
   itemsSummaryOnly?: boolean;
+  /** true imprime "*** TROCO ***" bem grande no ALTO da via (antes até do cabeçalho)
+   * quando o pagamento é em dinheiro — pedido explícito do cliente/dono: o caixa e o
+   * motoboy estavam esquecendo de separar/levar o troco. Só a via principal e a do
+   * motoboy ligam isso (ver printJob.service.ts); sem paymentMethod CASH não imprime nada.
+   * Com changeFor informado, sai também "P/ R$ X" e, se o total for conhecido, quanto
+   * levar de troco. */
+  changeAlert?: boolean;
 }
 
 /**
@@ -228,6 +235,19 @@ export function renderTicket(input: TicketInput): Buffer {
   // gastando papel à toa, e prefere começar direto pelo aviso de bebida (se houver).
   const headerText = input.headerOverride ?? STATION_LABEL[input.station];
   const parts: Buffer[] = [INIT];
+  if (input.changeAlert && input.paymentMethod === PaymentMethod.CASH) {
+    // Largura dupla = 16 colunas por linha: cada texto aqui cabe numa linha só.
+    parts.push(HEADER_MODE_ON, line('*** TROCO ***'));
+    if (input.changeFor) {
+      parts.push(line(`P/ ${formatCurrency(input.changeFor)}`), BODY_MODE_ON);
+      if (input.orderTotal != null && input.changeFor > input.orderTotal) {
+        parts.push(line(`LEVAR DE TROCO: ${formatCurrency(Math.round((input.changeFor - input.orderTotal) * 100) / 100)}`));
+      }
+    } else {
+      parts.push(BODY_MODE_ON);
+    }
+    parts.push(line('--------------------------------'));
+  }
   if (headerText) {
     parts.push(HEADER_MODE_ON, line(headerText), BODY_MODE_ON);
   } else {

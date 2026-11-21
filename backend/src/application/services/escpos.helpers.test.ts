@@ -528,6 +528,38 @@ describe('renderTicket', () => {
     expect(comTotal.indexOf('TOTAL DO PEDIDO')).toBeGreaterThan(comTotal.indexOf('1- X'));
   });
 
+  it('changeAlert + dinheiro imprime "*** TROCO ***" no alto, antes do cabeçalho, com o valor e quanto levar', () => {
+    const base = {
+      station: Station.KITCHEN,
+      tableNumber: null,
+      orderType: OrderType.DELIVERY,
+      orderNumber: 3,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: null,
+      placedAt: PLACED_AT,
+      paymentMethod: PaymentMethod.CASH,
+      orderTotal: 37,
+      items: [{ name: 'X', description: null, quantity: 1, additionals: [] }],
+    };
+    const comValor = renderTicket({ ...base, changeFor: 50, changeAlert: true }).toString('ascii');
+    expect(comValor).toContain('*** TROCO ***');
+    expect(comValor).toContain('P/ R$ 50,00');
+    expect(comValor).toContain('LEVAR DE TROCO: R$ 13,00');
+    expect(comValor.indexOf('*** TROCO ***')).toBeLessThan(comValor.indexOf('COZINHA'));
+
+    const semValor = renderTicket({ ...base, changeAlert: true }).toString('ascii');
+    expect(semValor).toContain('*** TROCO ***');
+    expect(semValor).not.toContain('P/ R$');
+    expect(semValor).not.toContain('LEVAR DE TROCO');
+
+    // Sem a opção (vias secundárias) ou sem ser dinheiro: nada de TROCO.
+    expect(renderTicket({ ...base, changeFor: 50 }).toString('ascii')).not.toContain('*** TROCO ***');
+    expect(
+      renderTicket({ ...base, paymentMethod: PaymentMethod.PIX, changeAlert: true }).toString('ascii'),
+    ).not.toContain('TROCO');
+  });
+
   it('pedido dividido isento imprime "TAXA DE ENTREGA: ISENTA (JUNTO DO PEDIDO #N)" no lugar do valor da taxa', () => {
     const base = {
       station: Station.KITCHEN,

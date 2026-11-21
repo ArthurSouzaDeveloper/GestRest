@@ -312,7 +312,12 @@ describe('fila de impressão térmica (PrintJob)', () => {
       expect(paper).not.toContain('Cliente Dados Minimos');
       expect(paper).not.toContain('Tel:');
       expect(paper).not.toContain('Rua dos Dados');
+      // TROCO só na via principal e na do motoboy (pedido do cliente/dono).
+      expect(paper).not.toContain('*** TROCO ***');
     }
+    expect(pastelPaper).toContain('*** TROCO ***');
+    const motoboyPaper = jobs.map((j) => j.payload.toString('ascii')).find((t) => t.includes('SEGUNDA VIA MOTOBOY'))!;
+    expect(motoboyPaper).toContain('*** TROCO ***');
   });
 
   it('sem pastel no pedido: a via de Mini Pizza reconhece que virou a principal e leva os dados completos — só Porção leva o número do pedido', async () => {
