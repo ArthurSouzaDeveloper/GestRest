@@ -7,7 +7,10 @@ from app.extensions import db
 from app.models import STATUSES, Appointment, Dentist, Patient, Service, only_digits
 from app.modules.auth.decorators import role_required
 from app.services.availability import BookingError, business_windows, free_slots, validate_booking
+from app.services.audit import log
 from app.services.finance import sync_appointment_entry
+from app.services.inventory import consume_for
+from app.services.messaging import enqueue_appointment
 
 bp = Blueprint("scheduling", __name__)
 
@@ -104,6 +107,10 @@ def _form(appt: Appointment | None):
         appt.start, appt.end = start, end
         appt.notes = f.get("observacoes") or None
         sync_appointment_entry(appt)
+        db.session.flush()
+        enqueue_appointment(appt)      # confirmação agora e lembrete na véspera
+        log("criou" if appt.id is None else "alterou", "Consulta", entity_id=appt.id,
+            patient_id=appt.patient_id, detail=f"{appt.service.name} com {appt.dentist.name}")
         db.session.commit()
         flash("Consulta salva na agenda.", "success")
         return redirect(url_for("scheduling.day_view", data=start.date().isoformat()))
@@ -158,6 +165,9 @@ def set_status(id):
             return redirect(request.referrer or url_for("scheduling.detail", id=id))
     appt.status = status
     entry = sync_appointment_entry(appt)
+    consume_for(appt)                  # baixa do material pela ficha técnica
+    log("alterou", "Consulta", entity_id=appt.id, patient_id=appt.patient_id,
+        detail=f"Status: {appt.status_label}")
     db.session.commit()
     msg = f"Consulta marcada como “{appt.status_label}”."
     if entry is not None and current_user.role in ("admin", "dentista"):

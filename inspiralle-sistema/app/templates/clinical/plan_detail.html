@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}{{ plan.title }} · {{ plan.patient.name }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow"><a href="{{ url_for('patients.detail', id=plan.patient_id) }}" class="link">{{ plan.patient.name }}</a> · {{ plan.dentist.name }}</p>
+    <h1>{{ plan.title }}</h1>
+  </div>
+  <div class="head-actions">
+    <a href="{{ url_for('clinical.odontogram', id=plan.patient_id) }}" class="btn btn-outline">Odontograma</a>
+    <a href="{{ url_for('clinical.plan_print', id=plan.id) }}" class="btn btn-outline" target="_blank">Imprimir orçamento</a>
+    <a href="{{ url_for('clinical.consent', id=plan.id) }}" class="btn btn-primary">{{ 'Ver termo assinado' if plan.signed_at else 'Assinar termo' }}</a>
+  </div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><span>Situação</span><strong class="cap">{{ plan.status_label }}</strong>
+    {% if plan.valid_until %}<em class="trend">validade {{ plan.valid_until|data }}</em>{% endif %}</div>
+  <div class="kpi"><span>Total do plano</span><strong>{{ plan.total|moeda }}</strong>
+    {% if plan.discount %}<em class="trend down">desconto {{ plan.discount|moeda }}</em>{% endif %}</div>
+  <div class="kpi"><span>Andamento</span><strong>{{ plan.progress }}%</strong><em class="trend">{{ plan.done_count }} de {{ plan.live_items|length }} executados</em></div>
+  <div class="kpi"><span>Termo de consentimento</span><strong>{{ 'Assinado' if plan.signed_at else 'Pendente' }}</strong>
+    {% if plan.signed_at %}<em class="trend up">{{ plan.signed_at|datahora }}</em>{% endif %}</div>
+</section>
+
+<div class="grid-2 fin-grid">
+  <section class="card table-card">
+    <div class="card-head"><h2>Procedimentos</h2><span class="count">{{ plan.live_items|length }}</span></div>
+    {% if plan.live_items %}
+    <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>Etapa</th><th>Procedimento</th><th>Local</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead>
+      <tbody>
+      {% for it in plan.live_items %}
+      <tr>
+        <td>{{ it.phase }}ª</td>
+        <td><strong>{{ it.service.name }}</strong></td>
+        <td>{{ it.where }}</td>
+        <td class="num">{{ it.total|moeda }}{% if it.discount %}<br><small class="muted">-{{ it.discount|moeda }}</small>{% endif %}</td>
+        <td><span class="badge st-{{ 'concluido' if it.status == 'executado' else 'agendado' }}">{{ it.status_label }}</span></td>
+        <td class="num">
+          {% if can_edit and it.status != 'executado' %}
+          <form method="post" action="{{ url_for('clinical.do_item', id=plan.id, item_id=it.id) }}" style="display:inline">{{ csrf() }}<button class="btn btn-sm btn-outline" title="Marcar como executado">✓</button></form>
+          <form method="post" action="{{ url_for('clinical.remove_item', id=plan.id, item_id=it.id) }}" style="display:inline">{{ csrf() }}<button class="btn btn-sm btn-link-danger" title="Retirar do plano">×</button></form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><th colspan="3">Total</th><th class="num">{{ plan.total|moeda }}</th><th colspan="2"></th></tr></tfoot>
+    </table>
+    </div>
+    {% else %}<p class="empty">Nenhum procedimento no plano ainda.</p>{% endif %}
+
+    {% if can_edit %}
+    <form method="post" action="{{ url_for('clinical.add_item', id=plan.id) }}" class="form row-2 price-form">
+      {{ csrf() }}
+      <label>Procedimento <select name="servico" required>{% for s in services %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></label>
+      <label>Dente <select name="dente"><option value="">Boca toda</option>{% for t in teeth %}<option value="{{ t }}">{{ t }}</option>{% endfor %}</select></label>
+      <label>Valor <input type="text" name="valor" class="price-input" placeholder="usa a tabela do dentista"></label>
+      <label>Etapa <input type="number" name="etapa" value="1" min="1" max="20"></label>
+      <fieldset class="checks"><legend class="face-legend">Faces</legend>
+        {% for f, label in faces.items() %}<label class="check"><input type="checkbox" name="face" value="{{ f }}"><span>{{ f }}</span></label>{% endfor %}
+      </fieldset>
+      <div class="form-actions"><button class="btn btn-primary">Adicionar procedimento</button></div>
+    </form>
+    {% endif %}
+  </section>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h2>Resposta do paciente</h2></div>
+      {% if plan.status in ('proposto',) %}
+      <form method="post" action="{{ url_for('clinical.plan_decide', id=plan.id) }}" class="form">
+        {{ csrf() }}
+        <label>Entrada <input type="text" name="entrada" placeholder="R$ 0,00"></label>
+        <label>Parcelas <input type="number" name="parcelas" value="3" min="1" max="24"></label>
+        <label>Primeiro vencimento <input type="date" name="primeiro_vencimento" value="{{ today.isoformat() }}"></label>
+        <label>Forma <select name="forma">{% for k, v in methods.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+        <div class="form-actions">
+          <button class="btn btn-primary" name="decisao" value="aprovar">Paciente aprovou</button>
+          <button class="btn btn-outline" name="decisao" value="recusar">Paciente recusou</button>
+        </div>
+      </form>
+      <p class="muted small" style="padding:0 16px 14px">Ao aprovar, as parcelas entram sozinhas em contas a receber.</p>
+      {% else %}
+      <div class="dl">
+        <div><dt>Decisão</dt><dd>{{ plan.status_label }}{% if plan.decided_at %} em {{ plan.decided_at|data }}{% endif %}</dd></div>
+        <div><dt>Parcelas geradas</dt><dd>{{ plan.receivables|length }}</dd></div>
+      </div>
+      {% if plan.receivables %}
+      <table class="table">
+        <thead><tr><th>Parcela</th><th>Vencimento</th><th class="num">Valor</th><th>Situação</th></tr></thead>
+        <tbody>
+        {% for r in plan.receivables %}
+        <tr><td>{{ r.installment }}/{{ r.installments }}</td><td>{{ r.due_date|data }}</td><td class="num">{{ r.amount|moeda }}</td>
+            <td><span class="badge st-{{ 'concluido' if r.paid else ('faltou' if r.state == 'atrasado' else 'agendado') }}">{{ r.state_label }}</span></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <p class="muted small" style="padding:10px 16px"><a class="link" href="{{ url_for('billing.receivables') }}">Ver em contas a receber</a></p>
+      {% endif %}
+      {% endif %}
+    </section>
+
+    {% if plan.signature_png %}
+    <section class="card">
+      <div class="card-head"><h2>Termo assinado</h2></div>
+      <div style="padding:14px 16px">
+        <img src="{{ plan.signature_png }}" alt="Assinatura" style="max-width:100%;border:1px solid #e2e6ee;border-radius:10px;background:#fff">
+        <p class="muted small">{{ plan.signed_name }} · {{ plan.signed_at|datahora }} · IP {{ plan.signed_ip or '—' }}</p>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if plan.notes %}<section class="card"><div class="card-head"><h2>Observações</h2></div><p style="padding:0 16px 16px">{{ plan.notes }}</p></section>{% endif %}
+  </div>
+</div>
+{% endblock %}

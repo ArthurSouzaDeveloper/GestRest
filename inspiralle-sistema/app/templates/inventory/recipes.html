@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Ficha técnica{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">Materiais</p><h1>Ficha técnica por procedimento</h1></div>
+  <div class="head-actions"><a href="{{ url_for('inventory.index') }}" class="btn btn-outline">Estoque</a></div>
+</header>
+
+<p class="muted small" style="margin:-8px 0 18px">O que cada procedimento consome. Serve para dar baixa automática
+  no estoque e para descontar o material do repasse do dentista.</p>
+
+<div class="grid-2 fin-grid">
+  <div class="stack">
+  {% for s in services %}
+  <section class="card">
+    <div class="card-head"><h2>{{ s.name }}</h2><span class="muted small">custo {{ s.supply_cost|moeda }}</span></div>
+    {% if s.supplies %}
+    {% for sup in s.supplies %}
+    <div class="split-row">
+      <span>{{ sup.item.name }} <small class="muted">· {{ sup.quantity|round(2) }} {{ sup.item.unit_label }}</small></span>
+      <span>{{ (sup.quantity * sup.item.unit_cost)|moeda }}
+        <form method="post" action="{{ url_for('inventory.remove_recipe', id=sup.id) }}" style="display:inline">{{ csrf() }}<button class="btn btn-sm btn-link-danger">×</button></form></span>
+    </div>
+    {% endfor %}
+    {% else %}<p class="empty">Sem material vinculado.</p>{% endif %}
+  </section>
+  {% endfor %}
+  </div>
+
+  <section class="card">
+    <div class="card-head"><h2>Vincular material</h2></div>
+    <form method="post" class="form">{{ csrf() }}
+      <label>Procedimento <select name="servico" required>{% for s in services %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></label>
+      <label>Material <select name="material" required>{% for i in items %}<option value="{{ i.id }}">{{ i.name }} ({{ i.unit_label }})</option>{% endfor %}</select></label>
+      <label>Quantidade por procedimento <input type="text" name="quantidade" value="1" required></label>
+      <div class="form-actions"><button class="btn btn-primary">Vincular</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

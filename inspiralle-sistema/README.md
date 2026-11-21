@@ -94,3 +94,36 @@ pip install -r requirements.txt && pytest -q
 - Lembretes automáticos por WhatsApp (API oficial ou Z-API) e e-mail.
 - Termo de privacidade/LGPD revisado pela clínica.
 - Se a landing ficar em outro domínio, preencher `data-api` em `#booking` no `index.html`.
+
+## Módulos clínicos e de gestão (prévia)
+
+| Módulo | Rota | Quem acessa |
+| --- | --- | --- |
+| Odontograma | `/painel/clinico/paciente/<id>/odontograma` | dentista marca, recepção vê |
+| Plano de tratamento e orçamento | `/painel/clinico/orcamentos` | dentista monta, recepção registra a decisão |
+| Termo de consentimento | `/painel/clinico/plano/<id>/termo` | assinado na tela, guardado no prontuário |
+| Contas a receber | `/painel/contas/receber` | recepção dá baixa; totais só para admin/dentista |
+| Contas a pagar e caixa | `/painel/contas/pagar` | só admin |
+| Comissão e repasse | `/painel/contas/comissao` | admin vê todos, dentista vê o próprio |
+| Mensagens (WhatsApp) | `/painel/mensagens/` | recepção e dentista |
+| Lista de espera e encaixe | `/painel/mensagens/espera` | recepção e dentista |
+| Recall por procedimento | `/painel/mensagens/recall` | recepção e dentista |
+| Indicadores | `/painel/indicadores/` | admin e dentista |
+| Estoque e ficha técnica | `/painel/estoque/` | recepção e dentista |
+| Convênios e guias TISS | `/painel/convenios/` | recepção e dentista |
+| Trilha de auditoria | `/painel/cadastros/auditoria` | só admin |
+| Portal: anamnese, orçamento e termo | `/portal/anamnese`, `/portal/orcamentos` | paciente |
+
+Regras que atravessam os módulos:
+
+- O odontograma nunca apaga: a marcação mais recente de cada dente/face é a que vale, o resto fica no histórico.
+- Aprovar um orçamento gera as parcelas em contas a receber; reparcelar apaga só as parcelas ainda em aberto.
+- Executar um item do plano atualiza o odontograma (cárie vira restaurado, canal indicado vira canal tratado).
+- Consulta concluída lança o valor no financeiro **e** dá baixa no material da ficha técnica, uma vez só.
+- O repasse do dentista desconta material (ficha técnica), laboratório do período e a taxa de cartão das parcelas recebidas.
+- A régua de cobrança dispara em 1, 7 e 20 dias de atraso, uma mensagem por parcela.
+- Nenhuma mensagem sai sem a clínica revisar: o sistema monta a fila, a clínica envia.
+- Toda ação sobre dado de paciente entra na trilha de auditoria, com usuário, IP e data.
+
+O envio real de WhatsApp exige conta na API oficial da Meta (cobrada por mensagem); aqui a fila, os
+textos e o controle de resposta já funcionam ponta a ponta.

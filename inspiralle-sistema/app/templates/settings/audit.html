@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Trilha de auditoria{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow"><a href="{{ url_for('settings.index') }}" class="link">Cadastros</a></p><h1>Trilha de auditoria</h1></div>
+</header>
+<p class="muted small" style="margin:-8px 0 18px">Registro de quem viu e quem alterou cada dado de paciente.
+  Exigência para prontuário eletrônico e para a LGPD. As linhas não são editáveis nem apagáveis.</p>
+
+<form class="card filters" method="get">
+  <div class="seg">
+    <a href="{{ url_for('settings.audit') }}" class="{{ 'on' if not action }}">Tudo <small>{{ total }}</small></a>
+    {% for key, label in actions.items() %}
+    <a href="{{ url_for('settings.audit', acao=key) }}" class="{{ 'on' if action == key }}">{{ label }} <small>{{ counters[key] }}</small></a>
+    {% endfor %}
+  </div>
+</form>
+
+<section class="card table-card">
+  <div class="card-head"><h2>Últimos registros</h2><span class="count">{{ rows|length }}</span></div>
+  {% if rows %}
+  <div class="table-scroll">
+  <table class="table">
+    <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Onde</th><th class="hide-sm">Paciente</th><th class="hide-sm">Detalhe</th><th class="hide-sm">IP</th></tr></thead>
+    <tbody>
+    {% for a in rows %}
+    <tr>
+      <td>{{ a.created_at|datahora }}</td>
+      <td><strong>{{ a.user_label }}</strong></td>
+      <td><span class="badge">{{ a.action_label }}</span></td>
+      <td>{{ a.entity }}</td>
+      <td class="hide-sm">{{ a.patient.name if a.patient else '—' }}</td>
+      <td class="hide-sm"><small>{{ a.detail or '' }}</small></td>
+      <td class="hide-sm"><small class="muted">{{ a.ip or '—' }}</small></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="empty">Nenhum registro ainda.</p>{% endif %}
+</section>
+{% endblock %}

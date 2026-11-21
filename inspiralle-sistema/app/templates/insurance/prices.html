@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Tabela de {{ ins.name }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow"><a href="{{ url_for('insurance.index') }}" class="link">Convênios</a></p><h1>{{ ins.name }}</h1></div>
+</header>
+<section class="card">
+  <div class="card-head"><h2>Quanto o convênio paga por procedimento</h2><span class="muted small">código TUSS e valor</span></div>
+  <form method="post" class="form">{{ csrf() }}
+    <table class="table">
+      <thead><tr><th>Procedimento</th><th>Código TUSS</th><th class="num">Valor particular</th><th class="num">Valor do convênio</th></tr></thead>
+      <tbody>
+      {% for s in services %}
+      {% set r = rows.get(s.id) %}
+      <tr>
+        <td>{{ s.name }}</td>
+        <td><input type="text" name="tuss_{{ s.id }}" value="{{ r.tuss if r else '' }}" class="input-sm" style="width:7rem" placeholder="81000000"></td>
+        <td class="num muted">{{ s.price|moeda }}</td>
+        <td class="num"><input type="text" name="valor_{{ s.id }}" value="{{ ('%.2f'|format(r.amount))|replace('.', ',') if r else '' }}" class="price-input input-sm"></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="form-actions"><button class="btn btn-primary">Salvar tabela</button></div>
+  </form>
+</section>
+{% endblock %}

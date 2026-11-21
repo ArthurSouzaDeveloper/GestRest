@@ -40,7 +40,13 @@ def create_app(env: str = "dev") -> Flask:
         return db.session.get(User, int(user_id))
 
     from app.modules.auth.routes import bp as auth_bp
+    from app.modules.billing.routes import bp as billing_bp
+    from app.modules.clinical.routes import bp as clinical_bp
     from app.modules.dashboard.routes import bp as dashboard_bp
+    from app.modules.insights.routes import bp as insights_bp
+    from app.modules.insurance_mod.routes import bp as insurance_bp
+    from app.modules.inventory.routes import bp as inventory_bp
+    from app.modules.messaging.routes import bp as messaging_bp
     from app.modules.finance.routes import bp as finance_bp
     from app.modules.patients.routes import bp as patients_bp
     from app.modules.portal.routes import bp as portal_bp
@@ -54,6 +60,12 @@ def create_app(env: str = "dev") -> Flask:
     app.register_blueprint(patients_bp, url_prefix="/painel/pacientes")
     app.register_blueprint(settings_bp, url_prefix="/painel/cadastros")
     app.register_blueprint(finance_bp, url_prefix="/painel/financeiro")
+    app.register_blueprint(clinical_bp, url_prefix="/painel/clinico")
+    app.register_blueprint(billing_bp, url_prefix="/painel/contas")
+    app.register_blueprint(messaging_bp, url_prefix="/painel/mensagens")
+    app.register_blueprint(insights_bp, url_prefix="/painel/indicadores")
+    app.register_blueprint(inventory_bp, url_prefix="/painel/estoque")
+    app.register_blueprint(insurance_bp, url_prefix="/painel/convenios")
     app.register_blueprint(portal_bp, url_prefix="/portal")  # área do paciente (login próprio)
     app.register_blueprint(public_api_bp, url_prefix="/api/public")
 

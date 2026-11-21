@@ -71,3 +71,19 @@ def dentist_form(id=None):
         flash("Profissional salvo.", "success")
         return redirect(url_for("settings.index"))
     return render_template("settings/dentist_form.html", d=d, services=services, weekday_labels=WEEKDAY_LABELS)
+
+
+@bp.route("/auditoria")
+@role_required("admin")
+def audit():
+    """Trilha de auditoria: quem viu e quem alterou cada dado de paciente."""
+    from app.models import ACTIONS, AuditLog
+
+    action = request.args.get("acao", "")
+    q = AuditLog.query
+    if action in ACTIONS:
+        q = q.filter_by(action=action)
+    rows = q.order_by(AuditLog.created_at.desc()).limit(200).all()
+    counters = {k: AuditLog.query.filter_by(action=k).count() for k in ACTIONS}
+    return render_template("settings/audit.html", rows=rows, actions=ACTIONS, action=action,
+                           counters=counters, total=AuditLog.query.count())

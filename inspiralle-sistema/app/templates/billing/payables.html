@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Contas a pagar{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow">Contas</p><h1>Contas a pagar e caixa</h1></div>
+  <div class="head-actions"><a href="{{ url_for('billing.receivables') }}" class="btn btn-outline">Contas a receber</a></div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><span>A pagar no mês</span><strong>{{ d.total|moeda }}</strong><em class="trend">{{ d.rows|length }} lançamento(s)</em></div>
+  <div class="kpi"><span>Já pago</span><strong>{{ d.paid|moeda }}</strong></div>
+  <div class="kpi"><span>Vencidas</span><strong>{{ d.overdue|length }}</strong>
+    <em class="trend {{ 'down' if d.overdue else 'up' }}">{{ (d.overdue|sum(attribute='amount'))|moeda if d.overdue else 'nada vencido' }}</em></div>
+  <div class="kpi"><span>Caixa projetado (mês)</span><strong>{{ projection[0].net|moeda }}</strong>
+    <em class="trend {{ 'up' if projection[0].net >= 0 else 'down' }}">entradas menos saídas</em></div>
+</section>
+
+<section class="card">
+  <div class="card-head"><h2>Caixa projetado</h2><span class="muted small">entradas previstas menos contas a pagar</span></div>
+  {% set maxv = (projection|map(attribute='inflow')|max) or 1 %}
+  <div class="bars money-bars">
+    {% for m in projection %}
+    <div class="bar" title="Entradas {{ m.inflow|moeda }} · Saídas {{ m.outflow|moeda }}">
+      <span class="bar-val">{{ (m.net|moeda)[3:].split(',')[0] }}</span>
+      <span class="bar-fill" style="height: {{ (m.inflow / maxv * 100)|round }}%"></span>
+      <span class="bar-fill out" style="height: {{ (m.outflow / maxv * 100)|round }}%"></span>
+      <span class="bar-lbl">{{ m.month.strftime('%m/%y') }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="muted small" style="padding:0 16px 14px"><i class="dot" style="background:#4f7cac"></i> entradas &nbsp; <i class="dot" style="background:#c0504d"></i> saídas</p>
+</section>
+
+<div class="grid-2 fin-grid">
+  <section class="card table-card">
+    <div class="card-head"><h2>Lançamentos do mês</h2></div>
+    {% if d.rows %}
+    <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>Vencimento</th><th>Descrição</th><th class="hide-sm">Categoria</th><th class="num">Valor</th><th></th></tr></thead>
+      <tbody>
+      {% for p in d.rows %}
+      <tr>
+        <td>{{ p.due_date|data }}</td>
+        <td>{{ p.description }}{% if p.recurring %} <small class="muted">fixa</small>{% endif %}</td>
+        <td class="hide-sm">{{ p.category_label }}</td>
+        <td class="num">{{ p.amount|moeda }}</td>
+        <td class="num"><form method="post" action="{{ url_for('billing.pay', id=p.id) }}" style="display:inline">{{ csrf() }}
+          <button class="btn btn-sm {{ 'btn-outline' if p.paid else 'btn-primary' }}">{{ 'Pago' if p.paid else 'Pagar' }}</button></form></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<p class="empty">Nenhuma conta lançada neste mês.</p>{% endif %}
+
+    <form method="post" class="form row-2 price-form">{{ csrf() }}
+      <label>Descrição <input type="text" name="descricao" required></label>
+      <label>Categoria <select name="categoria">{% for k, v in categories.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+      <label>Valor <input type="text" name="valor" class="price-input" required></label>
+      <label>Vencimento <input type="date" name="vencimento" value="{{ today.isoformat() }}" required></label>
+      <label class="check"><input type="checkbox" name="recorrente"> <span>Conta fixa mensal</span></label>
+      <div class="form-actions"><button class="btn btn-primary">Lançar conta</button></div>
+    </form>
+  </section>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h2>Por categoria</h2></div>
+      {% for cat, total in d.by_category %}
+      <div class="split-row"><span>{{ categories.get(cat, cat) }}</span><strong>{{ total|moeda }}</strong></div>
+      <div class="split-bar"><span style="width: {{ (total / d.total * 100)|round if d.total else 0 }}%"></span></div>
+      {% else %}<p class="empty">Sem lançamentos.</p>{% endfor %}
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Próximos meses</h2></div>
+      {% for m in projection %}
+      <div class="split-row"><span>{{ m.month.strftime('%m/%Y') }}</span>
+        <strong class="{{ 'trend down' if m.net < 0 }}">{{ m.net|moeda }}</strong></div>
+      {% endfor %}
+    </section>
+  </div>
+</div>
+{% endblock %}

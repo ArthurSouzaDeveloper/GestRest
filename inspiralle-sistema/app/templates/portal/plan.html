@@ -1,0 +1,77 @@
+{% extends "portal/_shell.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}{{ plan.title }}{% endblock %}
+{% block eyebrow %}<a href="{{ url_for('portal.plans') }}" style="color:inherit">Seus orçamentos</a>{% endblock %}
+{% block heading %}{{ plan.title }}{% endblock %}
+{% block main %}
+<section class="card">
+  <div class="card-head"><h2>O que está previsto</h2><span class="muted small">{{ plan.dentist.name }}</span></div>
+  <div style="padding:0 16px 16px">
+    <ul class="pt-items">
+      {% for it in plan.live_items %}
+      <li><span>{{ it.service.name }} <small class="muted">{{ it.where }}</small></span><strong>{{ it.total|moeda }}</strong></li>
+      {% endfor %}
+    </ul>
+    <div class="split-row" style="padding-left:0;padding-right:0"><strong>Total</strong><strong>{{ plan.total|moeda }}</strong></div>
+    {% if plan.receivables %}
+    <p class="muted small">Pagamento: {% for r in plan.receivables %}{{ r.amount|moeda }} em {{ r.due_date|data }}{{ '; ' if not loop.last }}{% endfor %}</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head"><h2>Termo de consentimento</h2></div>
+  <div class="consent-body" style="padding:0 16px">
+    <p>Eu, <strong>{{ plan.patient.name }}</strong>, declaro que recebi explicação sobre o plano de tratamento
+      acima, incluindo procedimentos, alternativas, riscos e o valor total de <strong>{{ plan.total|moeda }}</strong>,
+      e que minhas dúvidas foram respondidas por {{ plan.dentist.name }}.</p>
+    <p>Autorizo a execução do tratamento, podendo interromper a qualquer momento, e o registro fotográfico
+      para acompanhamento clínico no meu prontuário.</p>
+  </div>
+  {% if plan.signed_at %}
+  <div class="consent-sign" style="padding:0 16px 18px">
+    <img src="{{ plan.signature_png }}" alt="Sua assinatura">
+    <p class="muted small">{{ plan.signed_name }} · assinado em {{ plan.signed_at|datahora }}</p>
+  </div>
+  {% else %}
+  <form method="post" class="form" id="sign-form">{{ csrf() }}
+    <label>Seu nome completo <input type="text" name="nome" value="{{ plan.patient.name }}" required minlength="3"></label>
+    <p class="muted small">Assine com o dedo no quadro abaixo.</p>
+    <canvas id="pad" width="620" height="200" class="sign-pad"></canvas>
+    <input type="hidden" name="assinatura" id="assinatura">
+    <div class="form-actions">
+      <button type="button" class="btn btn-outline" id="limpar">Limpar</button>
+      <button class="btn btn-primary">Aprovar e assinar</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var pad = document.getElementById('pad');
+  if (!pad) return;
+  var ctx = pad.getContext('2d'), drawing = false, dirty = false;
+  ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = '#13213c';
+  function pos(e) {
+    var r = pad.getBoundingClientRect(), t = e.touches ? e.touches[0] : e;
+    return [(t.clientX - r.left) * pad.width / r.width, (t.clientY - r.top) * pad.height / r.height];
+  }
+  function start(e) { drawing = true; dirty = true; ctx.beginPath(); ctx.moveTo.apply(ctx, pos(e)); e.preventDefault(); }
+  function move(e) { if (!drawing) return; ctx.lineTo.apply(ctx, pos(e)); ctx.stroke(); e.preventDefault(); }
+  function stop() { drawing = false; }
+  ['mousedown', 'touchstart'].forEach(function (k) { pad.addEventListener(k, start); });
+  ['mousemove', 'touchmove'].forEach(function (k) { pad.addEventListener(k, move); });
+  ['mouseup', 'mouseleave', 'touchend'].forEach(function (k) { pad.addEventListener(k, stop); });
+  document.getElementById('limpar').addEventListener('click', function () {
+    ctx.clearRect(0, 0, pad.width, pad.height); dirty = false;
+  });
+  document.getElementById('sign-form').addEventListener('submit', function (e) {
+    if (!dirty) { e.preventDefault(); alert('Assine no quadro antes de continuar.'); return; }
+    document.getElementById('assinatura').value = pad.toDataURL('image/png');
+  });
+})();
+</script>
+{% endblock %}

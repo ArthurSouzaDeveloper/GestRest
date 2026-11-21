@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Termo de consentimento{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="eyebrow"><a href="{{ url_for('clinical.plan_detail', id=plan.id) }}" class="link">{{ plan.title }}</a></p>
+    <h1>Termo de consentimento</h1></div>
+</header>
+
+<div class="card consent">
+  <div class="consent-body">
+    <p>Eu, <strong>{{ plan.patient.name }}</strong>, declaro que recebi da <strong>Inspiralle Odontologia</strong>,
+      por meio de <strong>{{ plan.dentist.name }}</strong>, explicação sobre o plano de tratamento abaixo,
+      incluindo os procedimentos indicados, as alternativas, os riscos e o valor total de
+      <strong>{{ plan.total|moeda }}</strong>.</p>
+    <ul>
+      {% for it in plan.live_items %}
+      <li>{{ it.service.name }} — {{ it.where }} — {{ it.total|moeda }}</li>
+      {% endfor %}
+    </ul>
+    <p>Declaro que respondi à ficha de saúde com sinceridade, que tive minhas dúvidas respondidas e que
+      autorizo a execução do tratamento, podendo interromper a qualquer momento. Autorizo o registro
+      fotográfico para fins de acompanhamento clínico, no meu prontuário.</p>
+    <p class="muted small">Prontuário guardado por 20 anos, conforme a Lei 13.787/2018. Você pode pedir uma
+      cópia da sua ficha a qualquer momento.</p>
+  </div>
+
+  {% if plan.signed_at %}
+  <div class="consent-sign">
+    <img src="{{ plan.signature_png }}" alt="Assinatura de {{ plan.signed_name }}">
+    <p><strong>{{ plan.signed_name }}</strong><br><span class="muted small">Assinado em {{ plan.signed_at|datahora }} · IP {{ plan.signed_ip or '—' }}</span></p>
+  </div>
+  {% else %}
+  <form method="post" class="form consent-form" id="sign-form">
+    {{ csrf() }}
+    <label>Nome completo de quem assina
+      <input type="text" name="nome" value="{{ plan.patient.name }}" required minlength="3"></label>
+    <p class="muted small">Assine com o dedo ou com o mouse no quadro abaixo.</p>
+    <canvas id="pad" width="620" height="200" class="sign-pad"></canvas>
+    <input type="hidden" name="assinatura" id="assinatura">
+    <div class="form-actions">
+      <button type="button" class="btn btn-outline" id="limpar">Limpar</button>
+      <button class="btn btn-primary">Assinar e guardar no prontuário</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var pad = document.getElementById('pad');
+  if (!pad) return;
+  var ctx = pad.getContext('2d'), drawing = false, dirty = false;
+  ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = '#13213c';
+  function pos(e) {
+    var r = pad.getBoundingClientRect(), t = e.touches ? e.touches[0] : e;
+    return [(t.clientX - r.left) * pad.width / r.width, (t.clientY - r.top) * pad.height / r.height];
+  }
+  function start(e) { drawing = true; dirty = true; ctx.beginPath(); ctx.moveTo.apply(ctx, pos(e)); e.preventDefault(); }
+  function move(e) { if (!drawing) return; ctx.lineTo.apply(ctx, pos(e)); ctx.stroke(); e.preventDefault(); }
+  function stop() { drawing = false; }
+  ['mousedown', 'touchstart'].forEach(function (k) { pad.addEventListener(k, start); });
+  ['mousemove', 'touchmove'].forEach(function (k) { pad.addEventListener(k, move); });
+  ['mouseup', 'mouseleave', 'touchend'].forEach(function (k) { pad.addEventListener(k, stop); });
+  document.getElementById('limpar').addEventListener('click', function () {
+    ctx.clearRect(0, 0, pad.width, pad.height); dirty = false;
+  });
+  document.getElementById('sign-form').addEventListener('submit', function (e) {
+    if (!dirty) { e.preventDefault(); alert('Assine no quadro antes de continuar.'); return; }
+    document.getElementById('assinatura').value = pad.toDataURL('image/png');
+  });
+})();
+</script>
+{% endblock %}

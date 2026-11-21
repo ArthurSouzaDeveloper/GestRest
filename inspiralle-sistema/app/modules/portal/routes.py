@@ -132,3 +132,119 @@ def password():
             flash("Senha atualizada.", "success")
             return redirect(url_for("portal.timeline"))
     return render_template("portal/password.html", p=p)
+
+
+# ------------------------------------------------- anamnese preenchida pelo paciente
+
+ANAMNESIS = [
+    ("tratamento_medico", "Está em tratamento médico atualmente?"),
+    ("medicamentos", "Toma algum medicamento de uso contínuo?"),
+    ("alergia", "Tem alergia a algum medicamento ou material?"),
+    ("anestesia", "Já teve reação a anestesia odontológica?"),
+    ("sangramento", "Tem problema de coagulação ou sangramento?"),
+    ("pressao", "Tem pressão alta?"),
+    ("diabetes", "Tem diabetes?"),
+    ("cardiaco", "Tem problema cardíaco?"),
+    ("gravidez", "Está grávida ou amamentando?"),
+    ("fumante", "Fuma?"),
+    ("bruxismo", "Range ou aperta os dentes?"),
+    ("cirurgia", "Já fez cirurgia odontológica?"),
+]
+
+
+@bp.route("/anamnese", methods=["GET", "POST"])
+@patient_required
+def anamnesis():
+    import json
+
+    p = g.patient
+    if request.method == "POST":
+        answers = {}
+        for key, _label in ANAMNESIS:
+            answers[key] = {"resposta": request.form.get(key, "nao"),
+                            "detalhe": (request.form.get(f"{key}_detalhe") or "").strip()}
+        p.anamnesis_json = json.dumps(answers, ensure_ascii=False)
+        p.anamnesis_at = datetime.now()
+        # Alimenta o resumo que a equipe vê no prontuário
+        p.allergies = answers["alergia"]["detalhe"] or None if answers["alergia"]["resposta"] == "sim" else None
+        p.medications = answers["medicamentos"]["detalhe"] or None if answers["medicamentos"]["resposta"] == "sim" else None
+        from app.services.audit import log
+        log("alterou", "Anamnese", patient_id=p.id, detail="Preenchida pelo paciente no portal",
+            actor=p.name)
+        db.session.commit()
+        flash("Obrigado! Sua ficha de saúde foi enviada para a equipe.", "success")
+        return redirect(url_for("portal.timeline"))
+    return render_template("portal/anamnesis.html", p=p, questions=ANAMNESIS, saved=p.anamnesis)
+
+
+# ------------------------------------------- orçamento e termo na área do paciente
+
+@bp.route("/orcamentos")
+@patient_required
+def plans():
+    from app.models import TreatmentPlan
+    rows = (TreatmentPlan.query.filter(TreatmentPlan.patient_id == g.patient.id,
+                                       TreatmentPlan.status != "recusado")
+            .order_by(TreatmentPlan.created_at.desc()).all())
+    return render_template("portal/plans.html", p=g.patient, plans=rows)
+
+
+@bp.route("/orcamento/<int:id>", methods=["GET", "POST"])
+@patient_required
+def plan(id):
+    from app.models import TreatmentPlan
+    from app.services.audit import log
+
+    plan = db.session.get(TreatmentPlan, id)
+    if plan is None or plan.patient_id != g.patient.id:
+        abort(404)
+    if request.method == "POST":
+        name = (request.form.get("nome") or "").strip()
+        png = request.form.get("assinatura") or ""
+        if len(name) < 3 or not png.startswith("data:image/png"):
+            flash("Escreva seu nome completo e assine no quadro.", "danger")
+            return redirect(url_for("portal.plan", id=plan.id))
+        plan.signed_at = datetime.now()
+        plan.signed_name = name
+        plan.signed_ip = request.remote_addr
+        plan.signature_png = png[:400000]
+        if plan.status == "proposto":
+            from app.services.treatment import decide
+            decide(plan, True, installments=1)
+        log("assinou", "Termo de consentimento", entity_id=plan.id, patient_id=plan.patient_id,
+            detail=f"Assinado pelo paciente no portal ({name})", actor=g.patient.name)
+        db.session.commit()
+        flash("Orçamento aprovado e termo assinado. A clínica já foi avisada.", "success")
+        return redirect(url_for("portal.plans"))
+    return render_template("portal/plan.html", p=g.patient, plan=plan)
+
+
+# ------------------------------------------------- exportar a própria ficha (LGPD)
+
+@bp.route("/minha-ficha.json")
+@patient_required
+def export_record():
+    import json
+
+    from flask import Response
+
+    from app.services.audit import log
+    p = g.patient
+    data = {
+        "paciente": {"nome": p.name, "telefone": p.phone, "email": p.email, "cpf": p.cpf,
+                     "nascimento": p.birth_date.isoformat() if p.birth_date else None},
+        "anamnese": p.anamnesis,
+        "consultas": [{"data": a.start.isoformat(), "procedimento": a.service.name,
+                       "profissional": a.dentist.name, "situacao": a.status_label}
+                      for a in p.appointments],
+        "evolucao": [{"data": n.created_at.isoformat(), "procedimento": n.procedure, "texto": n.text}
+                     for n in p.clinical_notes if n.visible_to_patient],
+        "orcamentos": [{"titulo": pl.title, "situacao": pl.status_label, "total": str(pl.total)}
+                       for pl in p.plans],
+    }
+    log("exportou", "Ficha do paciente", patient_id=p.id,
+        detail="Exportação a pedido do paciente (LGPD art. 18)", actor=p.name)
+    db.session.commit()
+    body = json.dumps(data, ensure_ascii=False, indent=2)
+    return Response(body, mimetype="application/json",
+                    headers={"Content-Disposition": 'attachment; filename="minha-ficha-inspiralle.json"'})

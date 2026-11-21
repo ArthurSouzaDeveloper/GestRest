@@ -1,0 +1,27 @@
+{% extends "portal/_shell.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}Ficha de saúde{% endblock %}
+{% block eyebrow %}{{ p.name.split()[0] }}, só leva 2 minutos{% endblock %}
+{% block heading %}Ficha de saúde{% endblock %}
+{% block main %}
+<section class="card">
+  <div class="card-head"><h2>Antes da sua consulta</h2>
+    {% if p.anamnesis_at %}<span class="muted small">respondida em {{ p.anamnesis_at|data }}</span>{% endif %}</div>
+  <form method="post" class="form anamnese">{{ csrf() }}
+    {% for key, label in questions %}
+    {% set saved_q = saved.get(key, {}) %}
+    <div class="an-row">
+      <p class="an-q">{{ label }}</p>
+      <div class="an-opts">
+        <label class="check"><input type="radio" name="{{ key }}" value="sim" {{ 'checked' if saved_q.get('resposta') == 'sim' }}><span>Sim</span></label>
+        <label class="check"><input type="radio" name="{{ key }}" value="nao" {{ 'checked' if saved_q.get('resposta', 'nao') == 'nao' }}><span>Não</span></label>
+      </div>
+      <input type="text" name="{{ key }}_detalhe" placeholder="Se sim, conte um pouco" value="{{ saved_q.get('detalhe', '') }}">
+    </div>
+    {% endfor %}
+    <div class="form-actions"><button class="btn btn-primary btn-block">Enviar para a clínica</button></div>
+  </form>
+  <p class="muted small" style="padding:0 16px 16px">Suas respostas vão direto para o seu prontuário e são vistas
+    apenas pela equipe clínica. Você pode atualizar quando quiser.</p>
+</section>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "portal/_shell.html" %}
+{% block title %}Meus orçamentos{% endblock %}
+{% block eyebrow %}Olá, {{ p.name.split()[0] }}{% endblock %}
+{% block heading %}Seus orçamentos{% endblock %}
+{% block main %}
+{% for pl in plans %}
+<section class="card">
+  <div class="card-head"><h2>{{ pl.title }}</h2><span class="badge st-{{ 'concluido' if pl.status in ('aprovado','concluido','em_andamento') else 'agendado' }}">{{ pl.status_label }}</span></div>
+  <div style="padding:0 16px 16px">
+    <p class="muted small">{{ pl.dentist.name }}{% if pl.valid_until %} · válido até {{ pl.valid_until|data }}{% endif %}</p>
+    <ul class="pt-items">
+      {% for it in pl.live_items %}
+      <li><span>{{ it.service.name }} <small class="muted">{{ it.where }}</small></span><strong>{{ it.total|moeda }}</strong></li>
+      {% endfor %}
+    </ul>
+    <div class="split-row" style="padding-left:0;padding-right:0"><strong>Total</strong><strong>{{ pl.total|moeda }}</strong></div>
+    {% if pl.status in ('aprovado', 'em_andamento', 'concluido') %}
+    <div class="split-bar"><span style="width: {{ pl.progress }}%"></span></div>
+    <p class="muted small">{{ pl.done_count }} de {{ pl.live_items|length }} procedimentos concluídos</p>
+    {% endif %}
+    <div class="pt-cta">
+      <a class="btn {{ 'btn-outline' if pl.signed_at else 'btn-primary' }} btn-sm" href="{{ url_for('portal.plan', id=pl.id) }}">
+        {{ 'Ver termo assinado' if pl.signed_at else 'Ler e aprovar' }}</a>
+    </div>
+  </div>
+</section>
+{% else %}
+<section class="card"><p class="empty">Nenhum orçamento para você no momento.</p></section>
+{% endfor %}
+{% endblock %}
