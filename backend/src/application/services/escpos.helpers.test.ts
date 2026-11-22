@@ -544,13 +544,16 @@ describe('renderTicket', () => {
     };
     const comValor = renderTicket({ ...base, changeFor: 50, changeAlert: true }).toString('ascii');
     expect(comValor).toContain('*** TROCO ***');
-    expect(comValor).toContain('P/ R$ 50,00');
+    expect(comValor).toContain('TROCO P/ R$ 50,00');
     expect(comValor).toContain('LEVAR DE TROCO: R$ 13,00');
     expect(comValor.indexOf('*** TROCO ***')).toBeLessThan(comValor.indexOf('COZINHA'));
+    // Valor e quanto levar ficam embaixo, depois do total (pedido do cliente/dono).
+    expect(comValor.indexOf('TROCO P/ R$ 50,00')).toBeGreaterThan(comValor.indexOf('TOTAL DO PEDIDO'));
+    expect(comValor.indexOf('LEVAR DE TROCO')).toBeGreaterThan(comValor.indexOf('TROCO P/ R$ 50,00'));
 
     const semValor = renderTicket({ ...base, changeAlert: true }).toString('ascii');
     expect(semValor).toContain('*** TROCO ***');
-    expect(semValor).not.toContain('P/ R$');
+    expect(semValor).not.toContain('TROCO P/');
     expect(semValor).not.toContain('LEVAR DE TROCO');
 
     // Sem a opção (vias secundárias) ou sem ser dinheiro: nada de TROCO.
