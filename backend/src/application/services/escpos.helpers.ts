@@ -182,7 +182,7 @@ export interface TicketInput {
    * quando o pagamento é em dinheiro — pedido explícito do cliente/dono: o caixa e o
    * motoboy estavam esquecendo de separar/levar o troco. Só a via principal e a do
    * motoboy ligam isso (ver printJob.service.ts); sem paymentMethod CASH não imprime nada.
-   * Com changeFor informado, sai também "P/ R$ X" e, se o total for conhecido, quanto
+   * Com changeFor informado, sai embaixo, junto do total, "TROCO P/ R$ X" e quanto
    * levar de troco. */
   changeAlert?: boolean;
 }
@@ -235,18 +235,12 @@ export function renderTicket(input: TicketInput): Buffer {
   // gastando papel à toa, e prefere começar direto pelo aviso de bebida (se houver).
   const headerText = input.headerOverride ?? STATION_LABEL[input.station];
   const parts: Buffer[] = [INIT];
-  if (input.changeAlert && input.paymentMethod === PaymentMethod.CASH) {
-    // Largura dupla = 16 colunas por linha: cada texto aqui cabe numa linha só.
-    parts.push(HEADER_MODE_ON, line('*** TROCO ***'));
-    if (input.changeFor) {
-      parts.push(line(`P/ ${formatCurrency(input.changeFor)}`), BODY_MODE_ON);
-      if (input.orderTotal != null && input.changeFor > input.orderTotal) {
-        parts.push(line(`LEVAR DE TROCO: ${formatCurrency(Math.round((input.changeFor - input.orderTotal) * 100) / 100)}`));
-      }
-    } else {
-      parts.push(BODY_MODE_ON);
-    }
-    parts.push(line('--------------------------------'));
+  const showChangeAlert = input.changeAlert === true && input.paymentMethod === PaymentMethod.CASH;
+  if (showChangeAlert) {
+    // No alto só a palavra, grande (pedido do cliente/dono); valor e quanto levar saem
+    // embaixo, junto do total. Sem tracejado próprio quando já vem o do copyLabel.
+    parts.push(HEADER_MODE_ON, line('*** TROCO ***'), BODY_MODE_ON);
+    if (!input.copyLabel) parts.push(line('--------------------------------'));
   }
   if (headerText) {
     parts.push(HEADER_MODE_ON, line(headerText), BODY_MODE_ON);
@@ -350,6 +344,13 @@ export function renderTicket(input: TicketInput): Buffer {
       parts.push(line('TAXA DE ENTREGA: ISENTA'), line(`(JUNTO DO PEDIDO #${input.deliveryFeeWaivedByOrderNumber})`));
     } else if (input.deliveryFee) {
       parts.push(line(`TAXA DE ENTREGA: ${formatCurrency(input.deliveryFee)}`));
+    }
+  }
+  if (showChangeAlert && input.changeFor) {
+    if (input.orderTotal == null) parts.push(line('--------------------------------'));
+    parts.push(line(`TROCO P/ ${formatCurrency(input.changeFor)}`));
+    if (input.orderTotal != null && input.changeFor > input.orderTotal) {
+      parts.push(line(`LEVAR DE TROCO: ${formatCurrency(Math.round((input.changeFor - input.orderTotal) * 100) / 100)}`));
     }
   }
 
