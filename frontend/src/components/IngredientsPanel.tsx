@@ -40,6 +40,12 @@ export function IngredientsPanel({
     onError: (e) => alert(apiError(e)),
   });
 
+  const remove = useMutation({
+    mutationFn: async (i: Ingredient) => api.delete(`/catalog/ingredients/${i.id}`),
+    onSuccess: refreshAll,
+    onError: (e) => alert(apiError(e)),
+  });
+
   return (
     <div className="mb-8">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -80,6 +86,16 @@ export function IngredientsPanel({
                   </button>
                   <button className="btn-secondary !px-2 !py-1" onClick={() => setEditing(i)} title="Editar">
                     <Pencil size={14} />
+                  </button>
+                  <button
+                    className="btn-secondary !px-2 !py-1 text-red-600"
+                    disabled={remove.isPending}
+                    title="Excluir insumo"
+                    onClick={() => {
+                      if (confirm(`Excluir o insumo ${i.name}? Os produtos continuam no cardápio, só deixam de depender dele.`)) remove.mutate(i);
+                    }}
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </Card>
