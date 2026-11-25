@@ -54,7 +54,7 @@ async function main() {
   const rid = restaurant.id;
 
   const products = await prisma.product.findMany({
-    where: { restaurantId: rid },
+    where: { restaurantId: rid, deletedAt: null },
     select: {
       id: true,
       name: true,

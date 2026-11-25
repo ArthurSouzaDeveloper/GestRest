@@ -439,6 +439,9 @@ model Product {
   // "Montável" (ex.: Monte o Seu pastel): cliente escolhe obrigatoriamente 1 adicional
   // BASE (que carrega o preço) + adicionais comuns. Também ordena primeiro no cardápio.
   isCustom     Boolean    @default(false)
+  // Excluído pelo painel. Produto que já saiu em pedido não pode ser apagado de vez (o
+  // histórico aponta pra ele), então fica arquivado: some do painel e do cardápio.
+  deletedAt    DateTime?
   categoryId   String
   // Restrict (não Cascade): um produto já usado em algum pedido não pode desaparecer
   // do histórico só porque a categoria dele foi apagada depois — ver correção da
@@ -468,6 +471,8 @@ model Additional {
   price        Decimal        @default(0) @db.Decimal(10, 2)
   kind         AdditionalKind @default(ADDON)
   active       Boolean        @default(true)
+  // Excluído pelo painel (mesmo raciocínio do Product.deletedAt).
+  deletedAt    DateTime?
   categoryId   String?
   // Restrict: mesmo raciocínio do Product.category acima.
   category     Category?      @relation(fields: [categoryId], references: [id], onDelete: Restrict)

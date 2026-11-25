@@ -71,7 +71,7 @@ export const categoryService = {
     ]);
     if (productCount > 0 || additionalCount > 0) {
       throw new ConflictError(
-        'Esta categoria ainda tem produtos ou adicionais cadastrados. Remova ou mova-os antes de apagar a categoria.',
+        'Esta categoria ainda tem produtos ou adicionais cadastrados (inclusive excluídos que já saíram em pedidos). Mova-os antes de apagar a categoria.',
       );
     }
     return prisma.category.delete({ where: { id } });
@@ -117,7 +117,7 @@ export const productService = {
     tenantId: string,
     params: { search?: string; categoryId?: string; onlyAvailable?: boolean } = {},
   ) {
-    const where: Prisma.ProductWhereInput = { restaurantId: tenantId };
+    const where: Prisma.ProductWhereInput = { restaurantId: tenantId, deletedAt: null };
     if (params.search) where.name = { contains: params.search, mode: 'insensitive' };
     if (params.categoryId) where.categoryId = params.categoryId;
     if (params.onlyAvailable) {
@@ -134,7 +134,7 @@ export const productService = {
   },
   async get(tenantId: string, id: string) {
     const p = await prisma.product.findFirst({
-      where: { id, restaurantId: tenantId },
+      where: { id, restaurantId: tenantId, deletedAt: null },
       include: { category: true, ingredients: SOLD_OUT_INGREDIENTS, optionalIngredients: SOLD_OUT_INGREDIENTS },
     });
     if (!p) throw new NotFoundError('Produto');
@@ -205,22 +205,25 @@ export const productService = {
   },
   async remove(tenantId: string, id: string) {
     await productService.get(tenantId, id);
-    // Produto já usado em algum pedido não pode ser apagado — isso levaria o item do
-    // pedido (mesmo de venda já paga) junto. Quem quer tirar do cardápio sem perder
-    // histórico deve usar `available: false` em vez de excluir.
+    // Produto já usado em algum pedido não pode ser apagado de vez — isso levaria o item do
+    // pedido (mesmo de venda já paga) junto. Então ele é arquivado: some do painel e do
+    // cardápio, fica indisponível (o pedido recusa) e solta os insumos.
     const orderItemCount = await prisma.orderItem.count({ where: { productId: id } });
     if (orderItemCount > 0) {
-      throw new ConflictError(
-        'Este produto já foi usado em pedidos e não pode ser removido. Marque-o como indisponível em vez de excluir.',
-      );
+      await prisma.product.update({
+        where: { id },
+        data: { deletedAt: new Date(), available: false, ingredients: { set: [] }, optionalIngredients: { set: [] } },
+      });
+      return { archived: true };
     }
-    return prisma.product.delete({ where: { id } });
+    await prisma.product.delete({ where: { id } });
+    return { archived: false };
   },
 };
 
 export const additionalService = {
   async list(tenantId: string, params: { categoryId?: string; onlyActive?: boolean } = {}) {
-    const where: Prisma.AdditionalWhereInput = { restaurantId: tenantId };
+    const where: Prisma.AdditionalWhereInput = { restaurantId: tenantId, deletedAt: null };
     if (params.categoryId) where.categoryId = params.categoryId;
     if (params.onlyActive) {
       where.active = true;
@@ -248,26 +251,29 @@ export const additionalService = {
     id: string,
     data: Partial<{ name: string; price: number; categoryId: string; active: boolean; kind: AdditionalKind }>,
   ) {
-    const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });
+    const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId, deletedAt: null } });
     if (!a) throw new NotFoundError('Adicional');
     if (data.categoryId) await categoryService.ensure(tenantId, data.categoryId);
     const updated = await prisma.additional.update({ where: { id }, data });
     return serializeAdditional(updated);
   },
   async remove(tenantId: string, id: string) {
-    const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId } });
+    const a = await prisma.additional.findFirst({ where: { id, restaurantId: tenantId, deletedAt: null } });
     if (!a) throw new NotFoundError('Adicional');
     // Mesmo raciocínio do productService.remove() acima: adicional já usado em algum
-    // pedido não pode ser apagado, só desativado.
+    // pedido fica arquivado (inativo e fora do painel) em vez de apagado.
     const orderItemAdditionalCount = await prisma.orderItemAdditional.count({
       where: { additionalId: id },
     });
     if (orderItemAdditionalCount > 0) {
-      throw new ConflictError(
-        'Este adicional já foi usado em pedidos e não pode ser removido. Marque-o como inativo em vez de excluir.',
-      );
+      await prisma.additional.update({
+        where: { id },
+        data: { deletedAt: new Date(), active: false, ingredients: { set: [] } },
+      });
+      return { archived: true };
     }
-    return prisma.additional.delete({ where: { id } });
+    await prisma.additional.delete({ where: { id } });
+    return { archived: false };
   },
 };
 
@@ -295,12 +301,12 @@ function splitProductLinks(data: Partial<IngredientInput>) {
 async function assertOwnedLinks(tenantId: string, productIds?: string[], additionalIds?: string[]) {
   if (productIds?.length) {
     const ids = [...new Set(productIds)];
-    const n = await prisma.product.count({ where: { id: { in: ids }, restaurantId: tenantId } });
+    const n = await prisma.product.count({ where: { id: { in: ids }, restaurantId: tenantId, deletedAt: null } });
     if (n !== ids.length) throw new NotFoundError('Produto');
   }
   if (additionalIds?.length) {
     const ids = [...new Set(additionalIds)];
-    const n = await prisma.additional.count({ where: { id: { in: ids }, restaurantId: tenantId } });
+    const n = await prisma.additional.count({ where: { id: { in: ids }, restaurantId: tenantId, deletedAt: null } });
     if (n !== ids.length) throw new NotFoundError('Adicional');
   }
 }
@@ -323,9 +329,9 @@ function serializeIngredient(i: {
   };
 }
 const INGREDIENT_LINKS = {
-  products: { select: { id: true } },
-  optionalProducts: { select: { id: true } },
-  additionals: { select: { id: true } },
+  products: { where: { deletedAt: null }, select: { id: true } },
+  optionalProducts: { where: { deletedAt: null }, select: { id: true } },
+  additionals: { where: { deletedAt: null }, select: { id: true } },
 } as const;
 
 export const ingredientService = {

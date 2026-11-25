@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
@@ -40,6 +40,26 @@ export default function Products() {
     qc.invalidateQueries({ queryKey: ['products'] });
     qc.invalidateQueries({ queryKey: ['products', 'admin'] });
     qc.invalidateQueries({ queryKey: ['ingredients'] });
+  };
+
+  // Cadastrou errado? Excluir tira do painel e do cardápio. O que já saiu em pedido fica
+  // guardado por trás (o histórico de vendas não muda); o resto é apagado de vez.
+  const removeProduct = useMutation({
+    mutationFn: async (p: Product) => api.delete(`/catalog/products/${p.id}`),
+    onSuccess: () => { refresh(); setEditing(null); },
+    onError: (e) => alert(apiError(e)),
+  });
+  const removeAdditional = useMutation({
+    mutationFn: async (a: Additional) => api.delete(`/catalog/additionals/${a.id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['additionals'] }); qc.invalidateQueries({ queryKey: ['ingredients'] }); },
+    onError: (e) => alert(apiError(e)),
+  });
+  const confirmRemoveProduct = (p: Product) => {
+    if (confirm(`Excluir o produto ${p.name}? Ele sai do painel e do cardápio. Os pedidos antigos continuam iguais.`)) removeProduct.mutate(p);
+  };
+  const confirmRemoveAdditional = (a: Additional) => {
+    const what = a.kind === 'BASE' ? 'o sabor' : 'o adicional';
+    if (confirm(`Excluir ${what} ${a.name}? Ele sai do painel e do cardápio. Os pedidos antigos continuam iguais.`)) removeAdditional.mutate(a);
   };
 
   const toggleAvailable = useMutation({
@@ -114,7 +134,18 @@ export default function Products() {
                   )}
                 </td>
                 <td className="p-3 text-right">
-                  <button className="btn-secondary !px-2 !py-1" onClick={() => setEditing(p)}><Pencil size={14} /></button>
+                  <div className="flex justify-end gap-2">
+                    <button className="btn-secondary !px-2 !py-1" title="Editar" onClick={() => setEditing(p)}><Pencil size={14} /></button>
+                    <button
+                      className="btn-secondary !px-2 !py-1 text-red-600"
+                      title="Excluir produto"
+                      aria-label={`Excluir ${p.name}`}
+                      disabled={removeProduct.isPending}
+                      onClick={() => confirmRemoveProduct(p)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -134,6 +165,7 @@ export default function Products() {
               <th className="p-3">Tipo</th>
               <th className="p-3 text-right">Preço</th>
               <th className="p-3 text-center">Disponível</th>
+              <th className="p-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -158,6 +190,17 @@ export default function Products() {
                   </button>
                   <SoldOutBadge names={a.soldOutIngredients} />
                 </td>
+                <td className="p-3 text-right">
+                  <button
+                    className="btn-secondary !px-2 !py-1 text-red-600"
+                    title={a.kind === 'BASE' ? 'Excluir sabor' : 'Excluir adicional'}
+                    aria-label={`Excluir ${a.name}`}
+                    disabled={removeAdditional.isPending}
+                    onClick={() => confirmRemoveAdditional(a)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -171,6 +214,8 @@ export default function Products() {
           categories={categories}
           onClose={() => { setCreating(false); setEditing(null); }}
           onSaved={() => { refresh(); setCreating(false); setEditing(null); }}
+          onRemove={editing ? () => confirmRemoveProduct(editing) : undefined}
+          removing={removeProduct.isPending}
         />
       )}
     </div>
@@ -192,11 +237,15 @@ function ProductForm({
   categories,
   onClose,
   onSaved,
+  onRemove,
+  removing,
 }: {
   product: Product | null;
   categories: Category[];
   onClose: () => void;
   onSaved: () => void;
+  onRemove?: () => void;
+  removing?: boolean;
 }) {
   const [form, setForm] = useState({
     name: product?.name ?? '',
@@ -292,9 +341,18 @@ function ProductForm({
           </span>
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-2 pt-2">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>Salvar</button>
+        <div className="flex items-center justify-between gap-2 pt-2">
+          {onRemove ? (
+            <button className="btn-secondary text-red-600" disabled={removing} onClick={onRemove}>
+              <Trash2 size={14} /> Excluir
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+            <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>Salvar</button>
+          </div>
         </div>
       </div>
     </Modal>

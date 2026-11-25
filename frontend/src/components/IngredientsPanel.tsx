@@ -40,6 +40,13 @@ export function IngredientsPanel({
     onError: (e) => alert(apiError(e)),
   });
 
+  // Cadastrou errado? Excluir só desliga o insumo dos itens; produtos e sabores continuam.
+  const remove = useMutation({
+    mutationFn: async (i: Ingredient) => api.delete(`/catalog/ingredients/${i.id}`),
+    onSuccess: refreshAll,
+    onError: (e) => alert(apiError(e)),
+  });
+
   return (
     <div className="mb-8">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -80,6 +87,17 @@ export function IngredientsPanel({
                   </button>
                   <button className="btn-secondary !px-2 !py-1" onClick={() => setEditing(i)} title="Editar">
                     <Pencil size={14} />
+                  </button>
+                  <button
+                    className="btn-secondary !px-2 !py-1 text-red-600"
+                    disabled={remove.isPending}
+                    title="Excluir insumo"
+                    aria-label={`Excluir ${i.name}`}
+                    onClick={() => {
+                      if (confirm(`Excluir o insumo ${i.name}? Os produtos e sabores continuam no cardápio.`)) remove.mutate(i);
+                    }}
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </Card>
@@ -369,10 +387,10 @@ function IngredientForm({
               className="btn-secondary text-red-600"
               disabled={remove.isPending}
               onClick={() => {
-                if (confirm(`Apagar o insumo ${ingredient.name}? Os produtos continuam no cardápio.`)) remove.mutate();
+                if (confirm(`Excluir o insumo ${ingredient.name}? Os produtos e sabores continuam no cardápio.`)) remove.mutate();
               }}
             >
-              <Trash2 size={14} /> Apagar
+              <Trash2 size={14} /> Excluir
             </button>
           ) : (
             <span />
