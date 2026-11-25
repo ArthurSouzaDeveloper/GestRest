@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
@@ -13,6 +13,8 @@ export default function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
+  // Sabor/adicional em edição: 'new' = cadastro novo.
+  const [editingAdditional, setEditingAdditional] = useState<Additional | 'new' | null>(null);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products', 'admin'],
@@ -123,7 +125,12 @@ export default function Products() {
         </div>
       </Card>
 
-      <h2 className="mb-3 mt-8 text-lg font-semibold">Sabores e adicionais</h2>
+      <div className="mb-3 mt-8 flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Sabores e adicionais</h2>
+        <button className="btn-secondary !py-1 text-sm" onClick={() => setEditingAdditional('new')}>
+          <Plus size={14} /> Novo adicional
+        </button>
+      </div>
       <Card className="!p-0">
         <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
@@ -134,6 +141,7 @@ export default function Products() {
               <th className="p-3">Tipo</th>
               <th className="p-3 text-right">Preço</th>
               <th className="p-3 text-center">Disponível</th>
+              <th className="p-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -158,6 +166,9 @@ export default function Products() {
                   </button>
                   <SoldOutBadge names={a.soldOutIngredients} />
                 </td>
+                <td className="p-3 text-right">
+                  <button className="btn-secondary !px-2 !py-1" title="Editar" onClick={() => setEditingAdditional(a)}><Pencil size={14} /></button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -173,7 +184,127 @@ export default function Products() {
           onSaved={() => { refresh(); setCreating(false); setEditing(null); }}
         />
       )}
+
+      {editingAdditional && (
+        <AdditionalForm
+          additional={editingAdditional === 'new' ? null : editingAdditional}
+          categories={categories}
+          onClose={() => setEditingAdditional(null)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ['additionals'] });
+            qc.invalidateQueries({ queryKey: ['ingredients'] });
+            setEditingAdditional(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Excluir: o que nunca foi vendido é apagado; o que já saiu em pedido é arquivado (some
+ * do painel e do cardápio, mas fica no histórico). O backend decide e devolve `archived`.
+ */
+function DeleteButton({ label, url, onDone, onError }: { label: string; url: string; onDone: () => void; onError: (msg: string) => void }) {
+  const remove = useMutation({
+    mutationFn: async () => (await api.delete<{ archived?: boolean }>(url)).data,
+    onSuccess: onDone,
+    onError: (e) => onError(apiError(e)),
+  });
+  return (
+    <button
+      className="btn-secondary text-red-600"
+      disabled={remove.isPending}
+      onClick={() => {
+        if (confirm(`Excluir ${label}? Sai do painel e do cardápio. Pedidos antigos continuam com ele no histórico.`)) remove.mutate();
+      }}
+    >
+      <Trash2 size={14} /> Excluir
+    </button>
+  );
+}
+
+function AdditionalForm({
+  additional,
+  categories,
+  onClose,
+  onSaved,
+}: {
+  additional: Additional | null;
+  categories: Category[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: additional?.name ?? '',
+    price: additional?.price ?? 0,
+    categoryId: additional?.categoryId ?? categories[0]?.id ?? '',
+    kind: additional?.kind ?? 'ADDON',
+    active: additional?.active ?? true,
+  });
+  const [error, setError] = useState('');
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        name: form.name.trim(),
+        price: Number(form.price),
+        kind: form.kind,
+        active: form.active,
+        ...(form.categoryId ? { categoryId: form.categoryId } : {}),
+      };
+      if (additional) return api.patch(`/catalog/additionals/${additional.id}`, payload);
+      return api.post('/catalog/additionals', payload);
+    },
+    onSuccess: onSaved,
+    onError: (e) => setError(apiError(e)),
+  });
+
+  return (
+    <Modal open onClose={onClose} title={additional ? 'Editar adicional' : 'Novo adicional'}>
+      <div className="space-y-3">
+        <div>
+          <label className="label">Nome</label>
+          <input className="input" placeholder="Ex.: Bombom Ouro Branco" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Preço (R$)</label>
+            <input className="input" type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className="label">Tipo</label>
+            <select className="input" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as 'ADDON' | 'BASE' })}>
+              <option value="ADDON">Adicional</option>
+              <option value="BASE">Sabor</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="label">Aparece em</label>
+          <select className="input" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
+            {!additional?.categoryId && additional && <option value="">Todas as categorias</option>}
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
+          Disponível
+        </label>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex items-center justify-between gap-2 pt-2">
+          {additional ? (
+            <DeleteButton label={additional.name} url={`/catalog/additionals/${additional.id}`} onDone={onSaved} onError={setError} />
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+            <button className="btn-primary" disabled={save.isPending || !form.name.trim()} onClick={() => save.mutate()}>Salvar</button>
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -292,9 +423,16 @@ function ProductForm({
           </span>
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-2 pt-2">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>Salvar</button>
+        <div className="flex items-center justify-between gap-2 pt-2">
+          {product ? (
+            <DeleteButton label={product.name} url={`/catalog/products/${product.id}`} onDone={onSaved} onError={setError} />
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+            <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>Salvar</button>
+          </div>
         </div>
       </div>
     </Modal>

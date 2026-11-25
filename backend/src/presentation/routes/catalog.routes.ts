@@ -111,8 +111,8 @@ router.delete(
   '/products/:id',
   manager,
   asyncHandler(async (req, res) => {
-    await productService.remove(tid(req), req.params.id);
-    res.status(204).end();
+    // { archived: true } = já tinha sido vendido: saiu do painel/cardápio mas fica no histórico.
+    res.json(await productService.remove(tid(req), req.params.id));
   }),
 );
 
@@ -148,8 +148,8 @@ router.delete(
   '/additionals/:id',
   manager,
   asyncHandler(async (req, res) => {
-    await additionalService.remove(tid(req), req.params.id);
-    res.status(204).end();
+    // { archived: true } = já tinha sido vendido: saiu do painel/cardápio mas fica no histórico.
+    res.json(await additionalService.remove(tid(req), req.params.id));
   }),
 );
 

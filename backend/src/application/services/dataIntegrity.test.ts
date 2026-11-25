@@ -4,7 +4,7 @@ import { OrderStatus, Role, Station } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { ConflictError } from '../../utils/errors';
 import { tableService } from './table.service';
-import { categoryService, productService } from './catalog.service';
+import { additionalService, categoryService, productService } from './catalog.service';
 
 /**
  * Testes de integração (banco real) para a correção da auditoria QA: apagar uma mesa ou
@@ -83,7 +83,7 @@ describe('integridade de dados — remoção de mesa/categoria/produto com hist�
     await expect(categoryService.remove(restaurantId, category.id)).rejects.toBeInstanceOf(ConflictError);
   });
 
-  it('produto usado em pedido pago não pode ser removido, e o item do pedido sobrevive', async () => {
+  it('produto usado em pedido pago é arquivado (some das listas), e o item do pedido sobrevive', async () => {
     const category = await prisma.category.create({
       data: { name: `Categoria Produto Pago ${randomUUID()}`, station: Station.NONE, restaurantId },
     });
@@ -97,7 +97,45 @@ describe('integridade de dados — remoção de mesa/categoria/produto com hist�
       data: { orderId: order.id, productId: product.id, unitPrice: 10 },
     });
 
-    await expect(productService.remove(restaurantId, product.id)).rejects.toBeInstanceOf(ConflictError);
+    await expect(productService.remove(restaurantId, product.id)).resolves.toEqual({ archived: true });
     await expect(prisma.orderItem.findUnique({ where: { id: item.id } })).resolves.not.toBeNull();
+    const row = await prisma.product.findUnique({ where: { id: product.id } });
+    expect(row?.deletedAt).not.toBeNull();
+    expect(row?.available).toBe(false);
+    const listed = await productService.list(restaurantId);
+    expect(listed.some((p) => p.id === product.id)).toBe(false);
+  });
+
+  it('produto nunca vendido é apagado de verdade', async () => {
+    const category = await prisma.category.create({
+      data: { name: `Categoria Produto Novo ${randomUUID()}`, station: Station.NONE, restaurantId },
+    });
+    const product = await prisma.product.create({
+      data: { name: 'Produto Errado', price: 10, categoryId: category.id, restaurantId },
+    });
+    await expect(productService.remove(restaurantId, product.id)).resolves.toEqual({ archived: false });
+    await expect(prisma.product.findUnique({ where: { id: product.id } })).resolves.toBeNull();
+  });
+
+  it('adicional usado em pedido é arquivado; nunca usado é apagado', async () => {
+    const category = await prisma.category.create({
+      data: { name: `Categoria Adicional ${randomUUID()}`, station: Station.NONE, restaurantId },
+    });
+    const product = await prisma.product.create({
+      data: { name: 'Açaí Teste', price: 16, categoryId: category.id, restaurantId },
+    });
+    const used = await additionalService.create(restaurantId, { name: 'Bombom', price: 4, categoryId: category.id });
+    const fresh = await additionalService.create(restaurantId, { name: 'Bombom Errado', price: 4, categoryId: category.id });
+    const order = await prisma.order.create({ data: { restaurantId, waiterId: userId, status: OrderStatus.PAID } });
+    const item = await prisma.orderItem.create({ data: { orderId: order.id, productId: product.id, unitPrice: 20 } });
+    await prisma.orderItemAdditional.create({ data: { orderItemId: item.id, additionalId: used.id, name: 'Bombom', price: 4 } });
+
+    await expect(additionalService.remove(restaurantId, used.id)).resolves.toEqual({ archived: true });
+    await expect(additionalService.remove(restaurantId, fresh.id)).resolves.toEqual({ archived: false });
+    const listed = await additionalService.list(restaurantId, { categoryId: category.id });
+    expect(listed).toHaveLength(0);
+    const row = await prisma.additional.findUnique({ where: { id: used.id } });
+    expect(row?.active).toBe(false);
+    await prisma.orderItemAdditional.deleteMany({ where: { orderItemId: item.id } });
   });
 });
