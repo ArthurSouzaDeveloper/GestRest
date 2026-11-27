@@ -243,8 +243,19 @@ export function JuiceBuilder({
                     return (
                       <li key={p.id} className="flex items-center justify-between text-[12.5px] text-[#6B4A78]">
                         <span>
-                          {fruitName} — {brl(p.price)}
-                          {p.id === primary.id && <span className="font-bold text-brand"> (preço base)</span>}
+                          {/* Fruta extra mostra só o que ela acrescenta (+R$ 1,00), nunca o preço
+                           * avulso do suco dela — pedido do dono: "Pêssego — R$ 13,50" fazia o
+                           * cliente achar que ia pagar as duas frutas cheias. */}
+                          {p.id === primary.id ? (
+                            <>
+                              {fruitName} — {brl(p.price)}
+                              <span className="font-bold text-brand"> (preço base)</span>
+                            </>
+                          ) : (
+                            <>
+                              {fruitName} — +{brl(EXTRA_FRUIT_PRICE)}
+                            </>
+                          )}
                         </span>
                         <button onClick={() => removeFruit(fruitName)} className="-m-1.5 p-1.5 text-[#C9A9D6] hover:text-red-500" title="Remover fruta">
                           <X size={13} />
@@ -377,8 +388,16 @@ export function JuiceBuilder({
                   return (
                     <li key={p.id} className="flex items-center gap-1.5">
                       <span>
-                        {fruitName} — {brl(p.price)}
-                        {p.id === primary.id && <span className="text-brand"> (preço base)</span>}
+                        {p.id === primary.id ? (
+                          <>
+                            {fruitName} — {brl(p.price)}
+                            <span className="text-brand"> (preço base)</span>
+                          </>
+                        ) : (
+                          <>
+                            {fruitName} — +{brl(EXTRA_FRUIT_PRICE)}
+                          </>
+                        )}
                       </span>
                       <button onClick={() => removeFruit(fruitName)} className="-m-1.5 p-1.5 text-gray-900 dark:text-gray-100 hover:text-red-500" title="Remover fruta">
                         <X size={12} />
