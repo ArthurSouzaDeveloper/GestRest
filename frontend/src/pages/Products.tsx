@@ -92,7 +92,7 @@ export default function Products() {
               <th className="p-3 text-right">Preço</th>
               <th className="p-3 text-center">Preparo</th>
               <th className="p-3 text-center">Disponível</th>
-              <th className="p-3 text-center">Destaque</th>
+              <th className="p-3 text-center">Novidade</th>
               <th className="p-3"></th>
             </tr>
           </thead>
@@ -133,13 +133,13 @@ export default function Products() {
                     disabled={toggleFeatured.isPending}
                     title={
                       p.featured
-                        ? 'Tirar do destaque (volta pra ordem normal da categoria)'
-                        : 'Colocar em destaque: aparece em primeiro na categoria dele até você tirar'
+                        ? 'Tirar a novidade (volta pra ordem normal da categoria)'
+                        : 'Marcar como novidade: aparece em primeiro na categoria dele até você tirar'
                     }
                     onClick={() => toggleFeatured.mutate(p)}
                   >
                     <Star size={12} className={p.featured ? 'fill-amber-500 text-amber-500' : ''} />
-                    {p.featured ? 'Em destaque' : 'Destacar'}
+                    {p.featured ? 'Novidade' : 'Marcar'}
                   </button>
                 </td>
                 <td className="p-3 text-right">
@@ -447,9 +447,9 @@ function ProductForm({
             onChange={(e) => setForm({ ...form, featured: e.target.checked })}
           />
           <span>
-            Em destaque no cardápio
+            Novidade no cardápio
             <span className="block text-xs text-gray-900 dark:text-gray-100">
-              Aparece em primeiro na categoria dele, com o selo "Destaque". Fica assim até você desmarcar.
+              Aparece em primeiro na categoria dele, com o selo "Novidade". Fica assim até você desmarcar.
             </span>
           </span>
         </label>

@@ -464,7 +464,7 @@ export function OrderComposer({
                           categoria; aqui é só o selo pra ficar claro por que subiram. */}
                       {p.featured && (
                         <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
-                          <Star size={9} className="fill-amber-500 text-amber-500" /> Destaque
+                          <Star size={9} className="fill-amber-500 text-amber-500" /> Novidade
                         </span>
                       )}
                       <div className="text-[16px] font-bold leading-tight text-[#1E1024]">{p.name}</div>
@@ -536,7 +536,7 @@ export function OrderComposer({
                     )}
                     {p.featured && (
                       <span className="mb-0.5 inline-flex w-fit items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                        <Star size={9} className="fill-amber-500 text-amber-500" /> Destaque
+                        <Star size={9} className="fill-amber-500 text-amber-500" /> Novidade
                       </span>
                     )}
                     <div className="text-[15px] font-semibold leading-tight text-gray-900 dark:text-gray-50">{p.name}</div>
