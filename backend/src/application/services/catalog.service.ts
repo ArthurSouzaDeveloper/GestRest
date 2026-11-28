@@ -127,8 +127,9 @@ export const productService = {
     const products = await prisma.product.findMany({
       where,
       include: { category: true, ingredients: SOLD_OUT_INGREDIENTS, optionalIngredients: SOLD_OUT_INGREDIENTS },
-      // Montáveis ("Monte o Seu") primeiro na categoria, resto alfabético.
-      orderBy: [{ isCustom: 'desc' }, { name: 'asc' }],
+      // Dentro de cada categoria: destaques do dono primeiro (na ordem em que foram
+      // marcados), depois os montáveis ("Monte o Seu") e o resto alfabético.
+      orderBy: [{ featured: 'desc' }, { featuredAt: 'asc' }, { isCustom: 'desc' }, { name: 'asc' }],
     });
     return products.map(serializeProduct);
   },
@@ -151,6 +152,7 @@ export const productService = {
       imageUrl?: string;
       available?: boolean;
       isCustom?: boolean;
+      featured?: boolean;
       ingredients?: ProductIngredientInput[];
     },
   ) {
@@ -161,6 +163,7 @@ export const productService = {
     const p = await prisma.product.create({
       data: {
         ...fields,
+        ...(fields.featured ? { featuredAt: new Date() } : {}),
         restaurantId: tenantId,
         ...(links && {
           ingredients: { connect: links.essential },
@@ -182,19 +185,27 @@ export const productService = {
       imageUrl: string;
       available: boolean;
       isCustom: boolean;
+      featured: boolean;
       ingredients: ProductIngredientInput[];
     }>,
   ) {
-    await productService.get(tenantId, id);
+    const current = await productService.get(tenantId, id);
     // Reassigning to a category must stay inside the same tenant, same as on create.
     if (data.categoryId) await categoryService.ensure(tenantId, data.categoryId);
     const { ingredients, ...fields } = data;
     // `ingredients` ausente = não mexe nos vínculos; lista (mesmo vazia) substitui todos.
     const links = ingredients ? await ingredientLinksByName(tenantId, ingredients) : null;
+    // Só carimba a data quando o destaque é LIGADO agora: regravar o produto por outro
+    // motivo (preço, descrição) não pode jogá-lo pra frente dos outros destaques.
+    const featuredAt =
+      fields.featured === undefined || fields.featured === current.featured
+        ? {}
+        : { featuredAt: fields.featured ? new Date() : null };
     const p = await prisma.product.update({
       where: { id },
       data: {
         ...fields,
+        ...featuredAt,
         ...(links && {
           ingredients: { set: links.essential },
           optionalIngredients: { set: links.optional },
