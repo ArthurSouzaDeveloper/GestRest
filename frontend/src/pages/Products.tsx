@@ -448,9 +448,6 @@ function ProductForm({
           />
           <span>
             Novidade no cardápio
-            <span className="block text-xs text-gray-900 dark:text-gray-100">
-              Aparece em primeiro na categoria dele, com o selo "Novidade". Fica assim até você desmarcar.
-            </span>
           </span>
         </label>
         <label className="flex items-start gap-2 text-sm">
