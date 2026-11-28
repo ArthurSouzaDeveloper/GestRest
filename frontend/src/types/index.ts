@@ -60,6 +60,8 @@ export interface Product {
   category?: Category;
   /** Montável (Monte o Seu): exige escolher 1 adicional BASE, que carrega o preço. */
   isCustom?: boolean;
+  /** Destaque ligado pelo dono: aparece no topo da própria categoria, com selo "Destaque". */
+  featured?: boolean;
   /** Insumos em falta que deixam o produto fora do cardápio (ex.: ["Laranja"]). */
   soldOutIngredients?: string[];
   /** Insumos "dá pra tirar" em falta: o produto sai sem eles (ex.: ["Milho"]). */

@@ -94,6 +94,7 @@ export const productSchema = z.object({
   imageUrl: z.string().optional(),
   available: z.boolean().optional(),
   isCustom: z.boolean().optional(),
+  featured: z.boolean().optional(),
   ingredients: productIngredients.optional(),
 });
 
@@ -107,6 +108,7 @@ export const productUpdateSchema = z
     imageUrl: z.string().optional(),
     available: z.boolean().optional(),
     isCustom: z.boolean().optional(),
+    featured: z.boolean().optional(),
     ingredients: productIngredients.optional(),
   })
   .strict();

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Star, Trash2 } from 'lucide-react';
 import api, { apiError } from '../lib/api';
 import { brl } from '../lib/format';
 import { Card, Modal, PageHeader, Spinner } from '../components/ui';
@@ -44,6 +44,13 @@ export default function Products() {
     qc.invalidateQueries({ queryKey: ['ingredients'] });
   };
 
+  // Atalho da lista: liga/desliga o destaque sem abrir o cadastro do produto.
+  const toggleFeatured = useMutation({
+    mutationFn: async (p: Product) => api.patch(`/catalog/products/${p.id}`, { featured: !p.featured }),
+    onSuccess: refresh,
+    onError: (e) => alert(apiError(e)),
+  });
+
   const toggleAvailable = useMutation({
     mutationFn: async (p: Product) => api.patch(`/catalog/products/${p.id}`, { available: !p.available }),
     onSuccess: refresh,
@@ -85,6 +92,7 @@ export default function Products() {
               <th className="p-3 text-right">Preço</th>
               <th className="p-3 text-center">Preparo</th>
               <th className="p-3 text-center">Disponível</th>
+              <th className="p-3 text-center">Novidade</th>
               <th className="p-3"></th>
             </tr>
           </thead>
@@ -114,6 +122,25 @@ export default function Products() {
                       Vende sem {p.missingIngredients.join(', ').toLowerCase()}
                     </span>
                   )}
+                </td>
+                <td className="p-3 text-center">
+                  <button
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition ${
+                      p.featured
+                        ? 'bg-amber-100 text-amber-700 hover:bg-gray-200 hover:text-gray-900'
+                        : 'bg-gray-100 text-gray-900 dark:text-gray-100 dark:bg-gray-800 hover:bg-amber-100 hover:text-amber-700'
+                    }`}
+                    disabled={toggleFeatured.isPending}
+                    title={
+                      p.featured
+                        ? 'Tirar a novidade (volta pra ordem normal da categoria)'
+                        : 'Marcar como novidade: aparece em primeiro na categoria dele até você tirar'
+                    }
+                    onClick={() => toggleFeatured.mutate(p)}
+                  >
+                    <Star size={12} className={p.featured ? 'fill-amber-500 text-amber-500' : ''} />
+                    {p.featured ? 'Novidade' : 'Marcar'}
+                  </button>
                 </td>
                 <td className="p-3 text-right">
                   <button className="btn-secondary !px-2 !py-1" onClick={() => setEditing(p)}><Pencil size={14} /></button>
@@ -337,6 +364,7 @@ function ProductForm({
     description: product?.description ?? '',
     available: product?.available ?? true,
     isCustom: product?.isCustom ?? false,
+    featured: product?.featured ?? false,
   });
   const [error, setError] = useState('');
 
@@ -410,6 +438,17 @@ function ProductForm({
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.available} onChange={(e) => setForm({ ...form, available: e.target.checked })} />
           Disponível
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={form.featured}
+            onChange={(e) => setForm({ ...form, featured: e.target.checked })}
+          />
+          <span>
+            Novidade no cardápio
+          </span>
         </label>
         <label className="flex items-start gap-2 text-sm">
           <input

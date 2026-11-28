@@ -439,6 +439,12 @@ model Product {
   // "Montável" (ex.: Monte o Seu pastel): cliente escolhe obrigatoriamente 1 adicional
   // BASE (que carrega o preço) + adicionais comuns. Também ordena primeiro no cardápio.
   isCustom     Boolean    @default(false)
+  // Destaque: o dono liga/desliga pelo painel e o produto sobe pro topo da própria
+  // categoria no cardápio (não mistura categorias). Fica ligado até ele desligar — não
+  // existe validade automática. `featuredAt` guarda quando foi marcado, só pra dar uma
+  // ordem previsível entre vários destaques (quem foi marcado primeiro aparece primeiro).
+  featured     Boolean    @default(false)
+  featuredAt   DateTime?
   // Excluído pelo painel depois de já ter sido vendido: some de todas as listas e do
   // cardápio, mas a linha fica pra não quebrar o histórico dos pedidos.
   deletedAt    DateTime?

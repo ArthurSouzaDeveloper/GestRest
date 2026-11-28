@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda, IceCreamBowl, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Minus, X, Search, Pencil, Utensils, CupSoda, IceCreamBowl, Check, ChevronDown, ChevronUp, Star } from 'lucide-react';
 import api from '../lib/api';
 import { brl } from '../lib/format';
 import { JuiceBuilder } from './JuiceBuilder';
@@ -460,6 +460,13 @@ export function OrderComposer({
                           {productBadgeLabel(p)}
                         </span>
                       )}
+                      {/* Destaque do dono: o backend já devolve esses produtos na frente da
+                          categoria; aqui é só o selo pra ficar claro por que subiram. */}
+                      {p.featured && (
+                        <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                          <Star size={9} className="fill-amber-500 text-amber-500" /> Novidade
+                        </span>
+                      )}
                       <div className="text-[16px] font-bold leading-tight text-[#1E1024]">{p.name}</div>
                       {p.description && (
                         <div className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-[#6B4A78]">{p.description}</div>
@@ -525,6 +532,11 @@ export function OrderComposer({
                     {(searching || activeCat === 'all') && (
                       <span className="mb-0.5 block w-fit rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-900 dark:text-gray-100 dark:bg-gray-800">
                         {productBadgeLabel(p)}
+                      </span>
+                    )}
+                    {p.featured && (
+                      <span className="mb-0.5 inline-flex w-fit items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                        <Star size={9} className="fill-amber-500 text-amber-500" /> Novidade
                       </span>
                     )}
                     <div className="text-[15px] font-semibold leading-tight text-gray-900 dark:text-gray-50">{p.name}</div>
